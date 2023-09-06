@@ -64,17 +64,17 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-#EXE = runNVESoftSpheres
-#EXE = runFBNVESoftSpheres
-#EXE = runNVTSoftSpheres
-#EXE = runFBNVTSoftSpheres
-#EXE = runLJNVTSoftSpheres
-EXE = runActiveSoftSpheres
-#EXE = runFBActiveSoftSpheres
-#EXE = runAttractiveNVESoftSpheres
-#EXE = runAttractiveNVTSoftSpheres
-#EXE = runExtFieldSoftSpheres
-#EXE = runNPTSoftSpheres
+#EXE = runNVE
+#EXE = runNVT
+#EXE = runNPT
+EXE = runActive
+#EXE = runLennardJonesNVT
+#EXE = runFixedBoundaryActive
+#EXE = runFixedBoundaryNVE
+#EXE = runFixedBoundaryNVT
+#EXE = runAttractiveNVE
+#EXE = runAttractiveNVT
+#EXE = runExternalField
 
 # Object files:
 OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o
