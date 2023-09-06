@@ -5,13 +5,13 @@
 !makefile
 ## Do not ignore makefile
 *.txt
-*.o
+/bin/*.o
 *.d
 *.xyz
 *.test
-bash/slurm
-bash/bin
-bash/tasks
+bash/*/slurm
+bash/*/bin
+bash/*/tasks
 *~
 .DS_Store
 *.exe
