@@ -2,6 +2,8 @@
 !*/
 !*.*
 ## Ignore everything that does not have an extension or is included in a directory
+!makefile
+## Do not ignore makefile
 *.txt
 *.o
 *.d
@@ -20,9 +22,6 @@ bash/*/tasks
 *.avi
 *.mp4
 *.mov
-
-*.txt
-makefile
 
 
 
