@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -36,9 +36,9 @@ int main(int argc, char **argv) {
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-fb/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   //dirSample = whichDynamics + "T" + argv[3] + "/iod" + argv[6] + "/";
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
     readState = true;
@@ -70,40 +70,40 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioDPM.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  sigma = dpm.getMeanParticleSigma();
+  sp.setEnergyCosts(0, 0, 0, ec);
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
   //timeUnit = sigma * sigma * damping;//epsilon is 1
-  timeStep = dpm.setTimeStep(timeStep*timeUnit);
-  //timeStep = dpm.setTimeStep(timeStep);
+  timeStep = sp.setTimeStep(timeStep*timeUnit);
+  //timeStep = sp.setTimeStep(timeStep);
   cout << "Inertia over damping: " << inertiaOverDamping << ", damping: " << damping << endl;
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << endl;
-  ioDPM.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
-  dpm.calcParticleWallNeighborList(cutDistance);
-  dpm.calcParticleWallForceEnergy();
-  dpm.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
+  sp.calcParticleWallNeighborList(cutDistance);
+  sp.calcParticleWallForceEnergy();
+  sp.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
   // run integrator
-  waveQ = dpm.getSoftWaveNumber();
+  waveQ = sp.getSoftWaveNumber();
   while(step != maxStep) {
-    dpm.softParticleLangevinFixedBoundaryLoop();
+    sp.softParticleLangevinFixedBoundaryLoop();
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticleEnergy(step, timeStep, waveQ);
+      ioSP.saveParticleEnergy(step, timeStep, waveQ);
       if(step % checkPointFreq == 0) {
         cout << "Brownian: current step: " << step;
-        cout << " U/N: " << dpm.getParticleEnergy() / numParticles;
-        cout << " T: " << dpm.getParticleTemperature();
-        cout << " ISF: " << dpm.getParticleISF(waveQ) << endl;
-        ioDPM.saveParticleConfiguration(outDir);
+        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " T: " << sp.getParticleTemperature();
+        cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
+        ioSP.saveParticleConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -117,26 +117,26 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleState(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleState(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     if(step % updateFreq == 0) {
-      dpm.calcParticleWallNeighborList(cutDistance);
+      sp.calcParticleWallNeighborList(cutDistance);
     }
     step += 1;
   }
   // save final configuration
   if(saveFinal == true) {
-    ioDPM.saveParticleConfiguration(outDir);
+    ioSP.saveParticleConfiguration(outDir);
   }
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
 
   return 0;
 }

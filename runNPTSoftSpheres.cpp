@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -33,9 +33,9 @@ int main(int argc, char **argv) {
   double p0 = atof(argv[8]), pscale, beta = 1, taup = 1e-02;
   //dirSample = whichDynamics + "T" + argv[3] + "/";
   dirSample = whichDynamics + "Dr" + argv[4] + "/Dr" + argv[4] + "-f0" + argv[5] + "/";
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
   outDir = inDir + "dynamics-ptot" + argv[8] + "/";
@@ -45,43 +45,43 @@ int main(int argc, char **argv) {
   } else {
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  dpm.setEnergyCosts(0, 0, 0, ec);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  sp.setEnergyCosts(0, 0, 0, ec);
   if(readState == true) {
-    ioDPM.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
-  timeUnit = dpm.getMeanParticleSize()*dpm.getMeanParticleSize()*damping;//epsilon is 1
-  timeStep = dpm.setTimeStep(timeStep * timeUnit);
+  timeUnit = sp.getMeanParticleSize()*sp.getMeanParticleSize()*damping;//epsilon is 1
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
   Dr = Dr/timeUnit;
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << " p0: " << p0 << endl;
   if(whichDynamics == "active-langevin/") {
-    cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / dpm.getMeanParticleSize() << " v0: " << driving / damping << " Dr: " << Dr << endl;
-    cout << "Force Peclet number: " << 2. * dpm.getMeanParticleSize() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
+    cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sp.getMeanParticleSize() << " v0: " << driving / damping << " Dr: " << Dr << endl;
+    cout << "Force Peclet number: " << 2. * sp.getMeanParticleSize() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
     //taup = 1/Dr;
   }
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
-  dpm.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  //dpm.initSoftParticleLangevin(Tinject, damping, readState);
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
+  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  //sp.initSoftParticleLangevin(Tinject, damping, readState);
   while(step != maxStep) {
-    pscale = 1 + (timeStep / 3 * taup) * beta * (dpm.getParticleTotalPressure(driving) - p0);
-    //pscale = 1 + (timeStep / 3 * taup) * beta * (dpm.getParticleDynamicalPressure() - p0);
-    dpm.softParticleActiveLangevinLoop();
-    //dpm.softParticleLangevinLoop();
-    dpm.pressureScaleParticles(pscale);
+    pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleTotalPressure(driving) - p0);
+    //pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleDynamicalPressure() - p0);
+    sp.softParticleActiveLangevinLoop();
+    //sp.softParticleLangevinLoop();
+    sp.pressureScaleParticles(pscale);
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticlePressure(step, timeStep, driving);
+      ioSP.saveParticlePressure(step, timeStep, driving);
       if(step % checkPointFreq == 0) {
         cout << "NPT: current step: " << step;
-        cout << " Ptot: " << dpm.getParticleTotalPressure(driving);
-        cout << " T: " << dpm.getParticleTemperature();
-        cout << " phi: " << dpm.getParticlePhi() << endl;
-        //ioDPM.saveParticleConfiguration(outDir);
+        cout << " Ptot: " << sp.getParticleTotalPressure(driving);
+        cout << " T: " << sp.getParticleTemperature();
+        cout << " phi: " << sp.getParticlePhi() << endl;
+        //ioSP.saveParticleConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -95,26 +95,26 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleConfiguration(currentDir);
+        ioSP.saveParticleConfiguration(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleConfiguration(currentDir);
+        ioSP.saveParticleConfiguration(currentDir);
       }
     }
     if(step % updateFreq == 0) {
-      dpm.calcParticleNeighborList(cutDistance);
+      sp.calcParticleNeighborList(cutDistance);
     }
     step += 1;
   }
   // save final configuration
   if(saveFinal == true) {
-    ioDPM.saveParticleConfiguration(outDir);
+    ioSP.saveParticleConfiguration(outDir);
   }
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
 
   return 0;
 }

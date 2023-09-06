@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -22,26 +22,26 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, readAndSaveSameDir = false, testNVE = true, testNVT = false, update = false;
-  long numParticles = atol(argv[5]), nDim = 2, numVertexPerParticle = 32;
+  bool readState = true, readAndSaveSameDir = false, testNVE = true, testNVT = false, update = true;
+  long numParticles = atol(argv[5]), nDim = 2;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10);
   long saveEnergyFreq = int(checkPointFreq / 10), updateCount = 0, updateFreq = 100, totUpdate = 0;
   double ec = 240, cutDistance = 1, sigma, timeStep = atof(argv[2]), Tinject = atof(argv[3]);
   double Dr = 2e-04, driving = 8.5e-02, iod = 10, damping, timeUnit, forceUnit, cutoff, maxDelta;
   std::string energyFile, outDir, inDir = argv[1], currentDir;
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  // initialize sp object
+	SP2D sp(numParticles, nDim);
+  ioSPFile ioSP(&sp);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioDPM.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // initialization
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  sigma = dpm.getMeanParticleSigma();
+  sp.setEnergyCostant(ec);
+  sigma = sp.getMeanParticleSigma();
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
   outDir = inDir;
   if(testNVE == true) {
     if(readAndSaveSameDir == false) {
@@ -53,9 +53,9 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
     timeUnit = sigma;
-    timeStep = dpm.setTimeStep(timeStep * timeUnit);
+    timeStep = sp.setTimeStep(timeStep * timeUnit);
     cout << "NVE: time step: " << timeStep << " sigma: " << sigma << endl;
-    dpm.initSoftParticleNVE(Tinject, readState);
+    sp.initSoftParticleNVE(Tinject, readState);
   }
   else if(testNVT == true) {
     if(readAndSaveSameDir == false) {
@@ -68,13 +68,13 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(outDir);
     damping = sqrt(iod) / sigma;
     timeUnit = 1 / damping;
-    timeStep = dpm.setTimeStep(timeStep * timeUnit);
+    timeStep = sp.setTimeStep(timeStep * timeUnit);
     cout << "NVT: time step: " << timeStep << " damping: " << damping << " sigma: " << sigma << endl;
-    dpm.initSoftParticleLangevin(Tinject, damping, readState);
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
   }
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
-  cutoff = cutDistance * dpm.getMinParticleSigma();
+  ioSP.openEnergyFile(energyFile);
+  cutoff = cutDistance * sp.getMinParticleSigma();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -82,22 +82,22 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   // run integrator
-  dpm.resetPreviousPositions();
+  sp.resetLastPositions();
   while(step != maxStep) {
     //cout << "step: " << step << endl;
     if(testNVE == true) {
-      dpm.softParticleNVELoop();
+      sp.softParticleNVELoop();
     }
     else if(testNVT == true) {
-      dpm.softParticleLangevinLoop();
+      sp.softParticleLangevinLoop();
     }
     if(step % saveEnergyFreq == 0 && step > 0) {
-      ioDPM.saveParticleSimpleEnergy(step, timeStep);
+      ioSP.saveParticleSimpleEnergy(step, timeStep);
       if(step % checkPointFreq == 0) {
         cout << "Test: current step: " << step;
-        cout << " E: " << (dpm.getParticleEnergy() + dpm.getParticleKineticEnergy()) / numParticles;
-        cout << " T: " << dpm.getParticleTemperature() << endl;
-        //ioDPM.saveParticleConfiguration(outDir);
+        cout << " E: " << (sp.getParticleEnergy() + sp.getParticleKineticEnergy()) / numParticles;
+        cout << " T: " << sp.getParticleTemperature() << endl;
+        //ioSP.saveParticleConfiguration(outDir);
         if(step != 0 && updateCount > 0) {
           cout << "Number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
@@ -107,18 +107,18 @@ int main(int argc, char **argv) {
       }
     }
     if(update == true) {
-      maxDelta = dpm.getParticleMaxDisplacement();
+      maxDelta = sp.getParticleMaxDisplacement();
       if(3*maxDelta > cutoff) {
         totUpdate += 1;
-        dpm.calcParticleNeighborList(cutDistance);
-        dpm.resetPreviousPositions();
+        sp.calcParticleNeighborList(cutDistance);
+        sp.resetLastPositions();
         updateCount += 1;
       }
     } else {
       if(step % updateFreq == 0) {
-        maxDelta = dpm.getParticleMaxDisplacement();
-        dpm.calcParticleNeighborList(cutDistance);
-        dpm.resetPreviousPositions();
+        maxDelta = sp.getParticleMaxDisplacement();
+        sp.calcParticleNeighborList(cutDistance);
+        sp.resetLastPositions();
         updateCount += 1;
       }
     }
@@ -130,8 +130,8 @@ int main(int argc, char **argv) {
   cudaEventElapsedTime(&elapsed_time_ms, start, stop);
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save last configuration
-  ioDPM.saveParticleConfiguration(outDir);
+  ioSP.saveParticleConfiguration(outDir);
 
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
   return 0;
 }

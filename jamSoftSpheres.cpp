@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/FIRE.h"
@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, increasedStep1 = false, increasedStep2 = false;
-  long numParticles = 16384, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the dpm object
+  long numParticles = 16384, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the sp object
   long iteration = 0, maxIterations = 1e06, minStep = 20, numStep = 0, overJamCount = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, repetition;
   long printIter = int(maxIterations / 10), printFreq = int(maxStep / 10), updateFreq = 1e03;
@@ -39,43 +39,43 @@ int main(int argc, char **argv) {
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
   thrust::host_vector<double> particlePos(numParticles * nDim);
   thrust::host_vector<double> particleRad(numParticles);
-	// initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+	// initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
   if(read == true) {
     inDir = argv[2];
     inDir = outDir + inDir;
-    ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-    particlePos = dpm.getParticlePositions();
-    particleRad = dpm.getParticleRadii();
+    ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+    particlePos = sp.getParticlePositions();
+    particleRad = sp.getParticleRadii();
     if(readState == true) {
-      ioDPM.readParticleState(inDir, numParticles, nDim);
+      ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
-    dpm.setPolyRandomSoftParticles(phi0, polydispersity);
+    sp.setPolyRandomSoftParticles(phi0, polydispersity);
   }
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  currentPhi = dpm.getParticlePhi();
+  sp.setEnergyCosts(0, 0, 0, ec);
+  currentPhi = sp.getParticlePhi();
   cout << "Current phi: " << currentPhi << endl;
   previousPhi = currentPhi;
   while (searchStep < maxSearchStep) {
-    dpm.initFIRE(particleFIREparams, minStep, numStep, numParticles);
-    dpm.setParticleMassFIRE();
-    dpm.calcParticleNeighborList(cutDistance);
-    dpm.calcParticleForceEnergy();
+    sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
+    sp.setParticleMassFIRE();
+    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleForceEnergy();
     iteration = 0;
-    forceCheck = dpm.getParticleMaxUnbalancedForce();
-    energyCheck = dpm.getParticleEnergy();
+    forceCheck = sp.getParticleMaxUnbalancedForce();
+    energyCheck = sp.getParticleEnergy();
     repetition = 0;
     previousForceCheck = 0;
     newTimeStep = FIREStep;
-    forceTollerance = forceTollerance0 / dpm.getMeanParticleSigma();
+    forceTollerance = forceTollerance0 / sp.getMeanParticleSigma();
     while((forceCheck > forceTollerance) && (iteration != maxIterations)) {
-      dpm.particleFIRELoop();
-      forceCheck = dpm.getParticleMaxUnbalancedForce();
-      energyCheck = dpm.getParticleEnergy() / numParticles;
+      sp.particleFIRELoop();
+      forceCheck = sp.getParticleMaxUnbalancedForce();
+      energyCheck = sp.getParticleEnergy() / numParticles;
       if(iteration % printIter == 0 && iteration != 0) {
         cout << "FIRE: iteration: " << iteration;
         cout << " maxUnbalancedForce: " << setprecision(precision) << forceCheck;
@@ -85,25 +85,25 @@ int main(int argc, char **argv) {
         }
         if(repetition > 3) {
           newTimeStep /= 2;
-          dpm.setTimeStepFIRE(newTimeStep);
+          sp.setTimeStepFIRE(newTimeStep);
           cout << "Dividing the time step in half" << endl;
           repetition = 0;
         }
         previousForceCheck = forceCheck;
       }
       if(iteration % updateFreq == 0) {
-        dpm.calcParticleNeighborList(cutDistance);
+        sp.calcParticleNeighborList(cutDistance);
       }
       iteration += 1;
     }
-    pressure = dpm.getParticleVirialPressure();
+    pressure = sp.getParticleVirialPressure();
     cout << "FIRE: iteration: " << iteration;
     cout << " maxUnbalancedForce: " << setprecision(precision) << forceCheck;
     cout << " energy: " << energyCheck << endl;
     // save minimized configuration
-    std::string currentDir = outDir + std::to_string(dpm.getParticlePhi()) + "/";
+    std::string currentDir = outDir + std::to_string(sp.getParticlePhi()) + "/";
     std::experimental::filesystem::create_directory(currentDir);
-    ioDPM.saveParticleConfiguration(currentDir);
+    ioSP.saveParticleConfiguration(currentDir);
     // check configuration after energy minimization
     //jamCheck = (energyCheck < 2.0 * energyTollerance && energyCheck > energyTollerance);
     //overJamCheck = (energyCheck > 2.0 * energyTollerance);
@@ -123,16 +123,16 @@ int main(int argc, char **argv) {
         cout << " Found underjammed configuration, scaleFactor: " << scaleFactor;
         // save most recent underjammed configuration
         previousPhi = currentPhi;
-        particlePos = dpm.getParticlePositions();
-        particleRad = dpm.getParticleRadii();
+        particlePos = sp.getParticlePositions();
+        particleRad = sp.getParticleRadii();
       } else if(overJamCheck) {
         deltaPhi *= 0.5;
         scaleFactor = sqrt((previousPhi + deltaPhi) / previousPhi);
         cout << "Compression step: " << searchStep;
         cout << " Found overjammed configuration, scaleFactor: " << scaleFactor;
         // copy back most recent underjammed configuration and compress half much
-        dpm.setParticlePositions(particlePos);
-        dpm.setParticleRadii(particleRad);
+        sp.setParticlePositions(particlePos);
+        sp.setParticleRadii(particleRad);
         if(currentPhi > phi2) {
           overJamCount += 1;
         }
@@ -143,29 +143,29 @@ int main(int argc, char **argv) {
       }
       if(currentPhi > phi1) {
         // run dynamics
-        sigma = dpm.getMeanParticleSigma();
+        sigma = sp.getMeanParticleSigma();
         damping = sqrt(inertiaOverDamping) / sigma;
         timeUnit = 1 / damping;
-        timeStep = dpm.setTimeStep(dt * timeUnit);
+        timeStep = sp.setTimeStep(dt * timeUnit);
         cout << "\nRun dynamics, time step: " << timeStep << endl;
         step = 0;
         // thermalize packing after each energy minimization
-        dpm.initSoftParticleLangevin(Tinject, damping, true); // readState = false
+        sp.initSoftParticleLangevin(Tinject, damping, true); // readState = false
         while(step != maxStep) {
-          dpm.softParticleLangevinLoop();
+          sp.softParticleLangevinLoop();
           if(step % printFreq == 0) {
             cout << "Brownian: current step: " << step;
-            cout << " U/N: " << dpm.getParticleEnergy() / numParticles;
-            cout << " T: " << dpm.getParticleTemperature() << endl;
+            cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+            cout << " T: " << sp.getParticleTemperature() << endl;
           }
           if(step % updateFreq == 0) {
-            dpm.calcParticleNeighborList(cutDistance);
+            sp.calcParticleNeighborList(cutDistance);
           }
           step += 1;
         }
       }
-      dpm.scaleParticles(scaleFactor);
-      currentPhi = dpm.getParticlePhi();
+      sp.scaleParticles(scaleFactor);
+      currentPhi = sp.getParticlePhi();
       cout << "\nNew packing fraction: " << currentPhi << endl;
       searchStep += 1;
       // update parameters as the packing gets closer to jamming

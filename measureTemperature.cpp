@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -39,9 +39,9 @@ int main(int argc, char **argv) {
   } else {
     cout << "please specify the correct dynamics" << endl;
   }
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
   outDir = inDir + "dynamics-mass" + argv[8] + "/";
@@ -52,18 +52,18 @@ int main(int argc, char **argv) {
   } else {
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  sigma = dpm.getMeanParticleSigma();
-  dpm.setEnergyCosts(0, 0, 0, ec);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  sigma = sp.getMeanParticleSigma();
+  sp.setEnergyCosts(0, 0, 0, ec);
   if(readState == true) {
-    ioDPM.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
   timeUnit = sigma * sigma * damping;//epsilon is 1
-  timeStep = dpm.setTimeStep(timeStep * timeUnit);
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
   Dr = Dr/timeUnit;
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << endl;
   if(whichDynamics == "active-langevin/") {
@@ -71,30 +71,30 @@ int main(int argc, char **argv) {
     cout << "Force Peclet number: " << 2. * sigma * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
   }
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
   if(whichDynamics == "langevin/") {
-    dpm.initSoftLangevinSubSet(Tinject, damping, firstIndex, mass, readState, zeroOutMassiveVel);
+    sp.initSoftLangevinSubSet(Tinject, damping, firstIndex, mass, readState, zeroOutMassiveVel);
   } else if(whichDynamics == "active-langevin/") {
-    dpm.initSoftALSubSet(Tinject, Dr, driving, damping, firstIndex, mass, readState, zeroOutMassiveVel);
+    sp.initSoftALSubSet(Tinject, Dr, driving, damping, firstIndex, mass, readState, zeroOutMassiveVel);
   } else {
     cout << "please specify the correct dynamics" << endl;
   }
   while(step != maxStep) {
     if(whichDynamics == "langevin/") {
-      dpm.softLangevinSubSetLoop();
+      sp.softLangevinSubSetLoop();
     } else if(whichDynamics == "active-langevin/") {
-      dpm.softALSubSetLoop();
+      sp.softALSubSetLoop();
     } else {
       cout << "please specify the correct dynamics" << endl;
     }
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticlePressure(step, timeStep, driving);
+      ioSP.saveParticlePressure(step, timeStep, driving);
       if(step % checkPointFreq == 0) {
         cout << "MP: current step: " << step;
-        cout << " T: " << dpm.getParticleTemperature();
-        cout << " Tmassive: " << dpm.getMassiveTemperature(firstIndex, mass) << endl;
-        //ioDPM.saveParticleConfiguration(outDir);
+        cout << " T: " << sp.getParticleTemperature();
+        cout << " Tmassive: " << sp.getMassiveTemperature(firstIndex, mass) << endl;
+        //ioSP.saveParticleConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -108,26 +108,26 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleConfiguration(currentDir);
+        ioSP.saveParticleConfiguration(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleConfiguration(currentDir);
+        ioSP.saveParticleConfiguration(currentDir);
       }
     }
     if(step % updateFreq == 0) {
-      dpm.calcParticleNeighborList(cutDistance);
+      sp.calcParticleNeighborList(cutDistance);
     }
     step += 1;
   }
   // save final configuration
   if(saveFinal == true) {
-    ioDPM.saveParticleConfiguration(outDir);
+    ioSP.saveParticleConfiguration(outDir);
   }
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
 
   return 0;
 }

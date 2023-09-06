@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -38,9 +38,9 @@ int main(int argc, char **argv) {
     cout << "please specify the correct dynamics" << endl;
   }
   thrust::host_vector<double> boxSize(nDim);
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
   outDir = inDir + "comp-delta" + argv[7] + "/";
@@ -50,39 +50,39 @@ int main(int argc, char **argv) {
     inDir = outDir;
     compress = false;
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  sigma = dpm.getMeanParticleSigma()
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  ioDPM.readParticleState(inDir, numParticles, nDim);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  sigma = sp.getMeanParticleSigma()
+  sp.setEnergyCosts(0, 0, 0, ec);
+  ioSP.readParticleState(inDir, numParticles, nDim);
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
   timeUnit = sigma * sigma * damping;//epsilon is 1
-  timeStep = dpm.setTimeStep(timeStep * timeUnit);
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
   Dr = Dr/timeUnit;
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
   if(whichDynamics == "langevin/") {
-    dpm.initSoftParticleLangevin(Tinject, damping, readState);
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
   } else if(whichDynamics == "active-langevin/") {
-    dpm.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+    sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   } else {
     cout << "please specify the correct dynamics" << endl;
   }
   // make a volume change by changing the boxSize
-  dpm.calcParticleForceEnergy();
-  pressure = dpm.getParticleTotalPressure(driving);
-  energy = dpm.getParticleEnergy() + dpm.getParticleKineticEnergy();
+  sp.calcParticleForceEnergy();
+  pressure = sp.getParticleTotalPressure(driving);
+  energy = sp.getParticleEnergy() + sp.getParticleKineticEnergy();
   cout << "Initial pressure: " << pressure << " and energy: " << energy << endl;
   if(compress == true) {
-    boxSize = dpm.getBoxSize();
+    boxSize = sp.getBoxSize();
     volume = boxSize[0] * boxSize[1];
     for (long dim = 0; dim < nDim; dim++) {
       boxSize[dim] *= (1 - vscale);
     }
-    dpm.setBoxSize(boxSize);
+    sp.setBoxSize(boxSize);
     deltaV = boxSize[0] * boxSize[1] - volume;
   } else {
     cout << "Restarting already compressed configuration" << endl;
@@ -92,32 +92,32 @@ int main(int argc, char **argv) {
   step = 0;
   while(step != maxStep) {
     if(whichDynamics == "langevin/") {
-      dpm.softParticleLangevinLoop();
+      sp.softParticleLangevinLoop();
     } else if(whichDynamics == "active-langevin/") {
-      dpm.softParticleActiveLangevinLoop();
+      sp.softParticleActiveLangevinLoop();
     } else {
       cout << "please specify the correct dynamics" << endl;
     }
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticlePressure(step, timeStep, driving);
+      ioSP.saveParticlePressure(step, timeStep, driving);
       if(step % checkPointFreq == 0) {
         cout << "Run: current step: " << step;
-        cout << " E: " << dpm.getParticleEnergy() + dpm.getParticleKineticEnergy();
-        cout << " Pdyn: " << dpm.getParticleDynamicalPressure();
-        cout << " Pactive: " << dpm.getParticleActivePressure(driving);
-        cout << " T: " << dpm.getParticleTemperature() << endl;
+        cout << " E: " << sp.getParticleEnergy() + sp.getParticleKineticEnergy();
+        cout << " Pdyn: " << sp.getParticleDynamicalPressure();
+        cout << " Pactive: " << sp.getParticleActivePressure(driving);
+        cout << " T: " << sp.getParticleTemperature() << endl;
       }
     }
     if(step % updateFreq == 0) {
-      dpm.calcParticleNeighborList(cutDistance);
+      sp.calcParticleNeighborList(cutDistance);
     }
     step += 1;
   }
-  pressure = dpm.getParticleTotalPressure(driving);
-  cout << "Final pressure: " << pressure << " and energy: " << dpm.getParticleEnergy() + dpm.getParticleKineticEnergy() << "\n" << endl;
+  pressure = sp.getParticleTotalPressure(driving);
+  cout << "Final pressure: " << pressure << " and energy: " << sp.getParticleEnergy() + sp.getParticleKineticEnergy() << "\n" << endl;
 
-  ioDPM.closeEnergyFile();
-  ioDPM.saveParticleConfiguration(outDir);
+  ioSP.closeEnergyFile();
+  ioSP.saveParticleConfiguration(outDir);
 
   return 0;
 }

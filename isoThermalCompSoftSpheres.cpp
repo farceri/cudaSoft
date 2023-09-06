@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/FIRE.h"
@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, attraction = false;
-  long numParticles = 1024, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the dpm object
+  long numParticles = 1024, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the sp object
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateFreq = 10;
@@ -35,51 +35,51 @@ int main(int argc, char **argv) {
   std::string currentDir, outDir = argv[1], inDir;
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
-	// initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+	// initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
   if(read == true) {
     inDir = argv[4];
     inDir = outDir + inDir;
-    ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-    sigma = dpm.getMeanParticleSigma();
-    dpm.setEnergyCosts(0, 0, 0, ec);
+    ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+    sigma = sp.getMeanParticleSigma();
+    sp.setEnergyCosts(0, 0, 0, ec);
     if(attraction == true) {
-      dpm.setAttractionConstants(escale * sigma, l2); //kc = 1
+      sp.setAttractionConstants(escale * sigma, l2); //kc = 1
     }
     if(readState == true) {
-      ioDPM.readParticleState(inDir, numParticles, nDim);
+      ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
     // initialize polydisperse packing
-    dpm.setPolyRandomSoftParticles(phi0, polydispersity);
-    sigma = dpm.getMeanParticleSigma();
-    dpm.setEnergyCosts(0, 0, 0, ec);
-    dpm.initFIRE(particleFIREparams, minStep, numStep, numParticles);
-    dpm.setParticleMassFIRE();
-    dpm.calcParticleNeighborList(cutDistance);
-    dpm.calcParticleForceEnergy();
-    while((dpm.getParticleMaxUnbalancedForce() > forceTollerance) && (iteration != maxIterations)) {
-      dpm.particleFIRELoop();
+    sp.setPolyRandomSoftParticles(phi0, polydispersity);
+    sigma = sp.getMeanParticleSigma();
+    sp.setEnergyCosts(0, 0, 0, ec);
+    sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
+    sp.setParticleMassFIRE();
+    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleForceEnergy();
+    while((sp.getParticleMaxUnbalancedForce() > forceTollerance) && (iteration != maxIterations)) {
+      sp.particleFIRELoop();
       if(iteration % printFreq == 0 && iteration != 0) {
         cout << "\nFIRE: iteration: " << iteration;
-        cout << " maxUnbalancedForce: " << setprecision(precision) << dpm.getParticleMaxUnbalancedForce();
-        cout << " energy: " << dpm.getParticleEnergy() << endl;
+        cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
+        cout << " energy: " << sp.getParticleEnergy() << endl;
       }
       if(iteration % updateFreq == 0) {
-        dpm.calcParticleNeighborList(cutDistance);
+        sp.calcParticleNeighborList(cutDistance);
       }
       iteration += 1;
     }
     cout << "\nFIRE: iteration: " << iteration;
-    cout << " maxUnbalancedForce: " << setprecision(precision) << dpm.getParticleMaxUnbalancedForce();
-    cout << " energy: " << setprecision(precision) << dpm.getParticleEnergy() << endl;
-    ioDPM.saveParticlePacking(outDir);
+    cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
+    cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << endl;
+    ioSP.saveParticlePacking(outDir);
   }
   // quasistatic thermal compression
-  currentPhi = dpm.getParticlePhi();
+  currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
   if(attraction == true) {
     cout << "attractive constants, l1: " << escale * sigma << " l2: " << l2 << endl;
@@ -89,51 +89,51 @@ int main(int argc, char **argv) {
   while (searchStep < maxSearchStep) {
     damping = sqrt(inertiaOverDamping) / sigma;
     timeUnit = sigma * sigma * damping;//epsilon is 1
-    timeStep = dpm.setTimeStep(dt * timeUnit);
+    timeStep = sp.setTimeStep(dt * timeUnit);
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
-    dpm.initSoftParticleLangevin(Tinject, damping, readState);
-    //dpm.initSoftParticleNVERA(Tinject, readState);
-    //dpm.initSoftParticleNVEFixedBoundary(Tinject, readState);
-    dpm.calcParticleNeighborList(cutDistance);
-    dpm.calcParticleForceEnergy();
-    waveQ = dpm.getSoftWaveNumber();
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
+    //sp.initSoftParticleNVERA(Tinject, readState);
+    //sp.initSoftParticleNVEFixedBoundary(Tinject, readState);
+    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleForceEnergy();
+    waveQ = sp.getSoftWaveNumber();
     // equilibrate dynamics
     step = 0;
     isf = 1;
     while(step != maxStep) {
-      dpm.softParticleLangevinLoop();
-      //dpm.softParticleNVERALoop();
-      //dpm.softParticleNVEFixedBoundaryLoop();
+      sp.softParticleLangevinLoop();
+      //sp.softParticleNVERALoop();
+      //sp.softParticleNVEFixedBoundaryLoop();
       if(step % printFreq == 0) {
-        isf = dpm.getParticleISF(waveQ);
+        isf = sp.getParticleISF(waveQ);
         cout << "Langevin: current step: " << step;
-        cout << " U: " << dpm.getParticleEnergy();
-        cout << " K: " << dpm.getParticleKineticEnergy();
+        cout << " U: " << sp.getParticleEnergy();
+        cout << " K: " << sp.getParticleKineticEnergy();
         cout << " ISF: " << isf << endl;
       }
       if(step % updateFreq == 0) {
-        dpm.calcParticleNeighborList(cutDistance);
+        sp.calcParticleNeighborList(cutDistance);
       }
       step += 1;
     }
     cout << "Langevin: current step: " << step;
-    cout << " U: " << dpm.getParticleEnergy();
-    cout << " T: " << dpm.getParticleTemperature();
-    cout << " P: " << dpm.getParticleDynamicalPressure();
-    cout << " phi: " << dpm.getParticlePhi() << endl;
+    cout << " U: " << sp.getParticleEnergy();
+    cout << " T: " << sp.getParticleTemperature();
+    cout << " P: " << sp.getParticleDynamicalPressure();
+    cout << " phi: " << sp.getParticlePhi() << endl;
     // save minimized configuration
-    std::string currentDir = outDir + std::to_string(dpm.getParticlePhi()) + "/";
+    std::string currentDir = outDir + std::to_string(sp.getParticlePhi()) + "/";
     std::experimental::filesystem::create_directory(currentDir);
-    ioDPM.saveParticleConfiguration(currentDir);
+    ioSP.saveParticleConfiguration(currentDir);
     // check if target density is met
     if(currentPhi >= phiTh) {
       cout << "\nTarget density met, current phi: " << currentPhi << endl;
       searchStep = maxSearchStep; // exit condition
     } else {
       scaleFactor = sqrt((currentPhi + deltaPhi) / currentPhi);
-      dpm.scaleSoftParticles(scaleFactor);
-      currentPhi = dpm.getParticlePhi();
-      cout << "\nNew phi: " << currentPhi << ", average size: " << dpm.getMeanParticleSigma() << endl;
+      sp.scaleSoftParticles(scaleFactor);
+      currentPhi = sp.getParticlePhi();
+      cout << "\nNew phi: " << currentPhi << ", average size: " << sp.getMeanParticleSigma() << endl;
       searchStep += 1;
     }
   }

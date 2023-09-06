@@ -7,19 +7,19 @@
 #ifndef FIRE_H_
 #define FIRE_H_
 
-#include "DPM2D.h"
+#include "SP2D.h"
 #include "defs.h"
 #include <thrust/device_vector.h>
 
-class DPM2D;
+class SP2D;
 
 class FIRE
 {
 public:
-	DPM2D * dpm_;  //Pointer to the enclosing class
+	SP2D * sp_;  //Pointer to the enclosing class
 
 	FIRE() = default;
-	FIRE(DPM2D * dpmPtr);
+	FIRE(SP2D * spPtr);
 	~FIRE();
 	// Global FIRE params
 	double a_start;
@@ -55,20 +55,6 @@ public:
 	// fire minimizer loop for particles
 	void minimizerParticleLoop();
 
-	//****************** functions for rigid vertex minimizer ******************//
-	void updateRigidPosAng(double timeStep);
-	void updateRigidVelAngvel(double timeStep);
-	void checkRigidFIREParams();
-	void bendRigidVelocityTowardsForce();
-	void minimizerRigidLoop();
-	void translateVertexPositions();
-
-	//********************* functions for vertex minimizer *********************//
-	void updateVertexPosition(double timeStep);
-	void updateVertexVelocity(double timeStep);
-	void checkFIREParams();
-	void bendVertexVelocityTowardsForce();
-	void minimizerVertexLoop();
 };
 
 #endif /* FIRE_H_ */

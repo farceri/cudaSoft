@@ -26,6 +26,10 @@ struct square {
   __device__ __host__ double operator()(const double xi) { return xi*xi; }
 };
 
+struct cube {
+  __device__ __host__ double operator()(const double xi) { return xi*xi*xi; }
+};
+
 struct randNum
 {
     double a, b;

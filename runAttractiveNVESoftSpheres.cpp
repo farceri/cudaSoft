@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -35,9 +35,9 @@ int main(int argc, char **argv) {
   double ec = 240, Tinject = atof(argv[3]), l1 = atof(argv[4]), l2 = 0.2;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve-u/";
   dirSample = whichDynamics + "test/";//"T" + argv[3] + "-u" + argv[4] + "/";
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
     readState = true;
@@ -67,38 +67,38 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioDPM.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  dpm.setAttractionConstants(l1, l2);
-  sigma = dpm.getMeanParticleSigma();
+  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setAttractionConstants(l1, l2);
+  sigma = sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
-  timeStep = dpm.setTimeStep(timeStep * timeUnit);
-  //timeStep = dpm.setTimeStep(timeStep);
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
+  //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << endl;
   cout << "Thermal energy scale: " << Tinject << " attractive constants, l1: " << l1 << " l2: " << l2 << endl;
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
-  dpm.initSoftParticleNVERA(Tinject, readState);
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
+  sp.initSoftParticleNVERA(Tinject, readState);
   // run integrator
-  waveQ = dpm.getSoftWaveNumber();
+  waveQ = sp.getSoftWaveNumber();
   while(step != maxStep) {
-    dpm.softParticleNVERALoop();
+    sp.softParticleNVERALoop();
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticleEnergy(step, timeStep, waveQ);
+      ioSP.saveParticleEnergy(step, timeStep, waveQ);
       if(step % checkPointFreq == 0) {
         cout << "NVE-u: current step: " << step;
-        cout << " U/N: " << dpm.getParticleEnergy() / numParticles;
-        cout << " T: " << dpm.getParticleTemperature();
-        cout << " ISF: " << dpm.getParticleISF(waveQ) << endl;
-        ioDPM.saveParticleAttractiveConfiguration(outDir);
+        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " T: " << sp.getParticleTemperature();
+        cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
+        ioSP.saveParticleAttractiveConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -112,26 +112,26 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleAttractiveConfiguration(currentDir);
+        ioSP.saveParticleAttractiveConfiguration(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleAttractiveConfiguration(currentDir);
+        ioSP.saveParticleAttractiveConfiguration(currentDir);
       }
     }
     if(step % updateFreq == 0) {
-      dpm.calcParticleNeighborList(cutDistance);
+      sp.calcParticleNeighborList(cutDistance);
     }
     step += 1;
   }
   // save final configuration
   if(saveFinal == true) {
-    ioDPM.saveParticleAttractiveConfiguration(outDir);
+    ioSP.saveParticleAttractiveConfiguration(outDir);
   }
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
 
   return 0;
 }

@@ -3,16 +3,16 @@
 ## USER SPECIFIC DIRECTORIES ##
 
 # CUDA directory:
-#CUDA_ROOT_DIR=/usr/local/cuda
-CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.2.2
+CUDA_ROOT_DIR=/usr/local/cuda
+#CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.2.2
 
 ##########################################################
 
 ## CC COMPILER OPTIONS ##
 
 # CC compiler options:
-#CC=g++
-CC=/gpfs/loomis/apps/avx/software/GCCcore/10.2.0/bin/g++
+CC=g++
+#CC=/gpfs/loomis/apps/avx/software/GCCcore/10.2.0/bin/g++
 CC_FLAGS= -O3
 CC_LIBS= -lstdc++fs
 
@@ -53,26 +53,14 @@ INC_DIR = include
 
 # Target executable name:
 
-EXE = testDPM
-#EXE = testSP
+EXE = testSP
 
 # make packings
 #EXE = makeSpherePacking
-#EXE = isoCompRigid
-#EXE = jamDPM
 #EXE = jamSoftSpheres
-#EXE = isoCompression
-#EXE = isoCompRigid
-#EXE = isoThermalCompDPM
-#EXE = isoThermalCompRigid
 #EXE = isoThermalCompSoftSpheres
 
 # run dynamics
-#EXE = runNVEDPM
-#EXE = runBrownianDPM
-#EXE = runActiveDPM
-#EXE = runActiveDampedL0DPM
-#EXE = runRigidActiveDPM
 #EXE = runNVESoftSpheres
 #EXE = runFBNVESoftSpheres
 #EXE = runBrownianSoftSpheres
@@ -88,7 +76,7 @@ EXE = testDPM
 #EXE = measurePressure
 
 # Object files:
-OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/DPM2D.o $(OBJ_DIR)/BumpyEllipse.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o $(OBJ_DIR)/DPM3D.o
+OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o
 
 ##########################################################
 

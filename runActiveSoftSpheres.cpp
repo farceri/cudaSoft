@@ -4,7 +4,7 @@
 //
 // Include C++ header files
 
-#include "include/DPM2D.h"
+#include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
 #include "include/defs.h"
@@ -35,9 +35,9 @@ int main(int argc, char **argv) {
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
   dirSample = whichDynamics + "Dr" + argv[4] + "/";
   //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
-  // initialize dpm object
-	DPM2D dpm(numParticles, nDim, numVertexPerParticle);
-  ioDPMFile ioDPM(&dpm);
+  // initialize sp object
+	SP2D sp(numParticles, nDim, numVertexPerParticle);
+  ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
     readState = true;
@@ -70,21 +70,21 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioDPM.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioDPM.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleActiveState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
-  ioDPM.openEnergyFile(energyFile);
+  ioSP.openEnergyFile(energyFile);
   // initialization
-  dpm.setEnergyCosts(0, 0, 0, ec);
-  sigma = dpm.getMeanParticleSigma();
+  sp.setEnergyCosts(0, 0, 0, ec);
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
   //timeUnit = sigma * sigma * damping;
-  timeStep = dpm.setTimeStep(timeStep * timeUnit);
-  //timeStep = dpm.setTimeStep(timeStep);
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
+  //timeStep = sp.setTimeStep(timeStep);
   forceUnit = inertiaOverDamping / sigma;
   //forceUnit = 1 / (inertiaOverDamping * sigma);
   cout << "Inertia over damping: " << inertiaOverDamping << " damping: " << damping << " sigma: " << sigma << endl;
@@ -93,14 +93,14 @@ int main(int argc, char **argv) {
   cout << " f0: " << driving*forceUnit << ", " << driving << " Dr: " << Dr/timeUnit << ", " << Dr << endl;
   driving = driving*forceUnit;
   Dr = Dr/timeUnit;
-  ioDPM.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   // initialize simulation
-  dpm.calcParticleNeighborList(cutDistance);
-  dpm.calcParticleForceEnergy();
-  dpm.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = (1 + cutDistance) * dpm.getMinParticleSigma();
-  dpm.resetPreviousPositions();
-  //waveQ = dpm.getSoftWaveNumber();
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
+  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  sp.resetPreviousPositions();
+  //waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -109,22 +109,22 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    dpm.softParticleActiveLangevinLoop();
+    sp.softParticleActiveLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioDPM.saveParticleSimpleEnergy(step, timeStep);
-      //ioDPM.saveParticleActiveEnergy(step, timeStep, waveQ, driving);
+      ioSP.saveParticleSimpleEnergy(step, timeStep);
+      //ioSP.saveParticleActiveEnergy(step, timeStep, waveQ, driving);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step;
-        cout << " U/N: " << dpm.getParticleEnergy() / numParticles;
-        cout << " T: " << dpm.getParticleTemperature();
-        //cout << " ISF: " << dpm.getParticleISF(waveQ) << endl;
+        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " T: " << sp.getParticleTemperature();
+        //cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
           cout << " no updates" << endl;
         }
         updateCount = 0;
-        ioDPM.saveParticleActiveConfiguration(outDir);
+        ioSP.saveParticleActiveConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -138,24 +138,24 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleActiveState(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioDPM.saveParticleActiveState(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
-    maxDelta = dpm.getParticleMaxDisplacement();
+    maxDelta = sp.getParticleMaxDisplacement();
     if(3*maxDelta > cutoff) {
-      dpm.calcParticleNeighborList(cutDistance);
-      dpm.resetPreviousPositions();
+      sp.calcParticleNeighborList(cutDistance);
+      sp.resetPreviousPositions();
       updateCount += 1;
     }
     //if(step % updateFreq == 0) {
-    //  dpm.calcParticleNeighborList(cutDistance);
+    //  sp.calcParticleNeighborList(cutDistance);
     //  updateCount += 1;
     //}
     step += 1;
@@ -167,9 +167,9 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioDPM.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticleActiveConfiguration(outDir);
   }
-  ioDPM.closeEnergyFile();
+  ioSP.closeEnergyFile();
 
   return 0;
 }
