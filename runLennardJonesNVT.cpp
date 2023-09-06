@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLJLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep);
+      ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVT-LJ: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
