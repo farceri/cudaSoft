@@ -46,8 +46,8 @@ int main(int argc, char **argv) {
     if(runDynamics == true) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
-      //linSave = true;
-      outDir = outDir + "dynamics/test/";
+      linSave = true;
+      outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         initialStep = atof(argv[7]);
         //if(initialStep != 0) {
