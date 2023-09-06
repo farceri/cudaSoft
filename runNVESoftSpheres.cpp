@@ -27,16 +27,16 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = false, logSave, linSave = false, saveFinal = true;
-  long numParticles = atol(argv[6]), nDim = 2, numVertexPerParticle = 32;
+  long numParticles = atol(argv[6]), nDim = 2;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), updateFreq = 10;
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = 1e03, firstDecade = 0;
   double cutDistance = 1, waveQ, sigma, timeUnit, timeStep = atof(argv[2]);
-  double ec = 240, Tinject = atof(argv[3]);
+  double ec = 240, Tinject = atof(argv[3]), cutoff, maxDelta;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics;// + "T" + argv[3] + "/";
   // initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -75,7 +75,8 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setEnergyCostant(ec);
+  cutoff = cutDistance * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
@@ -120,8 +121,10 @@ int main(int argc, char **argv) {
         ioSP.saveParticleState(currentDir);
       }
     }
-    if(step % updateFreq == 0) {
+    maxDelta = sp.getParticleMaxDisplacement();
+    if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
+      sp.resetLastPositions();
     }
     step += 1;
   }

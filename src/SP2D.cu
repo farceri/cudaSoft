@@ -773,6 +773,7 @@ void SP2D::initFIRE(std::vector<double> &FIREparams, long minStep_, long numStep
   } else {
     cout << "SP2D::initFIRE: wrong number of FIRE parameters, must be 7" << endl;
   }
+  resetLastPositions();
 }
 
 void SP2D::setParticleMassFIRE() {
@@ -929,8 +930,8 @@ void SP2D::softParticleLangevinSubSetLoop() {
   this->sim_->integrate();
 }
 
-void SP2D::initSoftParticleExtField(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleExtField(this, SimConfig(Temp, 0, 0, 0));
+void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool readState) {
+  this->sim_ = new SoftParticleLangevinExtField(this, SimConfig(Temp, 0, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -947,7 +948,7 @@ void SP2D::initSoftParticleExtField(double Temp, double gamma, bool readState) {
   cout << "SP2D::initSoftParticleLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleExtFieldLoop() {
+void SP2D::softParticleLangevinExtFieldLoop() {
   this->sim_->integrate();
 }
 
@@ -1067,7 +1068,7 @@ void SP2D::softParticleActiveFixedSidesLoop() {
 
 }
 
-void SP2D::initSoftALSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
+void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
   this->sim_ = new SoftParticleActiveSubSet(this, SimConfig(Temp, Dr, driving, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
@@ -1090,10 +1091,10 @@ void SP2D::initSoftALSubSet(double Temp, double Dr, double driving, double gamma
   if(zeroOutMassiveVel == true) {
     thrust::fill(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, double(0));
   }
-  cout << "SP2D::initSoftALSubSet:: current temperature: " << setprecision(12) << getParticleTemperature() << " mass: " << this->sim_->mass << endl;
+  cout << "SP2D::initSoftParticleActiveSubSet:: current temperature: " << setprecision(12) << getParticleTemperature() << " mass: " << this->sim_->mass << endl;
 }
 
-void SP2D::softALSubSetLoop() {
+void SP2D::softParticleActiveSubSetLoop() {
   this->sim_->integrate();
 }
 

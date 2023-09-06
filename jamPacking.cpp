@@ -24,14 +24,14 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, increasedStep1 = false, increasedStep2 = false;
-  long numParticles = 16384, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the sp object
+  long numParticles = 1024, nDim = 2;
   long iteration = 0, maxIterations = 1e06, minStep = 20, numStep = 0, overJamCount = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, repetition;
   long printIter = int(maxIterations / 10), printFreq = int(maxStep / 10), updateFreq = 1e03;
   double polydispersity = 0.20, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, newTimeStep;
   double cutDistance = 1., forceTollerance0 = 1e-10, pressureTollerance = 1e-08, phi1 = 0.4, phi2 = 0.84;
   double forceCheck, previousForceCheck, energyCheck, energyTollerance = 1e-20, forceTollerance;
-  double FIREStep = 2e-03, dt = 5e-03, phi0 = 0.2, phiTh = 0.88, pressure;
+  double FIREStep = 2e-03, dt = 5e-03, phi0 = 0.2, phiTh = 0.88, pressure, cutoff, maxDelta;
   double ec = 240, Tinject = 1e-03, sigma, damping, inertiaOverDamping = 10, timeStep, timeUnit;
   bool jamCheck = 0, overJamCheck = 0, underJamCheck = 0;
   std::string currentDir, outDir = argv[1], inDir;
@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   thrust::host_vector<double> particlePos(numParticles * nDim);
   thrust::host_vector<double> particleRad(numParticles);
 	// initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
@@ -56,10 +56,11 @@ int main(int argc, char **argv) {
   } else {
     sp.setPolyRandomSoftParticles(phi0, polydispersity);
   }
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setEnergyCostant(ec);
   currentPhi = sp.getParticlePhi();
   cout << "Current phi: " << currentPhi << endl;
   previousPhi = currentPhi;
+  cutoff = cutDistance * sp.getMinParticleSigma();
   while (searchStep < maxSearchStep) {
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
@@ -91,8 +92,10 @@ int main(int argc, char **argv) {
         }
         previousForceCheck = forceCheck;
       }
-      if(iteration % updateFreq == 0) {
+      maxDelta = sp.getParticleMaxDisplacement();
+      if(3*maxDelta > cutoff) {
         sp.calcParticleNeighborList(cutDistance);
+        sp.resetLastPositions();
       }
       iteration += 1;
     }
@@ -158,8 +161,10 @@ int main(int argc, char **argv) {
             cout << " U/N: " << sp.getParticleEnergy() / numParticles;
             cout << " T: " << sp.getParticleTemperature() << endl;
           }
-          if(step % updateFreq == 0) {
+          maxDelta = sp.getParticleMaxDisplacement();
+          if(3*maxDelta > cutoff) {
             sp.calcParticleNeighborList(cutDistance);
+            sp.resetLastPositions();
           }
           step += 1;
         }

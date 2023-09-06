@@ -53,27 +53,28 @@ INC_DIR = include
 
 # Target executable name:
 
-EXE = testSP
+#EXE = testSP
 
 # make packings
-#EXE = makeSpherePacking
-#EXE = jamSoftSpheres
-#EXE = isoThermalCompSoftSpheres
+#EXE = jamPacking
+#EXE = compressPacking
+#EXE = make3DPacking
+
+#EXE = measurePressure
+#EXE = measureTemperature
 
 # run dynamics
 #EXE = runNVESoftSpheres
 #EXE = runFBNVESoftSpheres
-#EXE = runBrownianSoftSpheres
-#EXE = runFBBrownianSoftSpheres
-#EXE = runActiveSoftSpheres
+#EXE = runNVTSoftSpheres
+#EXE = runFBNVTSoftSpheres
+#EXE = runLJNVTSoftSpheres
+EXE = runActiveSoftSpheres
 #EXE = runFBActiveSoftSpheres
 #EXE = runAttractiveNVESoftSpheres
 #EXE = runAttractiveNVTSoftSpheres
-#EXE = runLJNVTSoftSpheres
 #EXE = runExtFieldSoftSpheres
 #EXE = runNPTSoftSpheres
-#EXE = measureTemperature
-#EXE = measurePressure
 
 # Object files:
 OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o

@@ -297,7 +297,7 @@ void SoftParticleLangevinSubSet::conserveMomentum() {
 }
 
 //************************* soft particle langevin ***************************//
-void SoftParticleExtField::integrate() {
+void SoftParticleLangevinExtField::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);

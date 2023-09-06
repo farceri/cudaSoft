@@ -23,18 +23,18 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, logSave = true, linSave = true, saveFinal = true;
-  long numParticles = 1024, nDim = 2, numVertexPerParticle = 32;
-  long step = 0, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), updateFreq = 1e02;
+  long numParticles = 1024, nDim = 2;
+  long step = 0, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10);
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = saveEnergyFreq, firstDecade = 0;
-  double cutDistance = 2., damping = 1e03, timeUnit, timeStep = atof(argv[2]);
+  double cutDistance = 2, damping = 1e03, timeUnit, timeStep = atof(argv[2]), cutoff, maxDelta;
   double ec = 240, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
   double p0 = atof(argv[8]), pscale, beta = 1, taup = 1e-02;
   //dirSample = whichDynamics + "T" + argv[3] + "/";
   dirSample = whichDynamics + "Dr" + argv[4] + "/Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(outDir);
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setEnergyCostant(ec);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -54,13 +54,13 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  timeUnit = sp.getMeanParticleSize()*sp.getMeanParticleSize()*damping;//epsilon is 1
+  timeUnit = sp.getMeanParticleSigma()*sp.getMeanParticleSigma()*damping;//epsilon is 1
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   Dr = Dr/timeUnit;
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << " p0: " << p0 << endl;
   if(whichDynamics == "active-langevin/") {
-    cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sp.getMeanParticleSize() << " v0: " << driving / damping << " Dr: " << Dr << endl;
-    cout << "Force Peclet number: " << 2. * sp.getMeanParticleSize() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
+    cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sp.getMeanParticleSigma() << " v0: " << driving / damping << " Dr: " << Dr << endl;
+    cout << "Force Peclet number: " << 2. * sp.getMeanParticleSigma() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
     //taup = 1/Dr;
   }
   // initialize simulation
@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
     //sp.softParticleLangevinLoop();
     sp.pressureScaleParticles(pscale);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticlePressure(step, timeStep, driving);
+      ioSP.saveParticleSimpleEnergy(step, timeStep);
       if(step % checkPointFreq == 0) {
         cout << "NPT: current step: " << step;
         cout << " Ptot: " << sp.getParticleTotalPressure(driving);
@@ -105,8 +105,10 @@ int main(int argc, char **argv) {
         ioSP.saveParticleConfiguration(currentDir);
       }
     }
-    if(step % updateFreq == 0) {
+    maxDelta = sp.getParticleMaxDisplacement();
+    if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
+      sp.resetLastPositions();
     }
     step += 1;
   }

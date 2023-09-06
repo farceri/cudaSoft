@@ -270,9 +270,9 @@ public:
 
   void softParticleLangevinSubSetLoop();
 
-  void initSoftParticleExtField(double Temp, double gamma, bool readState);
+  void initSoftParticleLangevinExtField(double Temp, double gamma, bool readState);
 
-  void softParticleExtFieldLoop();
+  void softParticleLangevinExtFieldLoop();
 
   // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);
@@ -300,9 +300,9 @@ public:
 
   void softParticleActiveFixedSidesLoop();
 
-  void initSoftALSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
+  void initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
 
-  void softALSubSetLoop();
+  void softParticleActiveSubSetLoop();
 
   void initSoftParticleActiveExtField(double Temp, double Dr, double driving, double gamma, bool readState);
 

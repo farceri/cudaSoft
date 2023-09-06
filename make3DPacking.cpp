@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   long numParticles = 32, nDim = 3; // this is just a default
   long iteration = 0, maxIterations = 1e06, printFreq = 1e04;
   long minStep = 20, numStep = 0, updateFreq = 1e02;
-  double polydispersity = 0.17, phi0 = atof(argv[2]), dt0 = 1e-03;
+  double polydispersity = 0.17, phi0 = atof(argv[2]), dt0 = 1e-03, maxDelta, cutoff;
   double ec = 1, cutDistance = 1, forceTollerance = 1e-10, forceCheck;
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, dt0, 10*dt0, 0.2};
   std::string inFile, outDir = argv[1];
@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
   // initialize polydisperse packing
   sp.setPolyRandomSoftParticles(phi0, polydispersity);
   sp.setEnergyCostant(ec); //kc = 1
+  cutoff = cutDistance * sp.getMinParticleSigma();
   // minimize soft sphere packing
   sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
   sp.setParticleMassFIRE();
@@ -44,8 +45,10 @@ int main(int argc, char **argv) {
   ioSP.saveParticleState(outDir);
   while((sp.getParticleMaxUnbalancedForce() > forceTollerance) && (iteration != maxIterations)) {
     sp.particleFIRELoop();
-    if(iteration % updateFreq == 0) {
+    maxDelta = sp.getParticleMaxDisplacement();
+    if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
+      sp.resetLastPositions();
     }
     if(iteration % printFreq == 0) {
       cout << "\nFIRE: iteration: " << iteration;

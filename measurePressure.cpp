@@ -23,12 +23,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = true;
-  long numParticles = 1024, nDim = 2, numVertexPerParticle = 32;
+  long numParticles = 1024, nDim = 2;
   long step = 0, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10);
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), updateFreq = 1e02;
   double cutDistance = 2., damping = 1e03, timeUnit, timeStep = atof(argv[2]);
   double ec = 1, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
-  double deltaV, pressure, volume, energy, vscale = atof(argv[7]);
+  double deltaV, pressure, volume, energy, vscale = atof(argv[7]), cutoff, maxDelta, sigma;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = argv[8];
   if(whichDynamics == "langevin/") {
     dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
   }
   thrust::host_vector<double> boxSize(nDim);
   // initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
@@ -51,8 +51,9 @@ int main(int argc, char **argv) {
     compress = false;
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  sigma = sp.getMeanParticleSigma()
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sigma = sp.getMeanParticleSigma();
+  sp.setEnergyCostant(ec);
+  cutoff = cutDistance * sp.getMinParticleSigma();
   ioSP.readParticleState(inDir, numParticles, nDim);
   // output file
   energyFile = outDir + "energy.dat";
@@ -99,7 +100,7 @@ int main(int argc, char **argv) {
       cout << "please specify the correct dynamics" << endl;
     }
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticlePressure(step, timeStep, driving);
+      ioSP.saveParticleSimpleEnergy(step, timeStep);
       if(step % checkPointFreq == 0) {
         cout << "Run: current step: " << step;
         cout << " E: " << sp.getParticleEnergy() + sp.getParticleKineticEnergy();
@@ -108,8 +109,10 @@ int main(int argc, char **argv) {
         cout << " T: " << sp.getParticleTemperature() << endl;
       }
     }
-    if(step % updateFreq == 0) {
+    maxDelta = sp.getParticleMaxDisplacement();
+    if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
+      sp.resetLastPositions();
     }
     step += 1;
   }

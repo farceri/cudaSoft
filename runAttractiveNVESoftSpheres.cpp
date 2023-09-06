@@ -27,16 +27,16 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = false, logSave, linSave = true, saveFinal = true;
-  long numParticles = 8, nDim = 2, numVertexPerParticle = 32;
+  long numParticles = 8, nDim = 2;
   long step = 0, maxStep = atof(argv[5]), checkPointFreq = int(maxStep / 10), updateFreq = 10;
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = 1e03, firstDecade = 0;
   double cutDistance = 1, waveQ, sigma, timeUnit, timeStep = atof(argv[2]);
-  double ec = 240, Tinject = atof(argv[3]), l1 = atof(argv[4]), l2 = 0.2;
+  double ec = 240, Tinject = atof(argv[3]), l1 = atof(argv[4]), l2 = 0.2, cutoff, maxDelta;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve-u/";
   dirSample = whichDynamics + "test/";//"T" + argv[3] + "-u" + argv[4] + "/";
   // initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -75,7 +75,8 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setEnergyCostant(ec);
+  cutoff = cutDistance * sp.getMinParticleSigma();
   sp.setAttractionConstants(l1, l2);
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
@@ -122,8 +123,10 @@ int main(int argc, char **argv) {
         ioSP.saveParticleAttractiveConfiguration(currentDir);
       }
     }
-    if(step % updateFreq == 0) {
+    maxDelta = sp.getParticleMaxDisplacement();
+    if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
+      sp.resetLastPositions();
     }
     step += 1;
   }

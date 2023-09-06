@@ -24,19 +24,19 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, attraction = false;
-  long numParticles = 1024, nDim = 2, numVertexPerParticle = 32; // this is just a default variable to initialize the sp object
+  long numParticles = 1024, nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateFreq = 10;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, isf = 1;
   double cutDistance = 0.1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 240, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.1, phiTh = 1;
-  double timeStep, timeUnit, escale = 1, sigma, l2 = 0.2; // warning: it is running attractive
+  double timeStep, timeUnit, escale = 1, sigma, l2 = 0.2, cutoff, maxDelta;
   std::string currentDir, outDir = argv[1], inDir;
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
@@ -45,7 +45,8 @@ int main(int argc, char **argv) {
     inDir = outDir + inDir;
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     sigma = sp.getMeanParticleSigma();
-    sp.setEnergyCosts(0, 0, 0, ec);
+    sp.setEnergyCostant(ec);
+    cutoff = cutDistance * sp.getMinParticleSigma();
     if(attraction == true) {
       sp.setAttractionConstants(escale * sigma, l2); //kc = 1
     }
@@ -56,7 +57,8 @@ int main(int argc, char **argv) {
     // initialize polydisperse packing
     sp.setPolyRandomSoftParticles(phi0, polydispersity);
     sigma = sp.getMeanParticleSigma();
-    sp.setEnergyCosts(0, 0, 0, ec);
+    sp.setEnergyCostant(ec);
+    cutoff = cutDistance * sp.getMinParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
     sp.calcParticleNeighborList(cutDistance);
@@ -68,8 +70,10 @@ int main(int argc, char **argv) {
         cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
         cout << " energy: " << sp.getParticleEnergy() << endl;
       }
-      if(iteration % updateFreq == 0) {
+      maxDelta = sp.getParticleMaxDisplacement();
+      if(3*maxDelta > cutoff) {
         sp.calcParticleNeighborList(cutDistance);
+        sp.resetLastPositions();
       }
       iteration += 1;
     }
@@ -111,8 +115,10 @@ int main(int argc, char **argv) {
         cout << " K: " << sp.getParticleKineticEnergy();
         cout << " ISF: " << isf << endl;
       }
-      if(step % updateFreq == 0) {
+      maxDelta = sp.getParticleMaxDisplacement();
+      if(3*maxDelta > cutoff) {
         sp.calcParticleNeighborList(cutDistance);
+        sp.resetLastPositions();
       }
       step += 1;
     }
@@ -131,7 +137,7 @@ int main(int argc, char **argv) {
       searchStep = maxSearchStep; // exit condition
     } else {
       scaleFactor = sqrt((currentPhi + deltaPhi) / currentPhi);
-      sp.scaleSoftParticles(scaleFactor);
+      sp.scaleParticles(scaleFactor);
       currentPhi = sp.getParticlePhi();
       cout << "\nNew phi: " << currentPhi << ", average size: " << sp.getMeanParticleSigma() << endl;
       searchStep += 1;

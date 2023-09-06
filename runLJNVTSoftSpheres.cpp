@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave;
-  long numParticles = atol(argv[7]), nDim = 2, numVertexPerParticle = 32;
+  long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
   long linFreq = 1e05, initialStep = 0, step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 7, sigma, timeUnit, timeStep = atof(argv[2]);
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
-	SP2D sp(numParticles, nDim, numVertexPerParticle);
+	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -76,7 +76,8 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setEnergyCosts(0, 0, 0, ec);
+  sp.setEnergyCostant(ec);
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   sp.setLJcutoff(LJcut);
   damping = sqrt(inertiaOverDamping) / sigma;
@@ -90,8 +91,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergyLJ();
   sp.initSoftParticleLangevinLJ(Tinject, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-  sp.resetPreviousPositions();
   //waveQ = sp.getSoftWaveNumber();
   // run integrator
   // record simulation time
@@ -142,7 +141,7 @@ int main(int argc, char **argv) {
     maxDelta = sp.getParticleMaxDisplacement();
     if(3*maxDelta > cutoff) {
       sp.calcParticleNeighborList(cutDistance);
-      sp.resetPreviousPositions();
+      sp.resetLastPositions();
       updateCount += 1;
     }
     //if(step % updateFreq == 0) {

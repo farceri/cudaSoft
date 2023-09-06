@@ -127,11 +127,11 @@ public:
 };
 
 // Soft particle Langevin integrator with external field child of softParticleLangevin2
-class SoftParticleExtField: public SoftParticleLangevin2
+class SoftParticleLangevinExtField: public SoftParticleLangevin2
 {
 public:
-  SoftParticleExtField() = default;
-  SoftParticleExtField(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
+  SoftParticleLangevinExtField() = default;
+  SoftParticleLangevinExtField(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
 
   virtual void integrate();
 };
