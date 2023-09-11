@@ -164,6 +164,8 @@ public:
   // initialization functions
   void setPolyRandomSoftParticles(double phi0, double polyDispersity);
 
+  void set3DPolyRandomSoftParticles(double phi0, double polyDispersity);
+
   void pressureScaleParticles(double pscale);
 
   void scaleParticles(double scale);

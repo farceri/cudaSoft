@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, increasedStep1 = false, increasedStep2 = false;
-  long numParticles = 1024, nDim = 2;
+  long numParticles = 65536, nDim = 2;
   long iteration = 0, maxIterations = 1e06, minStep = 20, numStep = 0, overJamCount = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, repetition;
   long printIter = int(maxIterations / 10), printFreq = int(maxStep / 10), updateFreq = 1e03;
@@ -157,7 +157,7 @@ int main(int argc, char **argv) {
         while(step != maxStep) {
           sp.softParticleLangevinLoop();
           if(step % printFreq == 0) {
-            cout << "Brownian: current step: " << step;
+              cout << "NVT: current step: " << step;
             cout << " U/N: " << sp.getParticleEnergy() / numParticles;
             cout << " T: " << sp.getParticleTemperature() << endl;
           }

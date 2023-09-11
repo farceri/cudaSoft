@@ -383,11 +383,42 @@ double SP2D::getParticleISF(double waveNumber_) {
   return thrust::reduce(d_particleSF.begin(), d_particleSF.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
+//************************ initialization functions **************************//
 void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean, sigma, scale, boxLength = 1.;
   mean = 0.;
   sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
+  // generate polydisperse particle size
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    r1 = drand48();
+    r2 = drand48();
+    randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
+    d_particleRad[particleId] = exp(mean + randNum * sigma);
+  }
+  scale = sqrt(getParticlePhi() / phi0);
+  for (long dim = 0; dim < nDim; dim++) {
+    boxSize[dim] = boxLength;
+  }
+  setBoxSize(boxSize);
+  // extract random positions
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    d_particleRad[particleId] /= scale;
+    for(long dim = 0; dim < nDim; dim++) {
+      d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
+    }
+  }
+  // need to set this otherwise forces are zeros
+  //setParticleLengthScale();
+  setLengthScaleToOne();
+}
+
+void SP2D::set3DPolyRandomSoftParticles(double phi0, double polyDispersity) {
+  thrust::host_vector<double> boxSize(nDim);
+  double r1, r2, randNum, mean, sigma, scale, boxLength = 1.;
+  mean = 0.;
+  sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
+  cout << "ok1" << endl;
   // generate polydisperse particle size
   for (long particleId = 0; particleId < numParticles; particleId++) {
     r1 = drand48();
@@ -408,7 +439,8 @@ void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
     }
   }
   // need to set this otherwise forces are zeros
-  setParticleLengthScale();
+  //setParticleLengthScale();
+  setLengthScaleToOne();
 }
 
 void SP2D::pressureScaleParticles(double pscale) {
