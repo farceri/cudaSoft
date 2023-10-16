@@ -1,6 +1,5 @@
 # cudaSoft
-Soft particle simulator for molecular dynamics and energy minimization, written in CUDA and C++
-
+Soft particle simulator for molecular dynamics and energy minimization, written in CUDA and C++ \n
 Current version includes:
 - 2D and 3D particles in periodic boundary or fixed boundary conditions with isotropic geometry
 - Molecular dynamics in the NVE and NVT ensembles
