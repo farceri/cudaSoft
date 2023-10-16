@@ -10,5 +10,5 @@ Current version includes:
 
 Please contact me at arceri.fra at gmail.com for more info
 
-Here is a video of self-propelled particles forming and dissolving clusters (active droplets)
+Here is an example of self-propelled particles in Langevin dynamics forming and dissolving clusters (labeled with different colors)
 ![droplet-active-8k-phi45-Dr1e-06](https://github.com/farceri/cudaSoft/assets/32315176/bff8248f-6280-46ef-a79c-1a292d9551bc)
