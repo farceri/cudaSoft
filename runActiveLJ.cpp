@@ -22,18 +22,19 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave;
-  long numParticles = atol(argv[7]), nDim = 2;
-  long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e02, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut-0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  bool readState = true, saveFinal = true, logSave, linSave = true;
+  long numParticles = atol(argv[9]), nDim = 2;
+  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
+  long linFreq = 1e04, initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  double ec = 1, LJcut = 7, cutDistance = LJcut+1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
+  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
+  dirSample = whichDynamics + "Dr" + argv[4] + "/";
+  //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
@@ -48,9 +49,9 @@ int main(int argc, char **argv) {
       linSave = true;
       outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
-        if(initialStep != 0) {
+        //if(initialStep != 0) {
         inDir = outDir;
-        }
+        //}
       } else {
         std::experimental::filesystem::create_directory(outDir);
       }
@@ -59,6 +60,7 @@ int main(int argc, char **argv) {
     if(readAndMakeNewDir == true) {
       readState = true;
       outDir = inDir + "../../" + dirSample;
+      //outDir = inDir + "../../../" + dirSample;
     } else {
       if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
         std::experimental::filesystem::create_directory(inDir + whichDynamics);
@@ -69,7 +71,7 @@ int main(int argc, char **argv) {
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleActiveState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -78,46 +80,49 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
-  sp.setLJcutoff(LJcut);
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
+  //timeUnit = sigma * sigma * damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   //timeStep = sp.setTimeStep(timeStep);
-  cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
-  cout << "Thermal energy scale: " << Tinject << endl;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  forceUnit = inertiaOverDamping / sigma;
+  //forceUnit = 1 / (inertiaOverDamping * sigma);
+  cout << "Inertia over damping: " << inertiaOverDamping << " damping: " << damping << " sigma: " << sigma << endl;
+  cout << "Tinject: " << Tinject << " time step: " << timeStep << " taup: " << timeUnit/Dr << endl;
+  cout << "Peclet number: " << driving * forceUnit * timeUnit / (damping * Dr * sigma);
+  cout << " f0: " << driving*forceUnit << ", " << driving << " Dr: " << Dr/timeUnit << ", " << Dr << endl;
+  driving = driving*forceUnit;
+  Dr = Dr/timeUnit;
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
-  sp.calcParticleForceEnergyLJ();
-  //ioSP.saveParticleAttractiveConfiguration(currentDir);
-  sp.initSoftParticleLangevinLJ(Tinject, damping, readState);
-  // run integrator
-  waveQ = sp.getSoftWaveNumber();
-  sp.setInitialPositions();
+  sp.calcParticleForceEnergy();
+  sp.initSoftParticleActiveLJLangevin(Tinject, Dr, driving, damping, readState);
+  //waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+  // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinLJLoop();
+    sp.softParticleActiveLJLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveParticleActiveEnergy(step, timeStep, waveQ, driving);
       if(step % checkPointFreq == 0) {
-        cout << "NVT-LJ: current step: " << step + initialStep;
+        cout << "Active LJ: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        cout << " ISF: " << sp.getParticleISF(waveQ);
+        //cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
           cout << " no updates" << endl;
         }
         updateCount = 0;
-        if(saveFinal == true) {
-          ioSP.saveParticleAttractiveConfiguration(outDir);
-        }
+        ioSP.saveParticleActiveConfiguration(outDir);
       }
     }
     if(logSave == true) {
@@ -131,14 +136,14 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();
@@ -160,7 +165,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleAttractiveConfiguration(outDir);
+    ioSP.saveParticleActiveConfiguration(outDir);
   }
   ioSP.closeEnergyFile();
 

@@ -307,6 +307,17 @@ void SoftParticleLangevinExtField::integrate() {
   conserveMomentum();
 }
 
+//************************* soft particle langevin ***************************//
+void SoftParticleLangevinLJExtField::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->calcParticleForceEnergyLJ();
+  sp_->addConstantParticleForce(extForce, firstIndex);
+  updateVelocity(0.5*sp_->dt);
+  conserveMomentum();
+}
+
 //**************************** soft particle nve *****************************//
 void SoftParticleNVE::integrate() {
   updateVelocity(0.5 * sp_->dt);
@@ -400,6 +411,16 @@ void SoftParticleActiveLangevin::updateThermalVel() {
   //};
 
   //thrust::for_each(s, s + sp_->numParticles, addActiveParticleForce);
+
+//*******#************* soft particle active LJ langevin *********************//
+void SoftParticleActiveLJLangevin::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->calcParticleForceEnergyLJ();
+  updateVelocity(0.5*sp_->dt);
+  //conserveMomentum();
+}
 
 //************** fixed boundary soft particle active langevin ****************//
 void SoftParticleActiveFixedBoundary::integrate() {

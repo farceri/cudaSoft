@@ -26,14 +26,14 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave;
-  long numParticles = atol(argv[7]), nDim = 2;
+  bool readState = true, saveFinal = true, logSave, linSave, perturb = false;
+  long numParticles = atol(argv[7]), nDim = 2, maxIndex = atol(argv[9]);
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e02, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  long linFreq = 1e03, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut-0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]);
+  double cutDistance = LJcut-0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]), externalForce = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "-EF" + argv[9] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
@@ -46,7 +46,12 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics/";
+      if(perturb == true) {
+        outDir = outDir + "perturb-f" + argv[8] + "/";
+      } else {
+        outDir = outDir + "perturb-f" + argv[8] + "/dynamics/";
+        inDir = inDir + "perturb-f" + argv[8] + "/";
+      }
       if(std::experimental::filesystem::exists(outDir) == true) {
         if(initialStep != 0) {
         inDir = outDir;
@@ -78,6 +83,7 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
+  externalForce *= inertiaOverDamping / sigma;
   sp.setLJcutoff(LJcut);
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
@@ -85,12 +91,17 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
   cout << "Thermal energy scale: " << Tinject << endl;
+  cout << "External force: " << externalForce << " applied to " << maxIndex << " particles" << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergyLJ();
   //ioSP.saveParticleAttractiveConfiguration(currentDir);
-  sp.initSoftParticleLangevinLJ(Tinject, damping, readState);
+  if(perturb == true) {
+    sp.initSoftParticleLangevinLJExtField(Tinject, damping, externalForce, maxIndex, readState);
+  } else {
+    sp.initSoftParticleLangevinLJ(Tinject, damping, readState);
+  }
   // run integrator
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
@@ -101,11 +112,15 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   while(step != maxStep) {
-    sp.softParticleLangevinLJLoop();
+    if(perturb == true) {
+      sp.softParticleLangevinLJExtFieldLoop();
+    } else {
+      sp.softParticleLangevinLJLoop();
+    }
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "NVT-LJ: current step: " << step + initialStep;
+        cout << "LJ-EF: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);

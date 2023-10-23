@@ -56,7 +56,7 @@ INC_DIR = include
 #EXE = testSP
 
 # make packings
-EXE = jamPacking
+#EXE = jamPacking
 #EXE = compressPacking
 #EXE = make3DPacking
 
@@ -68,7 +68,10 @@ EXE = jamPacking
 #EXE = runNVT
 #EXE = runNPT
 #EXE = runActive
+#EXE = runActiveLJ
 #EXE = runLennardJonesNVT
+EXE = runLennardJonesLE
+#EXE = runLennardJonesEF
 #EXE = runFixedBoundaryActive
 #EXE = runFixedBoundaryNVE
 #EXE = runFixedBoundaryNVT

@@ -41,12 +41,16 @@ SP2D::SP2D(long nParticles, long dim) {
   setDimBlock(dimBlock);
   setNDim(nDim);
   setNumParticles(numParticles);
+	simControl.geometryType = simControlStruct::geometryEnum::normal;
+	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
+	syncSimControlToDevice();
   // default parameters
   dt = 1e-04;
   rho0 = 1;
 	ec = 1;
 	l1 = 0;
 	l2 = 0;
+  LEshift = 0;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -131,6 +135,93 @@ void SP2D::initParticleNeighbors(long numParticles_) {
 }
 
 //**************************** setters and getters ***************************//
+//send simControl information to the gpu
+void SP2D::syncSimControlToDevice() {
+	cudaMemcpyToSymbol(d_simControl, &simControl, sizeof(simControl));
+}
+
+//get simControl information from the gpu
+void SP2D::syncSimControlFromDevice() {
+	cudaMemcpyFromSymbol(&simControl, d_simControl, sizeof(simControl));
+}
+
+void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
+	simControl.geometryType = geometryType_;
+  if(simControl.geometryType == simControlStruct::geometryEnum::normal) {
+    cout << "SP2D: setGeometryType: geometryType: normal" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
+    cout << "SP2D: setGeometryType: geometryType: leesEdwards" << endl;
+  } else {
+    cout << "SP2D: setGeometryType: please specify valid geometryType: normal or leesEdwards" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+simControlStruct::geometryEnum SP2D::getGeometryType() {
+	syncSimControlFromDevice();
+	return simControl.geometryType;
+}
+
+void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
+	simControl.potentialType = potentialType_;
+  if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
+    cout << "SP2D: setPotentialType: potentialType: harmonic" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
+    cout << "SP2D: setPotentialType: potentialType: lennardJones" << endl;
+  } else {
+    cout << "SP2D: setPotentialType: please specify valid potentialType: normal or lennardJones" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+simControlStruct::potentialEnum SP2D::getPotentialType() {
+	syncSimControlFromDevice();
+	return simControl.potentialType;
+}
+
+bool SP2D::testSimControlSync() {
+	bool returnValue = true;
+	simControlStruct temp = simControl;
+	syncSimControlFromDevice();
+	returnValue = ((temp.geometryType == simControl.geometryType) &&
+                  (temp.potentialType == simControl.potentialType));
+	if (returnValue == true) {
+    cout << "SP2D::testSimControlSync: symControl is in sync" << endl;
+	}
+	if (returnValue == false) {
+		cout << "SP2D::testSimControlSync: symControl is out of sync" << endl;
+	}
+  cout << "geometryType = " << (temp.geometryType == simControl.geometryType) << endl;
+  cout << "potentialType = " << (temp.potentialType == simControl.potentialType) << endl;
+	simControl = temp;
+	syncSimControlToDevice();
+	return returnValue;
+}
+
+void SP2D::setLEshift(double LEshift_) {
+	syncSimControlFromDevice();
+	if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
+		LEshift = LEshift_;
+		cudaError err = cudaMemcpyToSymbol(d_LEshift, &LEshift, sizeof(LEshift));
+		if(err != cudaSuccess) {
+			cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+		}
+	}
+	else {
+		cout << "SP2D::setLEshift: attempting to set LEshift without using LE boundary conditions" << endl;
+	}
+  cout << "SP2D::setLEshift: LEshift: " << LEshift << endl;
+}
+
+double SP2D::getLEshift() {
+  double LEshiftFromDevice;
+	cudaError err = cudaMemcpyFromSymbol(&LEshiftFromDevice, d_LEshift, sizeof(d_LEshift));
+	if(err != cudaSuccess) {
+		cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+	}
+	return LEshiftFromDevice;
+}
+
 // TODO: add error checks for all the getters and setters
 void SP2D::setDimBlock(long dimBlock_) {
 	dimBlock = dimBlock_;
@@ -266,6 +357,10 @@ thrust::host_vector<double> SP2D::getPBCParticlePositions() {
 
 void SP2D::resetLastPositions() {
   d_particleLastPos = getParticlePositions();
+}
+
+void SP2D::setInitialPositions() {
+  d_particleInitPos = getParticlePositions();
 }
 
 thrust::host_vector<double> SP2D::getLastPositions() {
@@ -576,6 +671,19 @@ void SP2D::calcParticleForceEnergyLJ() { // Repulsive and Attractive
    return particleExternalForce;
  }
 
+ void SP2D::addConstantParticleForce(double externalForce, long maxIndex) {
+   long p_nDim(nDim);
+   double p_externalForce(externalForce);
+   auto r = thrust::counting_iterator<long>(0);
+ 	 double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+
+   auto addExternalForce = [=] __device__ (long particleId) {
+     pForce[particleId * p_nDim] += p_externalForce;
+   };
+
+   thrust::for_each(r, r + maxIndex, addExternalForce);
+ }
+
  // return the sum of force magnitudes
  double SP2D::getParticleTotalForceMagnitude() {
    thrust::device_vector<double> forceSquared(d_particleForce.size());
@@ -611,6 +719,11 @@ double SP2D::getParticleVirialPressure() {
 	 }
 	 return totalStress / (nDim * volume);
 	 //return totalStress;
+}
+
+double SP2D::getParticleShearStress() {
+   calcParticleStressTensor();
+	 return (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
 }
 
 double SP2D::getParticleDynamicalPressure() {
@@ -984,6 +1097,30 @@ void SP2D::softParticleLangevinExtFieldLoop() {
   this->sim_->integrate();
 }
 
+void SP2D::initSoftParticleLangevinLJExtField(double Temp, double gamma, double extForce, long firstIndex, bool readState) {
+  this->sim_ = new SoftParticleLangevinLJExtField(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_->gamma = gamma;
+  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->d_rand.resize(numParticles * nDim);
+  this->sim_->d_rando.resize(numParticles * nDim);
+  this->sim_->d_thermalVel.resize(d_particleVel.size());
+  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  this->sim_->extForce = extForce;
+  this->sim_->firstIndex = firstIndex;
+  resetLastPositions();
+  if(readState == false) {
+    this->sim_->injectKineticEnergy();
+  }
+  cout << "SP2D::initSoftParticleLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+}
+
+void SP2D::softParticleLangevinLJExtFieldLoop() {
+  this->sim_->integrate();
+}
+
 //***************************** NVE integrators ******************************//
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0, 0));
@@ -1047,6 +1184,31 @@ void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving
 }
 
 void SP2D::softParticleActiveLangevinLoop() {
+  this->sim_->integrate();
+}
+
+void SP2D::initSoftParticleActiveLJLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
+  this->sim_ = new SoftParticleActiveLJLangevin(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_->gamma = gamma;
+  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->d_rand.resize(numParticles * nDim);
+  this->sim_->d_rando.resize(numParticles * nDim);
+  this->sim_->d_pActiveAngle.resize(numParticles);
+  this->sim_->d_thermalVel.resize(d_particleVel.size());
+  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  resetLastPositions();
+  if(readState == false) {
+    this->sim_->injectKineticEnergy();
+    computeParticleAngleFromVel();
+    //cout << "SP2D::initSoftParticleActiveLJLangevin:: damping coefficients: " << this->sim_->lcoeff1 << " " << this->sim_->lcoeff2 << " " << this->sim_->lcoeff3 << endl;
+  }
+  cout << "SP2D::initSoftParticleActiveLJLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+}
+
+void SP2D::softParticleActiveLJLangevinLoop() {
   this->sim_->integrate();
 }
 

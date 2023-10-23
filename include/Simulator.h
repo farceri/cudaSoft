@@ -35,6 +35,7 @@ public:
   double noiseVar;
   double gamma = 1; // this is just a choice
   long firstIndex = 10;
+  long extForce = 0;
   double mass = 1;
   thrust::device_vector<double> d_rand;
   thrust::device_vector<double> d_rando;
@@ -136,6 +137,16 @@ public:
   virtual void integrate();
 };
 
+// Soft particle Langevin integrator with external field child of softParticleLangevin2
+class SoftParticleLangevinLJExtField: public SoftParticleLangevin2
+{
+public:
+  SoftParticleLangevinLJExtField() = default;
+  SoftParticleLangevinLJExtField(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
+
+  virtual void integrate();
+};
+
 // Soft particle NVE integrator child of SoftParticleLangevin
 class SoftParticleNVE: public SoftParticleLangevin
 {
@@ -174,6 +185,15 @@ public:
   SoftParticleActiveLangevin(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
 
   virtual void updateThermalVel();
+  virtual void integrate();
+};
+
+class SoftParticleActiveLJLangevin: public SoftParticleActiveLangevin
+{
+public:
+  SoftParticleActiveLJLangevin() = default;
+  SoftParticleActiveLJLangevin(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
+
   virtual void integrate();
 };
 

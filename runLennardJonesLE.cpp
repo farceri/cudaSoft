@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave, linSave;
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e02, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut-0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]);
+  long linFreq = saveEnergyFreq, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 2.5, sigma, timeUnit, timeStep = atof(argv[2]);
+  double cutDistance = LJcut-0.5, maxDelta, damping, inertiaOverDamping = atof(argv[6]), LEshift=atof(argv[8]), shift;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics/";
+      outDir = outDir + "dynamics-LE" + argv[8] + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         if(initialStep != 0) {
         inDir = outDir;
@@ -86,13 +86,17 @@ int main(int argc, char **argv) {
   cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
   cout << "Thermal energy scale: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  //sp.testSimControlSync();
+  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  sp.setGeometryType(simControlStruct::geometryEnum::leesEdwards);
+  sp.setLEshift(LEshift);
+  shift = LEshift;
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergyLJ();
   //ioSP.saveParticleAttractiveConfiguration(currentDir);
   sp.initSoftParticleLangevinLJ(Tinject, damping, readState);
   // run integrator
-  waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
   // record simulation time
   float elapsed_time_ms = 0;
@@ -103,12 +107,14 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLJLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleStressEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "NVT-LJ: current step: " << step + initialStep;
+        //shift += LEshift;
+        //sp.setLEshift(shift);
+        //cout << "current shift: " << shift << endl;
+        cout << "LJ-LE: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        cout << " ISF: " << sp.getParticleISF(waveQ);
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
@@ -117,6 +123,7 @@ int main(int argc, char **argv) {
         updateCount = 0;
         if(saveFinal == true) {
           ioSP.saveParticleAttractiveConfiguration(outDir);
+          ioSP.saveParticleContacts(outDir);
         }
       }
     }
@@ -132,6 +139,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleContacts(currentDir);
       }
     }
     if(linSave == true) {
@@ -139,6 +147,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleContacts(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();
@@ -161,6 +170,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticleAttractiveConfiguration(outDir);
+    ioSP.saveParticleContacts(outDir);
   }
   ioSP.closeEnergyFile();
 

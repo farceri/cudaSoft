@@ -19,6 +19,11 @@ using namespace std;
 using std::vector;
 using std::string;
 
+struct simControlStruct {
+  enum class geometryEnum {normal, leesEdwards} geometryType;
+  enum class potentialEnum {harmonic, lennardJones} potentialType;
+};
+
 // pointer-to-member function call macro
 #define CALL_MEMBER_FN(object, ptrToMember) ((object).*(ptrToMember))
 
@@ -39,6 +44,8 @@ public:
   FIRE * fire_;
   SimInterface * sim_;
 
+  simControlStruct simControl;
+
   // variables for CUDA runtime details
   long dimGrid, dimBlock;
 
@@ -57,6 +64,8 @@ public:
   double l1, l2;
   // Lennard-Jones constants
   double LJcutoff, LJecut;
+  // Lees-Edwards shift
+  double LEshift;
 
   // dynamical particle variables
   thrust::device_vector<double> d_particlePos;
@@ -96,6 +105,19 @@ public:
   void initParticleNeighbors(long numParticles_);
 
   //setters and getters
+  void syncSimControlToDevice();
+  void syncSimControlFromDevice();
+  bool testSimControlSync();
+
+  void setGeometryType(simControlStruct::geometryEnum geometryType_);
+	simControlStruct::geometryEnum getGeometryType();
+
+  void setPotentialType(simControlStruct::potentialEnum potentialType_);
+	simControlStruct::potentialEnum getPotentialType();
+
+  void setLEshift(double LEshift_);
+  double getLEshift();
+
   void setDimBlock(long dimBlock_);
   long getDimBlock();
 
@@ -127,6 +149,8 @@ public:
   thrust::host_vector<double> getParticleDeltas();
 
   void resetLastPositions();
+
+  void setInitialPositions();
 
   thrust::host_vector<double> getLastPositions();
 
@@ -196,6 +220,8 @@ public:
 
   void makeExternalParticleForce(double externalForce);
 
+  void addConstantParticleForce(double externalForce, long maxIndex);
+
   void addExternalParticleForce();
   thrust::host_vector<double> getExternalParticleForce();
 
@@ -206,6 +232,8 @@ public:
   void calcParticleStressTensor();
 
   double getParticleVirialPressure();
+
+  double getParticleShearStress();
 
   double getParticleWallPressure();
 
@@ -276,6 +304,10 @@ public:
 
   void softParticleLangevinExtFieldLoop();
 
+  void initSoftParticleLangevinLJExtField(double Temp, double gamma, double extForce, long firstIndex, bool readState);
+
+  void softParticleLangevinLJExtFieldLoop();
+
   // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);
 
@@ -293,6 +325,10 @@ public:
   void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
 
   void softParticleActiveLangevinLoop();
+
+  void initSoftParticleActiveLJLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
+
+  void softParticleActiveLJLangevinLoop();
 
   void initSoftParticleActiveFixedBoundary(double Temp, double Dr, double driving, double gamma, bool readState);
 

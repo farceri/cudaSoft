@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave, linSave;
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e06, initialStep = 0, step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  long linFreq = 1e06, initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 240, cutDistance = 1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
@@ -47,9 +47,8 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics-1e06/";
+      outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
-        initialStep = atof(argv[7]);
         //if(initialStep != 0) {
         inDir = outDir;
         //}
@@ -110,7 +109,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleActiveEnergy(step, timeStep, waveQ, driving);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step;
