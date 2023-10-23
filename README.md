@@ -2,7 +2,7 @@
 Soft particle simulator for molecular dynamics and energy minimization, written in CUDA and C++
 
 Current version includes:
-- 2D and 3D particles in periodic boundary or fixed boundary conditions with isotropic geometry
+- 2D and 3D particles in Lees-Edwards, fixed and periodic boundary conditions
 - Molecular dynamics in the NVE and NVT ensembles
 - Interaction potentials: harmonic, Lennard-Jones potential
 - Active brownian model for self-propulsion
