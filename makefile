@@ -58,6 +58,7 @@ INC_DIR = include
 # make packings
 #EXE = jamPacking
 #EXE = compressPacking
+EXE = shearPacking
 #EXE = make3DPacking
 
 #EXE = measurePressure
@@ -70,7 +71,7 @@ INC_DIR = include
 #EXE = runActive
 #EXE = runActiveLJ
 #EXE = runLennardJonesNVT
-EXE = runLennardJonesLE
+#EXE = runLennardJonesLE
 #EXE = runLennardJonesEF
 #EXE = runFixedBoundaryActive
 #EXE = runFixedBoundaryNVE

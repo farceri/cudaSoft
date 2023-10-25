@@ -87,15 +87,14 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 	  }
 		break;
 		case simControlStruct::geometryEnum::leesEdwards:
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			if(dim == 1) {
-			 delta = pbcDistanceLE(thisVec[0], thisVec[1], otherVec[0], otherVec[1]);
-		 } else {
-			 delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
-		 }
-		 distanceSq += delta * delta;
-	 }
+		double deltay, deltax, shifty;
+		deltay = thisVec[1] - otherVec[1];
+		shifty = round(deltay / d_boxSizePtr[1]) * d_boxSizePtr[1];
+		deltax = thisVec[0] - otherVec[0];
+		deltax += shifty * d_LEshift;
+		deltax -= round(deltax / d_boxSizePtr[0]) * d_boxSizePtr[0];
+		deltay -= shifty;
+		distanceSq = deltax * deltax + deltay * deltay;
 		break;
 	}
   return sqrt(distanceSq);
@@ -113,16 +112,23 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 	  }
 		break;
 		case simControlStruct::geometryEnum::leesEdwards:
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			if(dim == 1) {
-			 delta = pbcDistanceLE(thisVec[0], thisVec[1], otherVec[0], otherVec[1]);
-		 } else {
-			 delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
-		 }
-		 deltaVec[dim] = delta;
-		 distanceSq += delta * delta;
-	 }
+		deltaVec[1] = thisVec[1] - otherVec[1];
+		double shifty = round(deltaVec[1] / d_boxSizePtr[1]) * d_boxSizePtr[1];
+		deltaVec[0] = thisVec[0] - otherVec[0];
+		deltaVec[0] += shifty * d_LEshift;
+		deltaVec[0] -= round(deltaVec[0] / d_boxSizePtr[0]) * d_boxSizePtr[0];
+		deltaVec[1] -= shifty;
+		distanceSq = deltaVec[0] * deltaVec[0] + deltaVec[1] * deltaVec[1];
+		//#pragma unroll (MAXDIM)
+		//for (long dim = 0; dim < d_nDim; dim++) {
+		//	if(dim == 1) {
+		//	 delta = pbcDistanceLE(thisVec[0], thisVec[1], otherVec[0], otherVec[1]);
+		// } else {
+		//	 delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
+		// }
+		// deltaVec[dim] = delta;
+		// distanceSq += delta * delta;
+	 	//}
 		break;
 	}
   return sqrt(distanceSq);
@@ -243,40 +249,44 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 }
 
 inline __device__ double calcContactInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  double overlap, gradMultiple, distance;
-	overlap = calcOverlap(thisPos, otherPos, radSum);
+	double delta[MAXDIM];
+  double distance, overlap, gradMultiple;
+	//overlap = calcOverlap(thisPos, otherPos, radSum);
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	overlap = 1 - distance / radSum;
 	if (overlap > 0) {
 		gradMultiple = d_ec * overlap / radSum;
-		distance = calcDistance(thisPos, otherPos);
 		#pragma unroll (MAXDIM)
 	  for (long dim = 0; dim < d_nDim; dim++) {
-	    currentForce[dim] += gradMultiple * pbcDistance(thisPos[dim], otherPos[dim], dim) / distance;
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
 	  }
 	  return (0.5 * d_ec * overlap * overlap) * 0.5;
 	}
 	return 0.;
 }
 
-inline __device__ double calcContactInteractionRA(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  double overlap, distance, gradMultiple = 0, epot = 0.;
-	distance = calcDistance(thisPos, otherPos);
-	overlap = calcOverlap(thisPos, otherPos, radSum);
-	if (distance < (1 + d_l1) * radSum) {
-		gradMultiple = d_ec * overlap / radSum;
-		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
-	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
-		gradMultiple = -(d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
-		epot = -(0.5 * (d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2)) * 0.5;
-	} else {
-		epot = 0.;
-	}
-	if (gradMultiple != 0) {
-		#pragma unroll (MAXDIM)
+// particle-particle contact interaction
+__global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  if (particleId < d_numParticles) {
+    double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the force and get particle positions
 		for (long dim = 0; dim < d_nDim; dim++) {
-	    currentForce[dim] += gradMultiple * pbcDistance(thisPos[dim], otherPos[dim], dim) / distance;
-	  }
-	}
-	return epot;
+			pForce[particleId * d_nDim + dim] = 0;
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+    thisRad = pRad[particleId];
+    pEnergy[particleId] = 0;
+    // interaction between vertices of neighbor particles
+    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+      if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+        radSum = thisRad + otherRad;
+  			pEnergy[particleId] += calcContactInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+    }
+  }
 }
 
 inline __device__ double calcLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
@@ -305,8 +315,8 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	return epot;
 }
 
-// particle-particle contact interaction
-__global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+// particle-particle Lennard-Jones interaction
+__global__ void kernelCalcParticleInteractionLJ(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
   long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   if (particleId < d_numParticles) {
     double thisRad, otherRad, radSum;
@@ -322,8 +332,55 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
     for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
       if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
         radSum = thisRad + otherRad;
-  			pEnergy[particleId] += calcContactInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
-				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+  			pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+				//if(calcOverlap(thisPos, otherPos, radSum)>0) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_neighborListSize+nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+    }
+  }
+}
+
+inline __device__ double calcContactInteractionRA(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  double overlap, distance, gradMultiple = 0, epot = 0.;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	overlap = 1 - distance / radSum;
+	if (distance < (1 + d_l1) * radSum) {
+		gradMultiple = d_ec * overlap / radSum;
+		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
+	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
+		gradMultiple = -(d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
+		epot = -(0.5 * (d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2)) * 0.5;
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  }
+	}
+	return epot;
+}
+
+// particle-particle attractive & repulsive interaction
+__global__ void kernelCalcParticleInteractionRA(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  if (particleId < d_numParticles) {
+    double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the force and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			pForce[particleId * d_nDim + dim] = 0;
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+    thisRad = pRad[particleId];
+    pEnergy[particleId] = 0;
+    // interaction between vertices of neighbor particles
+    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+      if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+        radSum = thisRad + otherRad;
+  			pEnergy[particleId] += calcContactInteractionRA(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+				//if(calcOverlap(thisPos, otherPos, radSum)>0) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_neighborListSize+nListId], calcOverlap(thisPos, otherPos, radSum));
 			}
     }
   }
@@ -475,59 +532,11 @@ __global__ void kernelCalcParticleSidesInteraction(const double* pRad, const dou
   }
 }
 
-// particle-particle attractive & repulsive interaction
-__global__ void kernelCalcParticleInteractionRA(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-    double thisRad, otherRad, radSum;
-		double thisPos[MAXDIM], otherPos[MAXDIM];
-		// zero out the force and get particle positions
-		for (long dim = 0; dim < d_nDim; dim++) {
-			pForce[particleId * d_nDim + dim] = 0;
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
-    thisRad = pRad[particleId];
-    pEnergy[particleId] = 0;
-    // interaction between vertices of neighbor particles
-    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-      if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
-        radSum = thisRad + otherRad;
-  			pEnergy[particleId] += calcContactInteractionRA(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
-				//if(calcOverlap(thisPos, otherPos, radSum)>0) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_neighborListSize+nListId], calcOverlap(thisPos, otherPos, radSum));
-			}
-    }
-  }
-}
-
-// particle-particle Lennard-Jones interaction
-__global__ void kernelCalcParticleInteractionLJ(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-    double thisRad, otherRad, radSum;
-		double thisPos[MAXDIM], otherPos[MAXDIM];
-		// zero out the force and get particle positions
-		for (long dim = 0; dim < d_nDim; dim++) {
-			pForce[particleId * d_nDim + dim] = 0;
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
-    thisRad = pRad[particleId];
-    pEnergy[particleId] = 0;
-    // interaction between vertices of neighbor particles
-    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-      if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
-        radSum = thisRad + otherRad;
-  			pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
-				//if(calcOverlap(thisPos, otherPos, radSum)>0) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_neighborListSize+nListId], calcOverlap(thisPos, otherPos, radSum));
-			}
-    }
-  }
-}
-
 __global__ void kernelCalcParticleStressTensor(const double* pRad, const double* pPos, double* pStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisRad, otherRad, radSum;
-		double gradMultiple, distance, scalingFactor = d_rho0 / (d_boxSizePtr[0] * d_boxSizePtr[1]);
+		double gradMultiple, distance;
 		double thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], forces[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
     thisRad = pRad[particleId];
@@ -542,11 +551,11 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 						forces[dim] = gradMultiple * delta[dim] / distance;
 					}
 					//diagonal terms
-					pStress[0] += delta[0] * forces[0] * scalingFactor;
-					pStress[3] += delta[1] * forces[1] * scalingFactor;
+					pStress[0] += delta[0] * forces[0];
+					pStress[3] += delta[1] * forces[1];
 					// cross terms
-					pStress[1] += delta[0] * forces[1] * scalingFactor;
-					pStress[2] += delta[1] * forces[0] * scalingFactor;
+					pStress[1] += delta[0] * forces[1];
+					pStress[2] += delta[1] * forces[0];
 				}
 			}
 		}
@@ -718,41 +727,30 @@ __global__ void kernelCalcContactVectorList(const double* pPos, const long* cont
 }
 
 //******************************** observables *******************************//
-__global__ void kernelCalcParticleDistanceSq(const double* pPos, const double* pInitialPos, double* pDelta) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (particleId < d_numParticles) {
-		double distance;
-		for (long dim = 0; dim < d_nDim; dim++) {
-			distance = pbcDistance(pPos[particleId * d_nDim + dim], pInitialPos[particleId * d_nDim + dim], d_boxSizePtr[dim]);
-			pDelta[particleId * d_nDim + dim] = distance * distance;
-		}
-	}
-}
-
 __global__ void kernelCalcParticleDisplacement(const double* pPos, const double* pPreviousPos, double* pDisp) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double delta, distance = 0;
+		pDisp[particleId] = calcDistance(&pPos[particleId*d_nDim], &pPreviousPos[particleId*d_nDim]);
+	}
+}
+
+__global__ void kernelCalcParticleDistanceSq(const double* pPos, const double* pInitialPos, double* pDelta) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double delta[MAXDIM];
+		calcDeltaAndDistance(&pPos[particleId*d_nDim], &pInitialPos[particleId*d_nDim], delta);
 		for (long dim = 0; dim < d_nDim; dim++) {
-			//delta = pbcDistance(pPos[particleId * d_nDim + dim], pPreviousPos[particleId * d_nDim + dim], d_boxSizePtr[dim]);
-			delta = pPos[particleId * d_nDim + dim] - pPreviousPos[particleId * d_nDim + dim];
-			distance += delta * delta;
+			pDelta[particleId * d_nDim + dim] = delta[dim]*delta[dim];
 		}
-		pDisp[particleId] = sqrt(distance);
 	}
 }
 
 __global__ void kernelCalcParticleScatteringFunction(const double* pPos, const double* pInitialPos, double* pSF, const double waveNum) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double distance, delta, deltaSq = 0;
-		for (long dim = 0; dim < d_nDim; dim++) {
-			distance = pPos[particleId * d_nDim + dim] - pInitialPos[particleId * d_nDim + dim];
-			//distance = pbcDistance(pPos[particleId * d_nDim + dim], pInitialPos[particleId * d_nDim + dim], d_boxSizePtr[dim]);
-			deltaSq += distance * distance;
-		}
-		delta = sqrt(deltaSq);
-		pSF[particleId] = sin(waveNum * delta) / (waveNum * delta);
+		double distance = 0;
+		distance = calcDistance(&pPos[particleId*d_nDim], &pInitialPos[particleId*d_nDim]);
+		pSF[particleId] = sin(waveNum * distance) / (waveNum * distance);
 	}
 }
 

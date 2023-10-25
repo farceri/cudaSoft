@@ -118,6 +118,8 @@ public:
   void setLEshift(double LEshift_);
   double getLEshift();
 
+  void applyLEShear(double LEshift_);
+
   void setDimBlock(long dimBlock_);
   long getDimBlock();
 

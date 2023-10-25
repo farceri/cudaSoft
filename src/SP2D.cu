@@ -222,6 +222,20 @@ double SP2D::getLEshift() {
 	return LEshiftFromDevice;
 }
 
+void SP2D::applyLEShear(double LEshift_) {
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+
+	auto shearPosition = [=] __device__ (long particleId) {
+		double shearPos;
+		shearPos = pPos[particleId * d_nDim] + LEshift_ * pPos[particleId * d_nDim + 1];
+		shearPos -= floor(shearPos);
+		pPos[particleId * d_nDim] = shearPos;
+	};
+
+	thrust::for_each(r, r+numParticles, shearPosition);
+}
+
 // TODO: add error checks for all the getters and setters
 void SP2D::setDimBlock(long dimBlock_) {
 	dimBlock = dimBlock_;
@@ -712,13 +726,7 @@ void SP2D::calcParticleStressTensor() {
 
 double SP2D::getParticleVirialPressure() {
    calcParticleStressTensor();
-	 double totalStress = 0, volume = 1;
-	 for (long dim = 0; dim < nDim; dim++) {
-		 totalStress += d_stress[dim * nDim + dim];
-     volume *= d_boxSize[dim];
-	 }
-	 return totalStress / (nDim * volume);
-	 //return totalStress;
+	 return (d_stress[0] + d_stress[3]) / (nDim * d_boxSize[0] * d_boxSize[1]);
 }
 
 double SP2D::getParticleShearStress() {

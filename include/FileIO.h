@@ -211,6 +211,25 @@ public:
     cout << "FileIO::readPBCParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << endl;
   }
 
+  void saveAthermalParticlePacking(string dirName) {
+    // save scalars
+    string fileParams = dirName + "params.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
+    saveParams << "dt" << "\t" << sp_->dt << endl;
+    saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
+    saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+    saveParams << "pressure" << "\t" << sp_->getParticleVirialPressure() << endl;
+    saveParams.close();
+    // save vectors
+    save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+    save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
+    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
+    sp_->calcParticleContacts(0.);
+    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+  }
+
   void saveParticlePacking(string dirName) {
     // save scalars
     string fileParams = dirName + "params.dat";
