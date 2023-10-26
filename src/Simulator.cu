@@ -161,32 +161,12 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticlePos);
 }
 
-//************************ soft particle langevinRA **************************//
-void SoftParticleLangevin2RA::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->calcParticleForceEnergyRA(); // this is the only difference
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
-
-//*********************** soft particle Lennard-Jones ************************//
-void SoftParticleLangevin2LJ::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->calcParticleForceEnergyLJ(); // this is the only difference
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
-
 //****************** fixed boundary soft particle langevin *******************//
-void SoftParticleLangevinFixedBoundary::integrate() {
+void SoftParticleLangevinFixedBox::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
-  sp_->calcParticleWallForceEnergy();
+  sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
 }
@@ -308,11 +288,11 @@ void SoftParticleLangevinExtField::integrate() {
 }
 
 //************************* soft particle langevin ***************************//
-void SoftParticleLangevinLJExtField::integrate() {
+void SoftParticleLangevinPerturb::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
-  sp_->calcParticleForceEnergyLJ();
+  sp_->calcParticleForceEnergy();
   sp_->addConstantParticleForce(extForce, firstIndex);
   updateVelocity(0.5*sp_->dt);
   conserveMomentum();
@@ -327,20 +307,11 @@ void SoftParticleNVE::integrate() {
   //conserveMomentum();
 }
 
-//*********************** attractive soft particle nve ***********************//
-void SoftParticleNVERA::integrate() {
-  updateVelocity(0.5 * sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->calcParticleForceEnergyRA();
-  updateVelocity(0.5 * sp_->dt);
-  //conserveMomentum();
-}
-
 //********************* fixed boundary soft particle nve *********************//
-void SoftParticleNVEFixedBoundary::integrate() {
+void SoftParticleNVEFixedBox::integrate() {
   updateVelocity(0.5 * sp_->dt);
   updatePosition(sp_->dt);
-  sp_->calcParticleWallForceEnergy();
+  sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();
 }
@@ -392,42 +363,13 @@ void SoftParticleActiveLangevin::updateThermalVel() {
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise);
 }
-  // generate active forces
-  //double amplitude = sqrt(2. * config.Dr * sp_->dt);
-  //thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  //thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles, d_pActiveAngle.begin(), gaussNum(0.f,1.f));
-  //double s_driving(config.driving);
-  //auto s = thrust::counting_iterator<long>(0);
-  //const double *pActiveAngle = thrust::raw_pointer_cast(&d_pActiveAngle[0]);
-  //double *pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
-	//double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
-
-  //auto addActiveParticleForce = [=] __device__ (long particleId) {
-  //  pAngle[particleId] += amplitude * pActiveAngle[particleId];
-  //  #pragma unroll (MAXDIM)
-	//	for (long dim = 0; dim < s_nDim; dim++) {
-  //    pForce[particleId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
-  //  }
-  //};
-
-  //thrust::for_each(s, s + sp_->numParticles, addActiveParticleForce);
-
-//*******#************* soft particle active LJ langevin *********************//
-void SoftParticleActiveLJLangevin::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->calcParticleForceEnergyLJ();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
 
 //************** fixed boundary soft particle active langevin ****************//
-void SoftParticleActiveFixedBoundary::integrate() {
+void SoftParticleActiveFixedBox::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
-  sp_->calcParticleWallForceEnergy();
+  sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
 }

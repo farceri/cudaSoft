@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
   //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -97,7 +98,7 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleActiveLJLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   //waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
@@ -107,7 +108,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleActiveLJLangevinLoop();
+    sp.softParticleActiveLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleActiveEnergy(step, timeStep, waveQ, driving);

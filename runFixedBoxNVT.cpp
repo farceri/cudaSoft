@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, logSave, linSave = false, saveFinal = true;
+  bool readState = false, logSave, linSave = false, saveFinal = true;
   long numParticles = 8192, nDim = 2;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), updateFreq = 1;
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
@@ -38,6 +38,7 @@ int main(int argc, char **argv) {
   //dirSample = whichDynamics + "T" + argv[3] + "/iod" + argv[6] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -90,13 +91,14 @@ int main(int argc, char **argv) {
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
-  sp.calcParticleWallNeighborList(cutDistance);
-  sp.calcParticleWallForceEnergy();
-  sp.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
+  sp.calcParticleBoxNeighborList(cutDistance);
+  sp.calcParticleBoxForceEnergy();
+  sp.initSoftParticleLangevinFixedBox(Tinject, damping, readState);
   // run integrator
   waveQ = sp.getSoftWaveNumber();
+  sp.setInitialPositions();
   while(step != maxStep) {
-    sp.softParticleLangevinFixedBoundaryLoop();
+    sp.softParticleLangevinFixedBoxLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleEnergy(step, timeStep, waveQ);
       if(step % checkPointFreq == 0) {

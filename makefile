@@ -57,9 +57,10 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-#EXE = compressPacking
-EXE = shearPacking
 #EXE = make3DPacking
+#EXE = compressPacking
+#EXE = shearPacking
+#EXE = shearPackingNVT
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -70,14 +71,15 @@ EXE = shearPacking
 #EXE = runNPT
 #EXE = runActive
 #EXE = runActiveLJ
+#EXE = runAdhesiveNVE
+#EXE = runAdhesiveNVT
 #EXE = runLennardJonesNVT
 #EXE = runLennardJonesLE
-#EXE = runLennardJonesEF
-#EXE = runFixedBoundaryActive
-#EXE = runFixedBoundaryNVE
-#EXE = runFixedBoundaryNVT
-#EXE = runAttractiveNVE
-#EXE = runAttractiveNVT
+EXE = shearActive
+#EXE = shearLennardJones
+#EXE = runFixedBoxActive
+#EXE = runFixedBoxNVE
+#EXE = runFixedBoxNVT
 #EXE = runExternalField
 
 # Object files:

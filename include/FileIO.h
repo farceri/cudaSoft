@@ -72,6 +72,15 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
+  void saveParticleStress(double strain, long numParticles) {
+    energyFile << strain << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
+  }
+
   void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";

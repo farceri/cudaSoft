@@ -20,8 +20,8 @@ using std::vector;
 using std::string;
 
 struct simControlStruct {
-  enum class geometryEnum {normal, leesEdwards} geometryType;
-  enum class potentialEnum {harmonic, lennardJones} potentialType;
+  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides} geometryType;
+  enum class potentialEnum {harmonic, lennardJones, adhesive} potentialType;
 };
 
 // pointer-to-member function call macro
@@ -212,13 +212,9 @@ public:
   // particle functions
   void calcParticleForceEnergy();
 
-  void calcParticleWallForceEnergy();
+  void calcParticleBoxForceEnergy();
 
   void calcParticleSidesForceEnergy();
-
-  void calcParticleForceEnergyRA();
-
-  void calcParticleForceEnergyLJ();
 
   void makeExternalParticleForce(double externalForce);
 
@@ -262,7 +258,7 @@ public:
 
   void syncParticleNeighborsToDevice();
 
-  void calcParticleWallNeighborList(double cutDistance);
+  void calcParticleBoxNeighborList(double cutDistance);
 
   void calcParticleContacts(double gapSize);
 
@@ -286,17 +282,9 @@ public:
 
   void softParticleLangevinLoop();
 
-  void initSoftParticleLangevinFixedBoundary(double Temp, double gamma, bool readState);
+  void initSoftParticleLangevinFixedBox(double Temp, double gamma, bool readState);
 
-  void softParticleLangevinFixedBoundaryLoop();
-
-  void initSoftParticleLangevinRA(double Temp, double gamma, bool readState);
-
-  void softParticleLangevinRALoop();
-
-  void initSoftParticleLangevinLJ(double Temp, double gamma, bool readState);
-
-  void softParticleLangevinLJLoop();
+  void softParticleLangevinFixedBoxLoop();
 
   void initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
 
@@ -306,35 +294,27 @@ public:
 
   void softParticleLangevinExtFieldLoop();
 
-  void initSoftParticleLangevinLJExtField(double Temp, double gamma, double extForce, long firstIndex, bool readState);
+  void initSoftParticleLangevinPerturb(double Temp, double gamma, double extForce, long firstIndex, bool readState);
 
-  void softParticleLangevinLJExtFieldLoop();
+  void softParticleLangevinPerturbLoop();
 
   // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);
 
   void softParticleNVELoop();
 
-  void initSoftParticleNVERA(double Temp, bool readState);
+  void initSoftParticleNVEFixedBox(double Temp, bool readState);
 
-  void softParticleNVERALoop();
-
-  void initSoftParticleNVEFixedBoundary(double Temp, bool readState);
-
-  void softParticleNVEFixedBoundaryLoop();
+  void softParticleNVEFixedBoxLoop();
 
   // Active integrators
   void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
 
   void softParticleActiveLangevinLoop();
 
-  void initSoftParticleActiveLJLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
+  void initSoftParticleActiveFixedBox(double Temp, double Dr, double driving, double gamma, bool readState);
 
-  void softParticleActiveLJLangevinLoop();
-
-  void initSoftParticleActiveFixedBoundary(double Temp, double Dr, double driving, double gamma, bool readState);
-
-  void softParticleActiveFixedBoundaryLoop();
+  void softParticleActiveFixedBoxLoop();
 
   void initSoftParticleActiveFixedSides(double Temp, double Dr, double driving, double gamma, bool readState);
 

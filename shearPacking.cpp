@@ -24,12 +24,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool save = true, saveSame = false;
+  long iteration = 0, maxIteration = 1e04, printFreq = maxIteration;
   long numParticles = 8192, nDim = 2, minStep = 20, numStep = 0, repetition = 0;
-  long step = 0, maxStep = 1, iteration = 0, maxIteration = 1e04, printFreq = maxIteration;
   double FIREStep = 1e-04, newFIREStep, phi, pressure, cutoff, maxDelta, strain, strainStep = atof(argv[3]);
   double cutDistance = 1, polydispersity = 0.20, ec = 1, sigma, maxStrain = atof(argv[2]);
   double forceCheck, lastEnergyCheck, energyCheck, forceTollerance = 1e-12, energyTollerance = 1e-05;
-  std::string inDir = argv[1], outDir, currentDir, dirSample = "shear-3/", saveFile;
+  std::string inDir = argv[1], outDir, currentDir, dirSample = "shear5/", saveFile;
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
@@ -50,14 +50,14 @@ int main(int argc, char **argv) {
   phi = sp.getParticlePhi();
   sigma = sp.getMeanParticleSigma();
   FIREStep = FIREStep * sigma;
-  cutoff = cutDistance * sp.getMinParticleSigma();
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   strain = strainStep;
   sp.setGeometryType(simControlStruct::geometryEnum::leesEdwards);
   sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
   sp.setParticleMassFIRE();
   while (strain < (maxStrain + strainStep)) {
     sp.setLEshift(strain);
-    //sp.applyLEShear(strainStep);
+    sp.applyLEShear(strainStep);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     iteration = 0;
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveAthermalParticlePacking(currentDir);
     }
-    ioSP.saveParticleStressEnergy(step, strain, numParticles);
+    ioSP.saveParticleStress(strain, numParticles);
     strain += strainStep;
   }
 
