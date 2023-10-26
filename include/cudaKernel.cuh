@@ -237,10 +237,11 @@ inline __device__ double calcLJForceShift(const double radSum, const double radS
 }
 
 inline __device__ double calcGradMultiple(const double* thisPos, const double* otherPos, const double radSum) {
+	double distance, overlap;
+	distance = calcDistance(thisPos, otherPos);
 	switch (d_simControl.potentialType) {
 		case simControlStruct::potentialEnum::harmonic:
-		double overlap;
-		overlap = calcOverlap(thisPos, otherPos, radSum);
+		overlap = 1 - distance / radSum;
 		if(overlap > 0) {
 			return d_ec * overlap / radSum;
 		} else {
@@ -248,13 +249,22 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 		}
 		break;
 		case simControlStruct::potentialEnum::lennardJones:
-		double distance, distance6, radSum6, forceShift;
-		distance = calcDistance(thisPos, otherPos);
+		double distance6, radSum6, forceShift;
 		distance6 = pow(distance, 6);
 		radSum6 = pow(radSum, 6);
 		if (distance <= (d_LJcutoff * radSum)) {
 			forceShift = calcLJForceShift(radSum, radSum6);
 			return -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance + forceShift;
+		} else {
+			return 0;
+		}
+		break;
+		case simControlStruct::potentialEnum::adhesive:
+		overlap = 1 - distance / radSum;
+		if (distance < (1 + d_l1) * radSum) {
+			return d_ec * overlap / radSum;
+		} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
+			return -(d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
 		} else {
 			return 0;
 		}

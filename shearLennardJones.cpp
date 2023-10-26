@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
       cout << "shear LJ: current step: " << step + initialStep;
       cout << " U/N: " << sp.getParticleEnergy() / numParticles;
       cout << " T: " << sp.getParticleTemperature();
+      cout << " shear stress: " << sp.getParticleShearStress();
       if(step != 0 && updateCount > 0) {
         cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
       } else {

@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "test/";//"T" + argv[3] + "-u" + argv[4] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setGeometryType(simControlStruct::potentialEnum::adhesive);
+  sp.setPotentialType(simControlStruct::potentialEnum::adhesive);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics

@@ -255,11 +255,9 @@ public:
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
-    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-    //sp_->calcParticleContacts(0.);
-    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    sp_->calcParticleContacts(0.);
+    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void readParticleState(string dirName, long numParticles_, long nDim_) {
@@ -281,9 +279,9 @@ public:
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    sp_->calcParticleContacts(0.);
-    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    //sp_->calcParticleContacts(0.);
+    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleActiveState(string dirName) {
@@ -291,14 +289,13 @@ public:
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    sp_->calcParticleContacts(0.);
-    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    //sp_->calcParticleContacts(0.);
+    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void saveParticleAttractiveState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
