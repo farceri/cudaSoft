@@ -59,8 +59,8 @@ INC_DIR = include
 #EXE = jamPacking
 #EXE = make3DPacking
 #EXE = compressPacking
-#EXE = shearPacking
-#EXE = shearPackingNVT
+#EXE = linearShear
+#EXE = linearShearNVT
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -74,13 +74,17 @@ INC_DIR = include
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
 #EXE = runLennardJonesNVT
-#EXE = runLennardJonesLE
-#EXE = shearActive
-EXE = shearLennardJones
 #EXE = runFixedBoxActive
 #EXE = runFixedBoxNVE
 #EXE = runFixedBoxNVT
 #EXE = runExternalField
+
+# mechanics
+#EXE = runLennardJonesLE
+#EXE = shearLJ
+#EXE = shearActive
+EXE = extendLJ
+#EXE = extendActive
 
 # Object files:
 OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o

@@ -452,11 +452,11 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 						forces[dim] = gradMultiple * delta[dim] / distance;
 					}
 					//diagonal terms
-					pStress[0] += delta[0] * forces[0];
-					pStress[3] += delta[1] * forces[1];
+					pStress[0] = delta[0] * forces[0];
+					pStress[3] = delta[1] * forces[1];
 					// cross terms
-					pStress[1] += delta[0] * forces[1];
-					pStress[2] += delta[1] * forces[0];
+					pStress[1] -= delta[0] * forces[1];
+					pStress[2] -= delta[1] * forces[0];
 				}
 			}
 		}

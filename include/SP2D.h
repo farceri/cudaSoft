@@ -120,6 +120,8 @@ public:
 
   void applyLEShear(double LEshift_);
 
+  void applyExtension(double shifty_);
+
   void setDimBlock(long dimBlock_);
   long getDimBlock();
 

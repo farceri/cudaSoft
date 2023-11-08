@@ -59,20 +59,18 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleTemperature() << endl;
   }
 
-  void saveParticleEnergy(long step, double timeStep, double waveNumber) {
+  void saveParticleEnergy(long step, double timeStep, double waveNumber, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleTemperature() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
-  void saveParticleStress(double strain, long numParticles) {
+  void saveParticleStressStrain(double strain, long numParticles) {
     energyFile << strain << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
@@ -90,14 +88,12 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
   }
 
-  void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving) {
+  void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleTemperature() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleActivePressure(driving) << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
@@ -198,7 +194,7 @@ public:
     // set length scales
     sp_->setLengthScaleToOne();
     boxSize_ = sp_->getBoxSize();
-    cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box:" << boxSize_[0] << boxSize_[1] << endl;
+    cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << endl;
   }
 
   void readPBCParticlePackingFromDirectory(string dirName, long numParticles_, long nDim_) {
@@ -289,15 +285,15 @@ public:
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //sp_->calcParticleContacts(0.);
-    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    sp_->calcParticleContacts(0.);
+    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void saveParticleAttractiveState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {

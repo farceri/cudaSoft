@@ -96,9 +96,10 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = Dr/timeUnit;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
-  sp.setLEshift(strain);
   if(initialStep == 0) {
-    sp.applyLEShear(strain);
+    sp.applyExtension(strain);
+    boxSize = sp.getBoxSize();
+    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << endl;
   }
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
@@ -123,7 +124,7 @@ int main(int argc, char **argv) {
       cout << "shear Active: current step: " << step + initialStep;
       cout << " U/N: " << sp.getParticleEnergy() / numParticles;
       cout << " T: " << sp.getParticleTemperature();
-      cout << " stress: " << sp.getParticleShearStress();
+      cout << " pressure: " << sp.getParticleVirialPressure();
       if(step != 0 && updateCount > 0) {
         cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
       } else {

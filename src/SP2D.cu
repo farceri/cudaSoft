@@ -151,6 +151,8 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
     cout << "SP2D: setGeometryType: geometryType: normal" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
     cout << "SP2D: setGeometryType: geometryType: leesEdwards" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
+    cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
   } else {
     cout << "SP2D: setGeometryType: please specify valid geometryType: normal or leesEdwards" << endl;
   }
@@ -235,6 +237,26 @@ void SP2D::applyLEShear(double LEshift_) {
 	};
 
 	thrust::for_each(r, r+numParticles, shearPosition);
+}
+
+void SP2D::applyExtension(double shifty_) {
+  // first set the new boxSize
+  thrust::host_vector<double> newBoxSize(nDim);
+  newBoxSize = getBoxSize();
+  newBoxSize[1] = (1 + shifty_) * newBoxSize[1];
+  setBoxSize(newBoxSize);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto extendPosition = [=] __device__ (long particleId) {
+		double extendPos;
+		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
+		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		pPos[particleId * d_nDim + 1] = extendPos;
+	};
+
+	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
 // TODO: add error checks for all the getters and setters
