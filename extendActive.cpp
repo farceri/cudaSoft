@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       logSave = true;
-      outDir = outDir + "dynamicsLE" + argv[10] + "-log/";
+      outDir = outDir + "dynamicsLy" + argv[10] + "-log/";
       //linSave = true;
       //outDir = outDir + "dynamicsLE" + argv[10] + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
