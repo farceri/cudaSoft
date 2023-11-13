@@ -82,8 +82,8 @@ INC_DIR = include
 # mechanics
 #EXE = runLennardJonesLE
 #EXE = shearLJ
-#EXE = shearActive
-EXE = extendLJ
+EXE = shearActive
+#EXE = extendLJ
 #EXE = extendActive
 
 # Object files:

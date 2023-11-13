@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
   double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
+  thrust::host_vector<double> boxSize(nDim);
   dirSample = whichDynamics + "Dr" + argv[4] + "/";
   //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
