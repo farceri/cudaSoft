@@ -828,7 +828,7 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
   // if the neighbors don't fit, resize the neighbor list
   if ( partMaxNeighbors > partNeighborListSize ) {
 		partNeighborListSize = pow(2, ceil(std::log2(partMaxNeighbors)));
-    //cout << "SP2D::calcParticleNeighborList: neighborListSize: " << neighborListSize << endl;
+    //cout << "SP2D::calcParticleNeighborList: neighborListSize: " << partNeighborListSize << endl;
 		//Now create the actual storage and then put the neighbors in it.
 		d_partNeighborList.resize(numParticles * partNeighborListSize);
 		//Pre-fill the neighborList with -1

@@ -263,10 +263,10 @@ public:
   }
 
   void readParticleActiveState(string dirName, long numParticles_, long nDim_) {
-    thrust::host_vector<double> particleAngle_(numParticles_);
+    //thrust::host_vector<double> particleAngle_(numParticles_);
     thrust::host_vector<double> particleVel_(numParticles_ * nDim_);
-    particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
-    sp_->setParticleAngles(particleAngle_);
+    //particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
+    //sp_->setParticleAngles(particleAngle_);
     particleVel_ = read2DFile(dirName + "particleVel.dat", numParticles_);
     sp_->setParticleVelocities(particleVel_);
   }
@@ -285,8 +285,8 @@ public:
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    sp_->calcParticleContacts(0.);
-    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    //sp_->calcParticleContacts(0.);
+    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void saveParticleAttractiveState(string dirName) {
@@ -311,9 +311,12 @@ public:
   void saveParticleContacts(string dirName) {
     sp_->calcParticleContacts(0.);
     save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
     //save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     //save2DFile(dirName + "lastPos.dat", sp_->getLastPositions(), sp_->nDim);
+  }
+
+  void saveParticleNeighbors(string dirName) {
+    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleConfiguration(string dirName) {

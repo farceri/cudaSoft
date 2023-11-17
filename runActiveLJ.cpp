@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
   long linFreq = 1e04, initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, LJcut = 7, cutDistance = LJcut+1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
+  double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
   dirSample = whichDynamics + "Dr" + argv[4] + "/";
@@ -81,6 +81,7 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
+  sp.setLJcutoff(LJcut);
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
   //timeUnit = sigma * sigma * damping;
@@ -111,9 +112,8 @@ int main(int argc, char **argv) {
     sp.softParticleActiveLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
-      //ioSP.saveParticleActiveEnergy(step, timeStep, waveQ, driving);
       if(step % checkPointFreq == 0) {
-        cout << "Active LJ: current step: " << step;
+        cout << "Active LJ: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         //cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
@@ -138,6 +138,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -145,6 +146,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();
@@ -153,10 +155,6 @@ int main(int argc, char **argv) {
       sp.resetLastPositions();
       updateCount += 1;
     }
-    //if(step % updateFreq == 0) {
-    //  sp.calcParticleNeighborList(cutDistance);
-    //  updateCount += 1;
-    //}
     step += 1;
   }
   // instrument code to measure end time

@@ -70,7 +70,7 @@ INC_DIR = include
 #EXE = runNVT
 #EXE = runNPT
 #EXE = runActive
-#EXE = runActiveLJ
+EXE = runActiveLJ
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
 #EXE = runLennardJonesNVT
@@ -82,7 +82,7 @@ INC_DIR = include
 # mechanics
 #EXE = runLennardJonesLE
 #EXE = shearLJ
-EXE = shearActive
+#EXE = shearActive
 #EXE = extendLJ
 #EXE = extendActive
 
