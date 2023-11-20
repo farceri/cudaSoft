@@ -151,10 +151,12 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
     cout << "SP2D: setGeometryType: geometryType: normal" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
     cout << "SP2D: setGeometryType: geometryType: leesEdwards" << endl;
-  } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
-    cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedBox) {
+    cout << "SP2D: setGeometryType: geometryType: fixedBox" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides) {
+    cout << "SP2D: setGeometryType: geometryType: leesSides" << endl;
   } else {
-    cout << "SP2D: setGeometryType: please specify valid geometryType: normal or leesEdwards" << endl;
+    cout << "SP2D: setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox or fixedSides" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -170,8 +172,12 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     cout << "SP2D: setPotentialType: potentialType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
     cout << "SP2D: setPotentialType: potentialType: lennardJones" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
+    cout << "SP2D: setPotentialType: potentialType: WCA" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
+    cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
   } else {
-    cout << "SP2D: setPotentialType: please specify valid potentialType: normal or lennardJones" << endl;
+    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA or adhesive" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -545,6 +551,37 @@ void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
   setLengthScaleToOne();
 }
 
+//************************ initialization functions **************************//
+void SP2D::setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, double lx) {
+  thrust::host_vector<double> boxSize(nDim);
+  double r1, r2, randNum, mean, sigma, scale;
+  mean = 0.;
+  sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
+  // generate polydisperse particle size
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    r1 = drand48();
+    r2 = drand48();
+    randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
+    d_particleRad[particleId] = exp(mean + randNum * sigma);
+  }
+  boxSize[0] = lx;
+  boxSize[1] = 1;
+  setBoxSize(boxSize);
+  scale = sqrt(getParticlePhi() / phi0);
+  boxSize[0] = lx * scale;
+  boxSize[1] = scale;
+  setBoxSize(boxSize);
+  // extract random positions
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    for(long dim = 0; dim < nDim; dim++) {
+      d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
+    }
+  }
+  // need to set this otherwise forces are zeros
+  //setParticleLengthScale();
+  setLengthScaleToOne();
+}
+
 void SP2D::set3DPolyRandomSoftParticles(double phi0, double polyDispersity) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean, sigma, scale, boxLength = 1.;
@@ -582,7 +619,22 @@ void SP2D::pressureScaleParticles(double pscale) {
 
 void SP2D::scaleParticles(double scale) {
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(scale), d_particleRad.begin(), thrust::multiplies<double>());
-  setParticleLengthScale();
+  //setParticleLengthScale();
+}
+
+void SP2D::scaleParticlePacking() {
+  double sigma = getMeanParticleSigma();
+  thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
+  thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
+  thrust::host_vector<double> boxSize_(nDim);
+  boxSize_ = getBoxSize();
+  for (long dim = 0; dim < nDim; dim++) {
+    boxSize_[dim] /= sigma;
+  }
+  d_boxSize = boxSize_;
+  double* boxSize = thrust::raw_pointer_cast(&(d_boxSize[0]));
+  cudaMemcpyToSymbol(d_boxSizePtr, &boxSize, sizeof(boxSize));
+  //setParticleLengthScale();
 }
 
 void SP2D::scaleParticleVelocity(double scale) {

@@ -237,7 +237,7 @@ inline __device__ double calcLJForceShift(const double radSum, const double radS
 }
 
 inline __device__ double calcGradMultiple(const double* thisPos, const double* otherPos, const double radSum) {
-	double distance, overlap;
+	double distance, overlap, distance6, radSum6, forceShift;
 	distance = calcDistance(thisPos, otherPos);
 	switch (d_simControl.potentialType) {
 		case simControlStruct::potentialEnum::harmonic:
@@ -249,12 +249,20 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 		}
 		break;
 		case simControlStruct::potentialEnum::lennardJones:
-		double distance6, radSum6, forceShift;
 		distance6 = pow(distance, 6);
 		radSum6 = pow(radSum, 6);
 		if (distance <= (d_LJcutoff * radSum)) {
 			forceShift = calcLJForceShift(radSum, radSum6);
 			return -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance + forceShift;
+		} else {
+			return 0;
+		}
+		break;
+		case simControlStruct::potentialEnum::WCA:
+		distance6 = pow(distance, 6);
+		radSum6 = pow(radSum, 6);
+		if (distance <= (WCAcut * radSum)) {
+			return -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
 		} else {
 			return 0;
 		}
@@ -309,7 +317,27 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 	    currentForce[dim] += gradMultiple * delta[dim] / distance;
-	    //currentForce[dim] += gradMultiple * pbcDistance(thisPos[dim], otherPos[dim], dim) / distance;
+	  }
+	}
+	return epot;
+}
+
+inline __device__ double calcWCAInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  double distance, distance6, radSum6, gradMultiple = 0, epot = 0.;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	distance6 = pow(distance, 6);
+	radSum6 = pow(radSum, 6);
+	if (distance <= (WCAcut * radSum)) {
+		gradMultiple = -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
+		epot = 0.5 * d_ec * (4 * (radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) + 1);
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
 	  }
 	}
 	return epot;
@@ -361,6 +389,9 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					break;
 					case simControlStruct::potentialEnum::lennardJones:
 					pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::WCA:
+					pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					break;
 					case simControlStruct::potentialEnum::adhesive:
 					pEnergy[particleId] += calcAdhesiveInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);

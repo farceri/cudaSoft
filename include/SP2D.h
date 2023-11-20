@@ -21,7 +21,7 @@ using std::string;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides} geometryType;
-  enum class potentialEnum {harmonic, lennardJones, adhesive} potentialType;
+  enum class potentialEnum {harmonic, lennardJones, WCA, adhesive} potentialType;
 };
 
 // pointer-to-member function call macro
@@ -192,11 +192,15 @@ public:
   // initialization functions
   void setPolyRandomSoftParticles(double phi0, double polyDispersity);
 
+  void setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, double lx);
+
   void set3DPolyRandomSoftParticles(double phi0, double polyDispersity);
 
   void pressureScaleParticles(double pscale);
 
   void scaleParticles(double scale);
+
+  void scaleParticlePacking();
 
   void scaleParticleVelocity(double scale);
 

@@ -21,6 +21,9 @@ const double finc = 1.1;
 const double fdec = 0.5;
 const double falpha = 0.99;
 
+// WCA cutoff
+const double WCAcut = 1.122462048;
+
 // thrust functors
 struct square {
   __device__ __host__ double operator()(const double xi) { return xi*xi; }
