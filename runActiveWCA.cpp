@@ -22,19 +22,19 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = true;
   long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e04, initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, cutDistance = 1.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-wca/";
-  //dirSample = whichDynamics + "Dr" + argv[4] + "/";
-  dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "/";
+  //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::WCA);
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
   // run integrator
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
-    if(step % saveEnergyFreq == 0) {
+    if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Active LJ: current step: " << step + initialStep;

@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = true;
   long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e04, initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
+  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
   // run integrator
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
-    if(step % saveEnergyFreq == 0) {
+    if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Active LJ: current step: " << step + initialStep;
