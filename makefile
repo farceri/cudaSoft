@@ -58,7 +58,7 @@ INC_DIR = include
 # make packings
 #EXE = jamPacking
 #EXE = make3DPacking
-#EXE = compressPacking
+EXE = compressPacking
 #EXE = linearShear
 #EXE = linearShearNVT
 
@@ -71,7 +71,7 @@ INC_DIR = include
 #EXE = runNPT
 #EXE = runActive
 #EXE = runActiveLJ
-EXE = runActiveWCA
+#EXE = runActiveWCA
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
 #EXE = runLennardJonesNVT
