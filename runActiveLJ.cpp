@@ -81,6 +81,7 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
+  damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
   //timeUnit = 1 / damping;
