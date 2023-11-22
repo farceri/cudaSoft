@@ -58,7 +58,7 @@ public:
   void saveParticleSimpleEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << endl;
   }
 
   void saveParticleEnergy(long step, double timeStep, double waveNumber, long numParticles) {

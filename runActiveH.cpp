@@ -30,13 +30,13 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, cutDistance = 1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
+  double ec = 1e02, cutDistance = 0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-wca/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-h/";
   dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  sp.setPotentialType(simControlStruct::potentialEnum::harmonic);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
-  damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
   //timeUnit = 1 / damping;

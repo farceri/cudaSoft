@@ -26,15 +26,14 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = true;
+  bool readState = true, saveFinal = true, logSave, linSave = false;
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
-  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "/";
-  //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -78,20 +77,20 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
+  sp.setLJcutoff(LJcut);
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
-  sp.setLJcutoff(LJcut);
-  damping = sqrt(inertiaOverDamping) / sigma;
-  timeUnit = 1 / damping;
-  timeStep = sp.setTimeStep(timeStep * timeUnit);
-  forceUnit = inertiaOverDamping / sigma;
-  cout << "Inertia over damping: " << inertiaOverDamping << " damping: " << damping << " sigma: " << sigma << endl;
-  cout << "Tinject: " << Tinject << " time step: " << timeStep << " taup: " << timeUnit/Dr << endl;
-  cout << "Peclet number: " << driving * forceUnit * timeUnit / (damping * Dr * sigma);
-  cout << " f0: " << driving*forceUnit << ", " << driving << " Dr: " << Dr/timeUnit << ", " << Dr << endl;
-  driving = driving*forceUnit;
-  Dr = Dr/timeUnit;
+  timeUnit = sigma / sqrt(ec);
+  damping = (inertiaOverDamping / sigma);
+  timeStep = sp.setTimeStep(timeStep*timeUnit);
+  forceUnit = ec / sigma;
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << endl;
+  cout << "Thermostat - damping: " << damping << "Tinject: " << Tinject << " time step: " << timeStep << endl;
+  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " f0: " << driving << " taup: " << 1/Dr << endl;
+  damping /= timeUnit;
+  driving *= forceUnit;
+  Dr /= timeUnit;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);

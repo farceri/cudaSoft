@@ -92,9 +92,9 @@ int main(int argc, char **argv) {
   previousPhi = currentPhi;
   // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
-    damping = sqrt(inertiaOverDamping) / sigma;
-    timeUnit = 1 / damping;
-    timeStep = sp.setTimeStep(dt * timeUnit);
+    timeUnit = sigma / sqrt(ec);
+    damping = (inertiaOverDamping / sigma);
+    timeStep = sp.setTimeStep(dt*timeUnit);
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
     sp.initSoftParticleLangevin(Tinject, damping, readState);
     sp.calcParticleNeighborList(cutDistance);
