@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj-test/";
   dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -82,15 +82,16 @@ int main(int argc, char **argv) {
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ec);
-  damping = (inertiaOverDamping / sigma);
-  timeStep = sp.setTimeStep(timeStep*timeUnit);
   forceUnit = ec / sigma;
+  //timeUnit = 1 / damping;
+  //forceUnit = inertiaOverDamping / sigma;
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << endl;
-  cout << "Thermostat - damping: " << damping << "Tinject: " << Tinject << " time step: " << timeStep << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " time step: " << timeStep << endl;
   cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " f0: " << driving << " taup: " << 1/Dr << endl;
   damping /= timeUnit;
-  driving *= forceUnit;
-  Dr /= timeUnit;
+  driving = driving*forceUnit;
+  Dr = Dr/timeUnit;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
