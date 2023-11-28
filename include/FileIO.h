@@ -76,7 +76,8 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
+    //energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
   void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
@@ -249,6 +250,8 @@ public:
     // save vectors
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
+    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
@@ -263,10 +266,10 @@ public:
   }
 
   void readParticleActiveState(string dirName, long numParticles_, long nDim_) {
-    //thrust::host_vector<double> particleAngle_(numParticles_);
+    thrust::host_vector<double> particleAngle_(numParticles_);
     thrust::host_vector<double> particleVel_(numParticles_ * nDim_);
-    //particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
-    //sp_->setParticleAngles(particleAngle_);
+    particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
+    sp_->setParticleAngles(particleAngle_);
     particleVel_ = read2DFile(dirName + "particleVel.dat", numParticles_);
     sp_->setParticleVelocities(particleVel_);
   }
@@ -274,10 +277,6 @@ public:
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //sp_->calcParticleContacts(0.);
-    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
-    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleActiveState(string dirName) {
@@ -285,15 +284,12 @@ public:
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //sp_->calcParticleContacts(0.);
-    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void saveParticleAttractiveState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {
@@ -327,11 +323,13 @@ public:
   void saveParticleActiveConfiguration(string dirName) {
     saveParticlePacking(dirName);
     saveParticleActiveState(dirName);
+    saveParticleNeighbors(dirName);
   }
 
   void saveParticleAttractiveConfiguration(string dirName) {
     saveParticlePacking(dirName);
     saveParticleAttractiveState(dirName);
+    saveParticleNeighbors(dirName);
   }
 
 };

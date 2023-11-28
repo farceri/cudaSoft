@@ -59,8 +59,6 @@ INC_DIR = include
 #EXE = jamPacking
 #EXE = make3DPacking
 #EXE = compressPacking
-#EXE = linearShear
-#EXE = linearShearNVT
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -70,8 +68,8 @@ INC_DIR = include
 #EXE = runNVT
 #EXE = runNPT
 #EXE = runActive
-EXE = runActiveH
-#EXE = runActiveLJ
+#EXE = runActiveH
+EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
@@ -82,9 +80,12 @@ EXE = runActiveH
 #EXE = runExternalField
 
 # mechanics
-#EXE = runLennardJonesLE
+#EXE = linearShearFIRE
+#EXE = linearShearNVT
 #EXE = shearLJ
 #EXE = shearActive
+#EXE = linearExtendNVT
+#EXE = linearExtendActive
 #EXE = extendLJ
 #EXE = extendActive
 

@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj-test/";
+  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]), waveQ;
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics/";
+      outDir = outDir + "dynamics-test/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -98,6 +98,8 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.setInitialPositions();
+  waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -113,14 +115,14 @@ int main(int argc, char **argv) {
         cout << "Active LJ: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        //cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
+        cout << " ISF: " << sp.getParticleISF(waveQ);
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
           cout << " no updates" << endl;
         }
         updateCount = 0;
-        ioSP.saveParticleActiveConfiguration(outDir);
+        ioSP.saveParticlePacking(outDir);
       }
     }
     if(logSave == true) {
@@ -134,16 +136,14 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleActiveState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticlePacking(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleActiveState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticlePacking(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();

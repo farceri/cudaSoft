@@ -122,6 +122,8 @@ public:
 
   void applyExtension(double shifty_);
 
+  void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
+
   void setDimBlock(long dimBlock_);
   long getDimBlock();
 
@@ -238,6 +240,8 @@ public:
   double getParticleVirialPressure();
 
   double getParticleShearStress();
+
+  double getParticleExtensileStress();
 
   double getParticleWallPressure();
 

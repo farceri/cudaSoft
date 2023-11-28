@@ -265,6 +265,23 @@ void SP2D::applyExtension(double shifty_) {
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
+void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto extendPosition = [=] __device__ (long particleId) {
+		double extendPos;
+		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
+		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		pPos[particleId * d_nDim + 1] = extendPos;
+	};
+
+	thrust::for_each(r, r+numParticles, extendPosition);
+}
+
 // TODO: add error checks for all the getters and setters
 void SP2D::setDimBlock(long dimBlock_) {
 	dimBlock = dimBlock_;
@@ -789,6 +806,11 @@ double SP2D::getParticleVirialPressure() {
 double SP2D::getParticleShearStress() {
    calcParticleStressTensor();
 	 return (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+}
+
+double SP2D::getParticleExtensileStress() {
+   calcParticleStressTensor();
+	 return d_stress[3] / (d_boxSize[0] * d_boxSize[1]);
 }
 
 double SP2D::getParticleDynamicalPressure() {
