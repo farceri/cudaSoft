@@ -22,21 +22,21 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = false;
-  long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, cutDistance = 1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-wca/";
-  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
+  long numParticles = atol(argv[7]), nDim = 2;
+  long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, waveQ, timeStep = atof(argv[2]);
+  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit;
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -71,12 +71,13 @@ int main(int argc, char **argv) {
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
+  sp.setLJcutoff(LJcut);
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
@@ -87,16 +88,15 @@ int main(int argc, char **argv) {
   //forceUnit = inertiaOverDamping / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject)*forceUnit << endl;
-  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " taup: " << 1/Dr << " f0: " << driving*forceUnit << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
   damping /= timeUnit;
-  driving = driving*forceUnit;
-  Dr = Dr/timeUnit;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
+  sp.setInitialPositions();
+  waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -105,14 +105,14 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleActiveLangevinLoop();
+    sp.softParticleLangevinLoop();
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "Active LJ: current step: " << step + initialStep;
+        cout << "Langevin LJ: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        //cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
+        cout << " ISF: " << sp.getParticleISF(waveQ);
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticleAttractiveConfiguration(outDir);
   }
   ioSP.closeEnergyFile();
 

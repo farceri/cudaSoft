@@ -57,9 +57,6 @@ int main(int argc, char **argv) {
   // save initial configuration
   sp.calcParticleNeighborList(cutDistance);
   ioSP.saveParticlePacking(outDir);
-  // output file
-  energyFile = outDir + "stressEnergy.dat";
-  ioSP.openEnergyFile(energyFile);
   sp.setEnergyCostant(ec);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
@@ -87,7 +84,12 @@ int main(int argc, char **argv) {
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
+    std::string currentDir = outDir + "strain" + std::to_string(strain) + "/";
+    std::experimental::filesystem::create_directory(currentDir);
+    energyFile = currentDir + "stressEnergy.dat";
+    ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
+      ioSP.saveParticleStressEnergy(step, timeStep, numParticles);
       sp.softParticleLangevinLoop();
       if(step % printFreq == 0) {
         cout << "extend NVT: current step: " << step;
@@ -104,17 +106,15 @@ int main(int argc, char **argv) {
     }
     // save minimized configuration
     if(save == true) {
-      std::string currentDir = outDir + "strain" + std::to_string(strain) + "/";
-      std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveParticlePacking(currentDir);
     }
     ioSP.saveParticleStressStrain(strain, numParticles);
     strain += strainStep;
+    ioSP.closeEnergyFile();
   }
   if(saveSame == true) {
     ioSP.saveParticlePacking(outDir);
   }
-  ioSP.closeEnergyFile();
 
   return 0;
 }

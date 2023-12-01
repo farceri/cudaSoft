@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics-test/";
+      outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -87,9 +87,9 @@ int main(int argc, char **argv) {
   //timeUnit = 1 / damping;
   //forceUnit = inertiaOverDamping / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " time step: " << timeStep << endl;
-  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " f0: " << driving << " taup: " << 1/Dr << endl;
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject)*forceUnit << endl;
+  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " taup: " << 1/Dr << " f0: " << driving*forceUnit << endl;
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = Dr/timeUnit;
