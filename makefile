@@ -3,7 +3,7 @@
 ## USER SPECIFIC DIRECTORIES ##
 
 # CUDA directory:
-CUDA_ROOT_DIR=/usr/local/cuda
+CUDA_ROOT_DIR=/usr/local/cuda-12.2
 #CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.2.2
 
 ##########################################################
@@ -11,7 +11,7 @@ CUDA_ROOT_DIR=/usr/local/cuda
 ## CC COMPILER OPTIONS ##
 
 # CC compiler options:
-CC=g++
+CC=/usr/bin/g++
 #CC=/gpfs/loomis/apps/avx/software/GCCcore/10.2.0/bin/g++
 CC_FLAGS= -O3
 CC_LIBS= -lstdc++fs
@@ -71,7 +71,7 @@ INC_DIR = include
 #EXE = runActiveH
 #EXE = runActiveLJ
 #EXE = runActiveWCA
-EXE = runLangevinLJ
+#EXE = runLangevinLJ
 #EXE = runLennardJonesNVT
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
@@ -79,6 +79,7 @@ EXE = runLangevinLJ
 #EXE = runFixedBoxNVE
 #EXE = runFixedBoxNVT
 #EXE = runExternalField
+EXE = simpleActive
 
 # mechanics
 #EXE = linearShearFIRE

@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
     energyFile = currentDir + "stressEnergy.dat";
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
-      ioSP.saveParticleStressEnergy(step, timeStep, numParticles);
+      ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       sp.softParticleActiveLangevinLoop();
       if(step % printFreq == 0) {
         cout << "extend Active: current step: " << step;

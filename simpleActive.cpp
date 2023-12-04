@@ -22,53 +22,17 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
-  // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
-  // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false;
-  long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  bool readState = true, saveFinal = true, logSave, linSave = true;
+  long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]), waveQ;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
-  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   ioSPFile ioSP(&sp);
-  // set input and output
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      //logSave = true;
-      //outDir = outDir + "dynamics-log/";
-      linSave = true;
-      outDir = outDir + "dynamics/";
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        //if(initialStep != 0) {
-        inDir = outDir;
-        //}
-      } else {
-        std::experimental::filesystem::create_directory(outDir);
-      }
-    }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
-      readState = true;
-      outDir = inDir + "../../" + dirSample;
-      //outDir = inDir + "../../../" + dirSample;
-    } else {
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
-      }
-      outDir = inDir + dirSample;
-    }
-    std::experimental::filesystem::create_directory(outDir);
-  }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleActiveState(inDir, numParticles, nDim);
@@ -122,7 +86,9 @@ int main(int argc, char **argv) {
           cout << " no updates" << endl;
         }
         updateCount = 0;
-        ioSP.saveParticlePacking(outDir);
+        if(saveFinal == true) {
+          ioSP.saveParticlePacking(inDir);
+        }
       }
     }
     if(logSave == true) {
@@ -134,16 +100,16 @@ int main(int argc, char **argv) {
         saveFreq *= 10;
       }
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
-        currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
+        currentDir = inDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticlePacking(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
-        currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
+        currentDir = inDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticlePacking(currentDir);
+        ioSP.saveParticleActiveState(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();

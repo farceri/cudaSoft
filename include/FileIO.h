@@ -55,6 +55,14 @@ public:
     }
   }
 
+  void reopenEnergyFile(string fileName) {
+    energyFile = ofstream(fileName.c_str(), std::fstream::app);
+    if (!energyFile.is_open()) {
+      cerr << "ioSPFile::openEnergyFile: error: could not open input file " << fileName << endl;
+      exit(1);
+    }
+  }
+
   void saveParticleSimpleEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
@@ -255,8 +263,8 @@ public:
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-    sp_->calcParticleContacts(0.);
-    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    //sp_->calcParticleContacts(0.);
+    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void readParticleState(string dirName, long numParticles_, long nDim_) {
@@ -283,13 +291,13 @@ public:
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleAttractiveState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {
