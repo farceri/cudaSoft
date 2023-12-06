@@ -24,13 +24,13 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, saveSame = false, lj = true, wca = false;
-  long step, maxStep = atof(argv[8]), printFreq = int(maxStep / 10);
+  long step, maxStep = atof(argv[8]), printFreq = int(maxStep / 10), linFreq = int(printFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, repetition = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
   double phi, pressure, cutoff, maxDelta, strain, Tinject = atof(argv[3]), strainStep = atof(argv[7]);
   double ec = 1, cutDistance = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[6]), waveQ;
   double Dr = atof(argv[4]), driving = atof(argv[5]), forceUnit;
-  std::string inDir = argv[1], outDir, currentDir, energyFile;
+  std::string inDir = argv[1], outDir, currentDir, energyFile, stressFile;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -99,10 +99,12 @@ int main(int argc, char **argv) {
     // make directory and energy file at each strain step
     std::string currentDir = outDir + "strain" + std::to_string(strain) + "/";
     std::experimental::filesystem::create_directory(currentDir);
-    energyFile = currentDir + "stressEnergy.dat";
+    energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      if(step % linFreq == 0) {
+        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      }
       sp.softParticleActiveLangevinLoop();
       if(step % printFreq == 0) {
         cout << "extend Active: current step: " << step;
@@ -121,7 +123,6 @@ int main(int argc, char **argv) {
     if(save == true) {
       ioSP.saveParticlePacking(currentDir);
     }
-    ioSP.saveParticleStressStrain(strain, numParticles);
     strain += strainStep;
     ioSP.closeEnergyFile();
   }

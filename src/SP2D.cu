@@ -282,6 +282,24 @@ void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
+void SP2D::applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shiftx_) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto extendPosition = [=] __device__ (long particleId) {
+		double extendPos;
+		extendPos = (1 + shiftx_) * pPos[particleId * d_nDim];
+		extendPos -= round(extendPos / boxSize[0]) * boxSize[0];
+		pPos[particleId * d_nDim] = extendPos;
+	};
+
+	thrust::for_each(r, r+numParticles, extendPosition);
+}
+
+
 // TODO: add error checks for all the getters and setters
 void SP2D::setDimBlock(long dimBlock_) {
 	dimBlock = dimBlock_;
@@ -636,7 +654,6 @@ void SP2D::pressureScaleParticles(double pscale) {
 
 void SP2D::scaleParticles(double scale) {
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(scale), d_particleRad.begin(), thrust::multiplies<double>());
-  //setParticleLengthScale();
 }
 
 void SP2D::scaleParticlePacking() {
@@ -813,12 +830,13 @@ double SP2D::getParticleExtensileStress() {
 	 return d_stress[3] / (d_boxSize[0] * d_boxSize[1]);
 }
 
-double SP2D::getParticleDynamicalPressure() {
-  double volume = 1;
-  for (long dim = 0; dim < nDim; dim++) {
-    volume *= d_boxSize[dim];
-  }
-  return getParticleTemperature() * numParticles / volume;
+double SP2D::getParticleWallForce(double range) {
+  d_wallForce.resize(d_particleEnergy.size());
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPos, range, wallForce);
+  return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
 }
 
 double SP2D::getParticleWallPressure() {
@@ -831,6 +849,14 @@ double SP2D::getParticleWallPressure() {
    kernelCalcParticleBoxPressure<<<dimGrid, dimBlock>>>(pRad, pPos, wallWork);
 	 return wallWork / (nDim * volume);
 	 //return totalStress;
+}
+
+double SP2D::getParticleDynamicalPressure() {
+  double volume = 1;
+  for (long dim = 0; dim < nDim; dim++) {
+    volume *= d_boxSize[dim];
+  }
+  return getParticleTemperature() * numParticles / volume;
 }
 
 double SP2D::getParticleActivePressure(double driving) {
@@ -855,10 +881,7 @@ double SP2D::getParticleEnergy() {
 
 double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
-  // compute squared velocities
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  // sum squares
-  //cout << "vel squared: " << velSquared[0] << " " << velSquared[1] << " " << thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>()) << endl;
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
 
@@ -868,9 +891,8 @@ double SP2D::getParticleTemperature() {
 }
 
 double SP2D::getMassiveTemperature(long firstIndex, double mass) {
-  // temperature computed from the massive particles which are set to be the first #
+  // temperature computed from the massive particles which are set to be the first
   thrust::device_vector<double> velSquared(firstIndex * nDim);
-  // compute squared velocities
   thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, velSquared.begin(), square());
   return mass * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
 }

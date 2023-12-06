@@ -78,8 +78,8 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
-  void saveParticleStressStrain(double strain, long numParticles) {
-    energyFile << strain << "\t";
+  void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
@@ -88,13 +88,12 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
-  void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
+  void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
   void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {
@@ -184,6 +183,13 @@ public:
       outputFile << endl;
     }
     outputFile.close();
+  }
+
+  thrust::host_vector<double> readBoxSize(string dirName, long nDim_) {
+    thrust::host_vector<double> boxSize_(nDim_);
+    boxSize_ = read1DFile(dirName + "boxSize.dat", nDim_);
+    cout << "FileIO::readBoxSize: " << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << endl;
+    return boxSize_;
   }
 
   void readParticlePackingFromDirectory(string dirName, long numParticles_, long nDim_) {

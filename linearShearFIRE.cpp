@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveAthermalParticlePacking(currentDir);
     }
-    ioSP.saveParticleStressStrain(strain, numParticles);
+    ioSP.saveParticleStressEnergy(strain, numParticles);
     strain += strainStep;
   }
   ioSP.closeEnergyFile();

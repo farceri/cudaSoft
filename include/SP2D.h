@@ -75,6 +75,7 @@ public:
   thrust::device_vector<double> d_particleEnergy;
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_stress;
+  thrust::device_vector<double> d_wallForce;
 
   // correlation variables
   thrust::device_vector<double> d_particleInitPos;
@@ -123,6 +124,8 @@ public:
   void applyExtension(double shifty_);
 
   void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
+
+  void applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shifty_);
 
   void setDimBlock(long dimBlock_);
   long getDimBlock();
@@ -242,6 +245,8 @@ public:
   double getParticleShearStress();
 
   double getParticleExtensileStress();
+
+  double getParticleWallForce(double range);
 
   double getParticleWallPressure();
 

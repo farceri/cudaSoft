@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateFreq = 10;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-02, scaleFactor, isf = 1;
-  double cutDistance = 1.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double cutDistance = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.5;
   double timeStep, timeUnit, escale = 1, sigma, cutoff, maxDelta, lx = atof(argv[4]);
   std::string currentDir, outDir = argv[1], inDir;
@@ -63,6 +63,7 @@ int main(int argc, char **argv) {
     sp.setParticleMassFIRE();
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
+    sp.resetLastPositions();
     cout << "Generate initial configurations with FIRE \n" << endl;
     while((sp.getParticleMaxUnbalancedForce() > forceTollerance) && (iteration != maxIterations)) {
       sp.particleFIRELoop();

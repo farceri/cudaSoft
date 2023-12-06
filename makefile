@@ -71,7 +71,7 @@ INC_DIR = include
 #EXE = runActiveH
 #EXE = runActiveLJ
 #EXE = runActiveWCA
-#EXE = runLangevinLJ
+EXE = runLangevinLJ
 #EXE = runLennardJonesNVT
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
@@ -79,7 +79,7 @@ INC_DIR = include
 #EXE = runFixedBoxNVE
 #EXE = runFixedBoxNVT
 #EXE = runExternalField
-EXE = simpleActive
+#EXE = simpleActive
 
 # mechanics
 #EXE = linearShearFIRE
