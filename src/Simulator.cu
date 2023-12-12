@@ -29,6 +29,7 @@ void SoftParticleLangevin::integrate() {
   updatePosition(0.5*sp_->dt);
   updateThermalVel();
   updatePosition(0.5*sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   conserveMomentum();
@@ -87,6 +88,7 @@ void SoftParticleLangevin2::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
@@ -166,6 +168,7 @@ void SoftParticleLangevinFixedBox::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
@@ -176,6 +179,7 @@ void SoftParticleLangevinSubSet::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
   conserveMomentum();
@@ -281,6 +285,7 @@ void SoftParticleLangevinExtField::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   sp_->addExternalParticleForce();
   updateVelocity(0.5*sp_->dt);
@@ -292,6 +297,7 @@ void SoftParticleLangevinPerturb::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   sp_->addConstantParticleForce(extForce, firstIndex);
   updateVelocity(0.5*sp_->dt);
@@ -302,6 +308,7 @@ void SoftParticleLangevinPerturb::integrate() {
 void SoftParticleNVE::integrate() {
   updateVelocity(0.5 * sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();
@@ -311,6 +318,7 @@ void SoftParticleNVE::integrate() {
 void SoftParticleNVEFixedBox::integrate() {
   updateVelocity(0.5 * sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();
@@ -321,6 +329,7 @@ void SoftParticleActiveLangevin::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
@@ -369,6 +378,7 @@ void SoftParticleActiveFixedBox::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleBoxForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
@@ -379,6 +389,7 @@ void SoftParticleActiveFixedSides::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleSidesForceEnergy();
   updateVelocity(0.5*sp_->dt);
   //conserveMomentum();
@@ -389,6 +400,7 @@ void SoftParticleActiveSubSet::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
   conserveMomentum();
@@ -446,6 +458,7 @@ void SoftParticleActiveExtField::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   sp_->addExternalParticleForce();
   updateVelocity(0.5*sp_->dt);

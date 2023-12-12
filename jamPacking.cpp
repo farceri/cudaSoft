@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
     // save minimized configuration
     std::string currentDir = outDir + std::to_string(sp.getParticlePhi()) + "/";
     std::experimental::filesystem::create_directory(currentDir);
-    ioSP.saveParticleConfiguration(currentDir);
+    ioSP.saveParticlePacking(currentDir);
     // check configuration after energy minimization
     //jamCheck = (energyCheck < 2.0 * energyTollerance && energyCheck > energyTollerance);
     //overJamCheck = (energyCheck > 2.0 * energyTollerance);

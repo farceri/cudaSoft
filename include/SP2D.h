@@ -66,6 +66,9 @@ public:
   double LJcutoff, LJecut;
   // Lees-Edwards shift
   double LEshift;
+  // neighbor update variables
+  double cutoff, cutDistance;
+  long updateCount;
 
   // dynamical particle variables
   thrust::device_vector<double> d_particlePos;
@@ -190,6 +193,14 @@ public:
 
   double getParticleMaxDisplacement();
 
+  void setDisplacementCutoff(double cutoff_, double cutDistance_);
+
+  void resetUpdateCount();
+
+  long getUpdateCount();
+
+  void checkParticleMaxDisplacement();
+
   double getSoftWaveNumber();
 
   double getParticleISF(double waveNumber_);
@@ -252,9 +263,9 @@ public:
 
   double getParticleDynamicalPressure();
 
-  double getParticleActivePressure(double driving);
+  double getParticleTotalPressure();
 
-  double getParticleTotalPressure(double driving);
+  double getParticleActivePressure(double driving);
 
   double getParticleEnergy();
 

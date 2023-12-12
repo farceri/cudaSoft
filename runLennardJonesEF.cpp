@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergyLJ();
-  //ioSP.saveParticleAttractiveConfiguration(currentDir);
   if(perturb == true) {
     sp.initSoftParticleLangevinPerturb(Tinject, damping, externalForce, maxIndex, readState);
   } else {
@@ -132,7 +131,7 @@ int main(int argc, char **argv) {
         }
         updateCount = 0;
         if(saveFinal == true) {
-          ioSP.saveParticleAttractiveConfiguration(outDir);
+          ioSP.saveParticlePacking(outDir);
         }
       }
     }
@@ -147,14 +146,14 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveState(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();
@@ -176,7 +175,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleAttractiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

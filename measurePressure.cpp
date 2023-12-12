@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
   cout << "Final pressure: " << pressure << " and energy: " << sp.getParticleEnergy() + sp.getParticleKineticEnergy() << "\n" << endl;
 
   ioSP.closeEnergyFile();
-  ioSP.saveParticleConfiguration(outDir);
+  ioSP.saveParticlePacking(outDir);
 
   return 0;
 }

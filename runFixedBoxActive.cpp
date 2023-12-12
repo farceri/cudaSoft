@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
         cout << " E/N: " << (sp.getParticleEnergy() + sp.getParticleKineticEnergy()) / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
-        ioSP.saveParticleActiveConfiguration(outDir);
+        ioSP.saveParticlePacking(outDir);
       }
     }
     if(logSave == true) {
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
   }
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

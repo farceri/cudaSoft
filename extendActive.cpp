@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   if(initialStep == 0) {
     currentDir = outDir + "/affine/";
     std::experimental::filesystem::create_directory(currentDir);
-    ioSP.saveParticleActiveConfiguration(currentDir);
+    ioSP.saveParticlePacking(currentDir);
   }
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   //waveQ = sp.getSoftWaveNumber();
@@ -132,7 +132,9 @@ int main(int argc, char **argv) {
         cout << " no updates" << endl;
       }
       updateCount = 0;
-      ioSP.saveParticleActiveConfiguration(outDir);
+      if(saveFinal == true) {
+        ioSP.saveParticlePacking(outDir);
+      }
     }
     if(logSave == true) {
       if(step > (multiple * maxStep)) {
@@ -163,10 +165,6 @@ int main(int argc, char **argv) {
       sp.resetLastPositions();
       updateCount += 1;
     }
-    //if(step % updateFreq == 0) {
-    //  sp.calcParticleNeighborList(cutDistance);
-    //  updateCount += 1;
-    //}
     step += 1;
   }
   // instrument code to measure end time
@@ -176,7 +174,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

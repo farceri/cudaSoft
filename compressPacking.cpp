@@ -82,9 +82,6 @@ int main(int argc, char **argv) {
     cout << "FIRE: iteration: " << iteration;
     cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
     cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << "\n" << endl;
-    //currentDir = outDir + "initial/";
-    //std::experimental::filesystem::create_directory(currentDir);
-    //ioSP.saveParticlePacking(currentDir);
   }
   // quasistatic thermal compression
   sp.setPotentialType(simControlStruct::potentialEnum::WCA);
@@ -107,8 +104,6 @@ int main(int argc, char **argv) {
     isf = 1;
     while(step != maxStep) {
       sp.softParticleLangevinLoop();
-      //sp.softParticleNVERALoop();
-      //sp.softParticleNVEFixedBoundaryLoop();
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
         cout << "Langevin: current step: " << step;
@@ -131,7 +126,7 @@ int main(int argc, char **argv) {
     // save minimized configuration
     currentDir = outDir + std::to_string(sp.getParticlePhi()) + "/";
     std::experimental::filesystem::create_directory(currentDir);
-    ioSP.saveParticleConfiguration(currentDir);
+    ioSP.saveParticlePacking(currentDir);
     // check if target density is met
     if(currentPhi >= phiTh) {
       cout << "\nTarget density met, current phi: " << currentPhi << endl;

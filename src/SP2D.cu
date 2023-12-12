@@ -51,6 +51,8 @@ SP2D::SP2D(long nParticles, long dim) {
 	l1 = 0;
 	l2 = 0;
   LEshift = 0;
+  cutDistance = 1;
+  updateCount = 0;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -525,15 +527,32 @@ double SP2D::getParticleMaxDisplacement() {
   double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
   kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
-  //auto r = thrust::counting_iterator<long>(0);
-  //const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  //const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+}
 
-	//auto perParticleDistance = [=] __device__ (int i) {
-	//	return calcDistance(&pPos[i*d_nDim], &pLastPos[i*d_nDim]);
-	//};
+void SP2D::setDisplacementCutoff(double cutoff_, double cutDistance_) {
+  cutoff = cutoff_;
+  cutDistance = cutDistance_;
+  cout << "DPM2D::setDisplacementCutoff - cutoff: " << cutoff << " cutDistance: " << cutDistance << endl;
+}
 
-	//return double( thrust::transform_reduce( r, r + numParticles, perParticleDistance, double(-1), thrust::maximum<double>()) );
+void SP2D::resetUpdateCount() {
+  updateCount = double(0);
+  //cout << "DPM2D::resetUpdateCount - updatCount " << updateCount << endl;
+}
+
+long SP2D::getUpdateCount() {
+  return updateCount;
+}
+
+void SP2D::checkParticleMaxDisplacement() {
+  double maxDelta;
+  maxDelta = getParticleMaxDisplacement();
+  if(3*maxDelta > cutoff) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    updateCount += 1;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta: " << maxDelta << " cutoff: " << cutoff << endl;
+  }
 }
 
 double SP2D::getSoftWaveNumber() {
@@ -859,6 +878,10 @@ double SP2D::getParticleDynamicalPressure() {
   return getParticleTemperature() * numParticles / volume;
 }
 
+double SP2D::getParticleTotalPressure() {
+  return getParticleVirialPressure() + getParticleDynamicalPressure();
+}
+
 double SP2D::getParticleActivePressure(double driving) {
   double activeWork = 0, volume = 1;
   for (long dim = 0; dim < nDim; dim++) {
@@ -869,10 +892,6 @@ double SP2D::getParticleActivePressure(double driving) {
   kernelCalcParticleActivePressure<<<dimGrid, dimBlock>>>(pAngle, pPos, driving, activeWork);
 
   return activeWork / (nDim * volume);
-}
-
-double SP2D::getParticleTotalPressure(double driving) {
-  return getParticleDynamicalPressure() + getParticleActivePressure(driving);
 }
 
 double SP2D::getParticleEnergy() {
@@ -1063,7 +1082,7 @@ void SP2D::conserveParticleMomentum() {
 
 //***************************** NVT integrators ******************************//
 void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1089,7 +1108,7 @@ void SP2D::softParticleLangevinLoop() {
 }
 
 void SP2D::initSoftParticleLangevinFixedBox(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevinFixedBox(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleLangevinFixedBox(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1111,7 +1130,7 @@ void SP2D::softParticleLangevinFixedBoxLoop() {
 }
 
 void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
-  this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1139,7 +1158,7 @@ void SP2D::softParticleLangevinSubSetLoop() {
 }
 
 void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevinExtField(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleLangevinExtField(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1161,7 +1180,7 @@ void SP2D::softParticleLangevinExtFieldLoop() {
 }
 
 void SP2D::initSoftParticleLangevinPerturb(double Temp, double gamma, double extForce, long firstIndex, bool readState) {
-  this->sim_ = new SoftParticleLangevinPerturb(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleLangevinPerturb(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1186,7 +1205,7 @@ void SP2D::softParticleLangevinPerturbLoop() {
 
 //***************************** NVE integrators ******************************//
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
-  this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
@@ -1199,7 +1218,7 @@ void SP2D::softParticleNVELoop() {
 }
 
 void SP2D::initSoftParticleNVEFixedBox(double Temp, bool readState) {
-  this->sim_ = new SoftParticleNVEFixedBox(this, SimConfig(Temp, 0, 0, 0));
+  this->sim_ = new SoftParticleNVEFixedBox(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
@@ -1213,7 +1232,7 @@ void SP2D::softParticleNVEFixedBoxLoop() {
 
 //**************************** Active integrators ****************************//
 void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1238,7 +1257,7 @@ void SP2D::softParticleActiveLangevinLoop() {
 }
 
 void SP2D::initSoftParticleActiveFixedBox(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveFixedBox(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_ = new SoftParticleActiveFixedBox(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1263,7 +1282,7 @@ void SP2D::softParticleActiveFixedBoxLoop() {
 }
 
 void SP2D::initSoftParticleActiveFixedSides(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveFixedSides(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_ = new SoftParticleActiveFixedSides(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1288,7 +1307,7 @@ void SP2D::softParticleActiveFixedSidesLoop() {
 }
 
 void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
-  this->sim_ = new SoftParticleActiveSubSet(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_ = new SoftParticleActiveSubSet(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1318,7 +1337,7 @@ void SP2D::softParticleActiveSubSetLoop() {
 }
 
 void SP2D::initSoftParticleActiveExtField(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveExtField(this, SimConfig(Temp, Dr, driving, 0));
+  this->sim_ = new SoftParticleActiveExtField(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;

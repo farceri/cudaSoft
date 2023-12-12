@@ -19,9 +19,8 @@ public:
   double Tinject;
   double Dr;
   double driving;
-  double cutDist;
   SimConfig() = default;
-  SimConfig(double Tin, double Dr, double driving, double cutDist):Tinject(Tin), Dr(Dr), driving(driving), cutDist(cutDist){}
+  SimConfig(double Tin, double Dr, double driving):Tinject(Tin), Dr(Dr), driving(driving){}
 };
 
 class SimInterface // integration functions

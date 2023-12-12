@@ -93,7 +93,7 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleTotalPressure() << endl;
   }
 
   void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {
@@ -294,15 +294,17 @@ public:
   }
 
   void saveParticleActiveState(string dirName) {
-    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
-  void saveParticleAttractiveState(string dirName) {
-    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+  void saveParticleContacts(string dirName) {
+    sp_->calcParticleContacts(0.);
+    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+  }
+
+  void saveParticleNeighbors(string dirName) {
     save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
@@ -316,34 +318,6 @@ public:
     saveParams << "Dr" << "\t" << Dr << endl;
     saveParams << "f0" << "\t" << driving << endl;
     saveParams.close();
-  }
-
-  void saveParticleContacts(string dirName) {
-    sp_->calcParticleContacts(0.);
-    save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
-    //save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-    //save2DFile(dirName + "lastPos.dat", sp_->getLastPositions(), sp_->nDim);
-  }
-
-  void saveParticleNeighbors(string dirName) {
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-  }
-
-  void saveParticleConfiguration(string dirName) {
-    saveParticlePacking(dirName);
-    saveParticleState(dirName);
-  }
-
-  void saveParticleActiveConfiguration(string dirName) {
-    saveParticlePacking(dirName);
-    saveParticleActiveState(dirName);
-    saveParticleNeighbors(dirName);
-  }
-
-  void saveParticleAttractiveConfiguration(string dirName) {
-    saveParticlePacking(dirName);
-    saveParticleAttractiveState(dirName);
-    saveParticleNeighbors(dirName);
   }
 
 };

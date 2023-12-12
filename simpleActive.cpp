@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
+  double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]), waveQ, range;
   std::string outDir, energyFile, currentDir, inDir = argv[1];
   // initialize sp object
@@ -43,7 +43,6 @@ int main(int argc, char **argv) {
   // initialization
   sp.setLJcutoff(LJcut);
   sp.setEnergyCostant(ec);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
@@ -62,6 +61,9 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  cutoff = (1 + cutDistance) * sigma;
+  sp.setDisplacementCutoff(cutoff, cutDistance);
+  sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   // range for computing force across fictitious wall
@@ -82,12 +84,13 @@ int main(int argc, char **argv) {
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
+        updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
           cout << " no updates" << endl;
         }
-        updateCount = 0;
+        sp.resetUpdateCount();
       }
     }
     if(logSave == true) {
@@ -111,12 +114,6 @@ int main(int argc, char **argv) {
         ioSP.saveParticleActiveState(currentDir);
       }
     }
-    maxDelta = sp.getParticleMaxDisplacement();
-    if(3*maxDelta > cutoff) {
-      sp.calcParticleNeighborList(cutDistance);
-      sp.resetLastPositions();
-      updateCount += 1;
-    }
     step += 1;
   }
   // instrument code to measure end time
@@ -126,7 +123,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(initialStep != 0) {
-    ioSP.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

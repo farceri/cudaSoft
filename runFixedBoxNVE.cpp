@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
   }
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

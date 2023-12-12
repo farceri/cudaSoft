@@ -51,14 +51,19 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  if(saveSame == true) {
-    outDir = inDir;
+  outDir = inDir + "extend" + argv[4] + "/";
+  if(initStrain != 0) {
+    // read initial boxSize
+    initBoxSize = ioSP.readBoxSize(inDir, nDim);
+    strain = initStrain;
+    inDir = inDir + "extend" + argv[4] + "/strain" + std::to_string(initStrain) + "/";
+    ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
-    outDir = inDir + "extend" + argv[6] + "/";
+    strain = strainStep;
+    ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+    initBoxSize = sp.getBoxSize();
   }
   std::experimental::filesystem::create_directory(outDir);
-  // read initial configuration
-  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -66,7 +71,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   ioSP.saveParticlePacking(outDir);
   sp.setEnergyCostant(ec);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
@@ -82,8 +86,10 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  strain = strainStep;
-  initBoxSize = sp.getBoxSize();
+  cutoff = (1 + cutDistance) * sigma;
+  sp.setDisplacementCutoff(cutoff, cutDistance);
+  sp.resetUpdateCount();
+  // strain by strainStep up to maxStrain
   while (strain < (maxStrain + strainStep)) {
     //sp.applyExtension(strainStep);
     newBoxSize = initBoxSize;
@@ -110,12 +116,14 @@ int main(int argc, char **argv) {
         cout << "extend Active: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
-      }
-      maxDelta = sp.getParticleMaxDisplacement();
-      if(3*maxDelta > cutoff) {
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
+        cout << " ISF: " << sp.getParticleISF(waveQ);
+        updateCount = sp.getUpdateCount();
+        if(step != 0 && updateCount > 0) {
+          cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+        } else {
+          cout << " no updates" << endl;
+        }
+        sp.resetUpdateCount();
       }
       step += 1;
     }

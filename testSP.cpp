@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
         cout << "Test: current step: " << step;
         cout << " E: " << (sp.getParticleEnergy() + sp.getParticleKineticEnergy()) / numParticles;
         cout << " T: " << sp.getParticleTemperature() << endl;
-        //ioSP.saveParticleConfiguration(outDir);
         if(step != 0 && updateCount > 0) {
           cout << "Number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
@@ -130,7 +129,7 @@ int main(int argc, char **argv) {
   cudaEventElapsedTime(&elapsed_time_ms, start, stop);
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save last configuration
-  ioSP.saveParticleConfiguration(outDir);
+  ioSP.saveParticlePacking(outDir);
 
   ioSP.closeEnergyFile();
   return 0;

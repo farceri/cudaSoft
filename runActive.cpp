@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
           cout << " no updates" << endl;
         }
         updateCount = 0;
-        ioSP.saveParticleActiveConfiguration(outDir);
+        ioSP.saveParticlePacking(outDir);
       }
     }
     if(logSave == true) {
@@ -165,7 +165,7 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleActiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

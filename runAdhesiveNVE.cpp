@@ -100,7 +100,9 @@ int main(int argc, char **argv) {
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
-        ioSP.saveParticleAttractiveConfiguration(outDir);
+        if(saveFinal == true) {
+          ioSP.saveParticlePacking(outDir);
+        }
       }
     }
     if(logSave == true) {
@@ -114,14 +116,14 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * checkPointFreq) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveConfiguration(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     if(linSave == true) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleAttractiveConfiguration(currentDir);
+        ioSP.saveParticleState(currentDir);
       }
     }
     maxDelta = sp.getParticleMaxDisplacement();
@@ -133,7 +135,7 @@ int main(int argc, char **argv) {
   }
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleAttractiveConfiguration(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 
