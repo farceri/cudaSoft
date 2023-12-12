@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, lj = true;
   long step, maxStep = atof(argv[6]), printFreq = int(maxStep / 10);
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, repetition = 0;
+  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]);
   double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
