@@ -86,9 +86,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = (1 + cutDistance) * sigma;
-  sp.setDisplacementCutoff(cutoff, cutDistance);
-  sp.resetUpdateCount();
   // strain by strainStep up to maxStrain
   while (strain < (maxStrain + strainStep)) {
     //sp.applyExtension(strainStep);
@@ -99,6 +96,9 @@ int main(int argc, char **argv) {
     cout << "strain: " << strain << " new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Ly0: " << initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
+    cutoff = (1 + cutDistance) * sigma;
+    sp.setDisplacementCutoff(cutoff, cutDistance);
+    sp.resetUpdateCount();
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
