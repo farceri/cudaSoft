@@ -24,13 +24,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, saveSame = false, lj = true, wca = false;
-  long step, maxStep = atof(argv[8]), printFreq = int(maxStep / 10), linFreq = int(printFreq / 100);
+  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
-  double phi, pressure, cutoff, maxDelta, strain, Tinject = atof(argv[3]), strainStep = atof(argv[7]);
-  double ec = 1, cutDistance = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[6]), waveQ;
-  double Dr = atof(argv[4]), driving = atof(argv[5]), forceUnit;
-  std::string inDir = argv[1], outDir, currentDir, energyFile, stressFile;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0;
+  double ec = 1, cutDistance = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[6]), strainStep = atof(argv[7]);
+  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
+  std::string inDir = argv[1], outDir, currentDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -51,12 +50,12 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + "extend" + argv[4] + "/";
+  outDir = inDir + "extend" + argv[7] + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + "extend" + argv[4] + "/strain" + std::to_string(initStrain) + "/";
+    inDir = inDir + "extend" + argv[7] + "/strain" + std::to_string(initStrain) + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -83,12 +82,9 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = Dr/timeUnit;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
-  sp.calcParticleNeighborList(cutDistance);
-  sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   // strain by strainStep up to maxStrain
   while (strain < (maxStrain + strainStep)) {
-    //sp.applyExtension(strainStep);
     newBoxSize = initBoxSize;
     newBoxSize[1] *= (1 + strain);
     sp.applyLinearExtension(newBoxSize, strainStep);
@@ -103,7 +99,7 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
     // make directory and energy file at each strain step
-    std::string currentDir = outDir + "strain" + std::to_string(strain) + "/";
+    std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
@@ -112,8 +108,8 @@ int main(int argc, char **argv) {
         ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleActiveLangevinLoop();
-      if(step % printFreq == 0) {
-        cout << "extend Active: current step: " << step;
+      if(step % checkPointFreq == 0) {
+        cout << "Extend Active: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -124,6 +120,9 @@ int main(int argc, char **argv) {
           cout << " no updates" << endl;
         }
         sp.resetUpdateCount();
+        if(save == true) {
+          ioSP.saveParticlePacking(currentDir);
+        }
       }
       step += 1;
     }
