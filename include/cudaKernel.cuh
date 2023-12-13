@@ -417,13 +417,13 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 	}
 	wallForce[particleId] = 0;
 	thisHeight = thisPos[1] - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
-	if(thisHeight < midHeight && thisHeight > midHeight - range) {
+	if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
 		thisRad = pRad[particleId];
 		// interaction between vertices of neighbor particles
 		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
 				otherHeight = otherPos[1] - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
-				if(otherHeight > midHeight && otherHeight < midHeight + range) {
+				if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
 					radSum = thisRad + otherRad;
 						switch (d_simControl.potentialType) {
 							case simControlStruct::potentialEnum::harmonic:
@@ -443,9 +443,9 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 					}
 				}
 			}
-			wallForce[particleId] += acrossForce[1];
-			//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
 		}
+		wallForce[particleId] += acrossForce[1];
+		//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
   	}
 }
 
