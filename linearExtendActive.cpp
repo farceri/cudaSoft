@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0;
-  double ec = 1, cutDistance = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[6]), strainStep = atof(argv[7]);
+  double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]);
   double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
   std::string inDir = argv[1], outDir, currentDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
