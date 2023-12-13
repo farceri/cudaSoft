@@ -23,18 +23,22 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = true, wca = false;
+  bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
-  double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]);
+  double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1;
   double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, energyFile;
+  std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(compress == true) {
+    sign = -1;
+    dirSample = "compress";
+  }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
@@ -50,12 +54,12 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + "extend" + argv[5] + "/";
+  outDir = inDir + dirSample + argv[5] + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + "extend" + argv[5] + "/strain" + std::to_string(initStrain) + "/";
+    inDir = inDir + dirSample + argv[5] + "/strain" + std::to_string(initStrain) + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -81,8 +85,8 @@ int main(int argc, char **argv) {
   // strain by strainStep up to maxStrain
   while (strain < (maxStrain + strainStep)) {
     newBoxSize = initBoxSize;
-    newBoxSize[0] *= (1 + strain);
-    sp.applyLinearExtension(newBoxSize, strainStep);
+    newBoxSize[0] *= (1 + sign * strain);
+    sp.applyLinearExtension(newBoxSize, sign * strainStep);
     boxSize = sp.getBoxSize();
     cout << "\nStrain: " << strain << " new box - Ly: " << boxSize[1] << ", Lx: " << boxSize[0] << ", Lx0: " << initBoxSize[0] << endl;
     sp.calcParticleNeighborList(cutDistance);
