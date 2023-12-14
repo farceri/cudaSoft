@@ -265,10 +265,10 @@ public:
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
     save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
-    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+    //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
     //sp_->calcParticleContacts(0.);
     //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
