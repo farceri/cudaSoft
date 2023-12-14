@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, readSame = true, logSave, linSave = true, saveFinal = true;
+  bool readState = true, readSame = true, logSave, linSave = false, saveFinal = true;
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[7]);
@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
   outDir = inDir + "dynamics/";
   if(readSame == true) {
     if(std::experimental::filesystem::exists(outDir) == true) {
+      cout << "reading existing directory" << endl;
       inDir = outDir;
     }
   }
