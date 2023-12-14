@@ -31,9 +31,9 @@ int main(int argc, char **argv) {
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, sigma, damping, forceUnit, timeUnit, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]), waveQ;
+  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), inertiaOverDamping = atof(argv[8]), waveQ;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-lj/";
-  dirSample = whichDynamics + "T" + argv[3] + "-Dr" + argv[4] + "-f0" + argv[5] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "-tp" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -87,11 +87,11 @@ int main(int argc, char **argv) {
   //forceUnit = inertiaOverDamping / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject)*forceUnit << endl;
-  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " taup: " << 1/Dr << " f0: " << driving*forceUnit << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
+  cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
   damping /= timeUnit;
   driving = driving*forceUnit;
-  Dr = Dr/timeUnit;
+  Dr = 1/(tp*timeUnit);
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);

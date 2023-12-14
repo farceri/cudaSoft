@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0;
   double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), sign = 1;
-  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
+  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -79,12 +79,12 @@ int main(int argc, char **argv) {
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " time step: " << timeStep << endl;
-  cout << "Activity - Peclet: " << driving / (damping * Dr * sigma) << " f0: " << driving << " taup: " << 1/Dr << endl;
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
+  cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
   damping /= timeUnit;
   driving = driving*forceUnit;
-  Dr = Dr/timeUnit;
+  Dr = 1/(tp * timeUnit);
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   // strain by strainStep up to maxStrain

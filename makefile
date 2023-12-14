@@ -69,7 +69,7 @@ INC_DIR = include
 #EXE = runNPT
 #EXE = runActive
 #EXE = runActiveH
-#EXE = runActiveLJ
+EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinLJ
 #EXE = runAdhesiveNVE
@@ -86,7 +86,7 @@ INC_DIR = include
 #EXE = shearActive
 #EXE = linearExtendNVT
 #EXE = linearExtendActive
-EXE = simpleActive
+#EXE = simpleActive
 #EXE = extendLJ
 #EXE = extendActive
 
