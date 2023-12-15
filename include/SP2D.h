@@ -128,7 +128,7 @@ public:
 
   void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
 
-  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shift_);
+  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
 
   void applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shifty_);
 

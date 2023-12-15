@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
   long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0, strainx, strainStepx;
   double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), sign = 1;
   double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range;
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[7] + "-tmax" + argv[8] + "/";
+  outDir = inDir + dirSample + argv[7] + "-tmax" + argv[8] + "-test/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
@@ -90,17 +90,22 @@ int main(int argc, char **argv) {
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   // strain by strainStep up to maxStrain
+  strainStepx = -strainStep / (1+strainStep);
   while (strain < (maxStrain + strainStep)) {
     newBoxSize = initBoxSize;
     newBoxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
-      newBoxSize[0] *= (1 - sign * strain);
-      sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
+      strainx = -strain/(1+strain);
+      newBoxSize[0] *= (1 + sign * strainx);
+      cout << "strainx: " << strainx << endl;
+      sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
     } else {
       sp.applyLinearExtension(newBoxSize, sign * strainStep);
     }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << strain << " density: " << sp.getParticlePhi() << " new box - Lx: " << boxSize[0] << ", Lx0: " << initBoxSize[0] << ", Ly: " << boxSize[1] << ", Ly0: " << initBoxSize[1] << endl;
+    cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
+    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
+    cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     cutoff = (1 + cutDistance) * sigma;
