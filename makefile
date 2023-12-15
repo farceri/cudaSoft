@@ -85,8 +85,8 @@ INC_DIR = include
 #EXE = shearLJ
 #EXE = shearActive
 #EXE = linearExtendNVT
-#EXE = linearExtendActive
-EXE = simpleActive
+EXE = linearExtendActive
+#EXE = simpleActive
 #EXE = extendLJ
 #EXE = extendActive
 

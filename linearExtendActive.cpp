@@ -23,12 +23,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false;
-  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
+  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0;
   double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), sign = 1;
-  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
+  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range;
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -38,6 +38,8 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     dirSample = "compress";
+  } else if(biaxial == true) {
+    dirSample = "biaxial";
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -91,9 +93,14 @@ int main(int argc, char **argv) {
   while (strain < (maxStrain + strainStep)) {
     newBoxSize = initBoxSize;
     newBoxSize[1] *= (1 + sign * strain);
-    sp.applyLinearExtension(newBoxSize, sign * strainStep);
+    if(biaxial == true) {
+      newBoxSize[0] *= (1 - sign * strain);
+      sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
+    } else {
+      sp.applyLinearExtension(newBoxSize, sign * strainStep);
+    }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << strain << " new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Ly0: " << initBoxSize[1] << endl;
+    cout << "strain: " << strain << " density: " << sp.getParticlePhi() << " new box - Lx: " << boxSize[0] << ", Lx0: " << initBoxSize[0] << ", Ly: " << boxSize[1] << ", Ly0: " << initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     cutoff = (1 + cutDistance) * sigma;
@@ -102,6 +109,8 @@ int main(int argc, char **argv) {
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
+    // range for computing force across fictitious wall
+    range = 2.5 * LJcut * sigma;
     // make directory and energy file at each strain step
     std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
@@ -109,7 +118,7 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
       }
       sp.softParticleActiveLangevinLoop();
       if(step % checkPointFreq == 0) {

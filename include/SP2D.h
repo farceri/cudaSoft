@@ -128,6 +128,8 @@ public:
 
   void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
 
+  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shift_);
+
   void applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shifty_);
 
   void setDimBlock(long dimBlock_);

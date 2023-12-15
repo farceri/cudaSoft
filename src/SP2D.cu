@@ -284,6 +284,26 @@ void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
+void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shift_) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto biaxialPosition = [=] __device__ (long particleId) {
+		double extendPos, compressPos;
+		extendPos = (1 + shift_) * pPos[particleId * d_nDim + 1];
+		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		pPos[particleId * d_nDim + 1] = extendPos;
+		compressPos = (1 - shift_) * pPos[particleId * d_nDim];
+		compressPos -= round(compressPos / boxSize[0]) * boxSize[0];
+		pPos[particleId * d_nDim] = compressPos;
+	};
+
+	thrust::for_each(r, r+numParticles, biaxialPosition);
+}
+
 void SP2D::applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shiftx_) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
