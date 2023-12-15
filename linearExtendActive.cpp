@@ -90,12 +90,12 @@ int main(int argc, char **argv) {
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   // strain by strainStep up to maxStrain
-  strainStepx = -strainStep / (1+strainStep);
+  strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
     newBoxSize = initBoxSize;
     newBoxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
-      strainx = -strain/(1+strain);
+      strainx = -strain/(1 + strain);
       newBoxSize[0] *= (1 + sign * strainx);
       cout << "strainx: " << strainx << endl;
       sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
