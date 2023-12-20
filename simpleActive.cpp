@@ -22,9 +22,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, readSame = true, logSave, linSave = true, saveFinal = true;
-  long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  bool readState = true, readSame = true, logSave, linSave = false, saveFinal = true;
+  long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[7]);
   double ec = 1, LJcut = 5.5, cutDistance = LJcut-0.5, cutoff, sigma, damping;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
@@ -56,8 +56,6 @@ int main(int argc, char **argv) {
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
-  //timeUnit = 1 / damping;
-  //forceUnit = inertiaOverDamping / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
