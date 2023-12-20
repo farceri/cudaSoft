@@ -22,14 +22,13 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, compress = false, biaxial = true, lj = false, wca = false;
+  bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
   bool saveFinal = true, logSave = false, linSave = true, savePacking = false;
-  long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 1000);
-  long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, cutDistance, LJcut = 5.5, cutoff, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
-  double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]), strainx;
-  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
+  long numParticles = atol(argv[7]), nDim = 2, updateCount = 0;
+  long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveFreq = 1;
+  long linFreq = int(checkPointFreq / 1000), initialStep = atof(argv[5]), firstDecade = 0, multiple = 1;
+  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;
+  double cutDistance, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1, range;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -56,7 +55,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[10] + "/";
+  outDir = inDir + dirSample + argv[8] + "/";
   if(initialStep != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
@@ -73,20 +72,16 @@ int main(int argc, char **argv) {
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
-  // save initial configuration
+  // initialization
   sp.setEnergyCostant(ec);
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
-  forceUnit = ec / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
-  cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
   damping /= timeUnit;
-  driving = driving*forceUnit;
-  Dr = 1/(tp * timeUnit);
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   if(initialStep == 0) {
     strainx = -strain / (1 + strain);
     boxSize = sp.getBoxSize();
@@ -109,19 +104,19 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutoff = (1 + cutDistance) * sigma;
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
   // range for computing force across fictitious wall
-  range = 2.5 * LJcut * sigma;
+  range = 5 * LJcut * sigma;
   // run integrator
   while(step != maxStep) {
-    sp.softParticleActiveLangevinLoop();
+    sp.softParticleLangevinLoop();
     if(step % checkPointFreq == 0) {
-      cout << "Extend Active: current step: " << step + initialStep;
+      cout << "Extend NVT: current step: " << step + initialStep;
       cout << " U/N: " << sp.getParticleEnergy() / numParticles;
       cout << " T: " << sp.getParticleTemperature();
       cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -149,7 +144,7 @@ int main(int argc, char **argv) {
         if(savePacking == true) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
-          ioSP.saveParticleActiveState(currentDir);
+          ioSP.saveParticleState(currentDir);
         }
       }
     }
@@ -159,7 +154,7 @@ int main(int argc, char **argv) {
         if(savePacking == true) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
-          ioSP.saveParticleActiveState(currentDir);
+          ioSP.saveParticleState(currentDir);
         }
       }
     }

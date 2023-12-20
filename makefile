@@ -69,7 +69,7 @@ INC_DIR = include
 #EXE = runNPT
 #EXE = runActive
 #EXE = runActiveH
-EXE = runActiveLJ
+#EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinLJ
 #EXE = runAdhesiveNVE
@@ -82,13 +82,13 @@ EXE = runActiveLJ
 # mechanics
 #EXE = linearShearFIRE
 #EXE = linearShearNVT
-#EXE = shearLJ
-#EXE = shearActive
+#EXE = shearNVT
 #EXE = linearExtendNVT
-#EXE = simpleLangevin
+#EXE = simpleNVT
+EXE = extendNVT
+#EXE = shearActive
 #EXE = linearExtendActive
 #EXE = simpleActive
-#EXE = extendLJ
 #EXE = extendActive
 
 # Object files:
