@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   sp.setGeometryType(simControlStruct::geometryEnum::leesEdwards);
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cutDistance = LJcut-0.5;
+    cutDistance = LJcut+0.5;
     dirSample = "shear-NVTLJ-5.5/";
   }
   ioSPFile ioSP(&sp);

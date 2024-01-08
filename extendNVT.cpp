@@ -24,9 +24,9 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
   bool saveFinal = true, logSave = false, linSave = true, savePacking = false;
-  long numParticles = atol(argv[7]), nDim = 2, updateCount = 0;
-  long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveFreq = 1;
-  long linFreq = int(checkPointFreq / 1000), initialStep = atof(argv[5]), firstDecade = 0, multiple = 1;
+  long numParticles = atol(argv[7]), nDim = 2;
+  long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;
   double cutDistance, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1, range;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut-0.5;
+    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleLangevin(Tinject, damping, readState);
-  cutoff = (1 + cutDistance) * sigma;
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();

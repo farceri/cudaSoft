@@ -234,6 +234,7 @@ inline __device__ double calcLJForceShift(const double radSum, const double radS
 	distance = d_LJcutoff * radSum;
 	distance6 = pow(distance, 6);
 	return 24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
+	//return 24 * d_ec * (2 * radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) / distance;
 }
 
 inline __device__ double calcGradMultiple(const double* thisPos, const double* otherPos, const double radSum) {
@@ -307,9 +308,12 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	radSum6 = pow(radSum, 6);
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum, radSum6);
-		gradMultiple = -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance + forceShift;
+		gradMultiple = -24 * d_ec * radSum6 * (1 / distance6 - 2 * radSum6 / (distance6 * distance6)) / distance + forceShift;
 		epot = 0.5 * d_ec * (4 * (radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) - d_LJecut);
-		epot -= 0.5 * forceShift * (distance - d_LJcutoff * radSum);
+		epot -= 0.5 * abs(forceShift) * (distance - d_LJcutoff * radSum);
+		//gradMultiple = 24 * d_ec * (2 * radSum12 / distance12 - radSum6 / distance6) / distance - forceShift;
+		//epot = 0.5 * d_ec * (4 * (radSum12 / distance12 - radSum6 / distance6) - d_LJecut);
+		//epot -= 0.5 * abs(forceShift) * (distance - d_LJcutoff * radSum);
 	} else {
 		epot = 0.;
 	}

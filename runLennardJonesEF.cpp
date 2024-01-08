@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
   long linFreq = 1e03, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
   double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut-0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]), externalForce = atof(argv[8]);
+  double cutDistance = LJcut+0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]), externalForce = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "-EF" + argv[9] + "/";
   // initialize sp object

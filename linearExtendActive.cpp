@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut-0.5;
+    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    cutoff = (1 + cutDistance) * sigma;
+    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     step = 0;

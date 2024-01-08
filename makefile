@@ -65,8 +65,8 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-#EXE = runNVT
 #EXE = runNPT
+#EXE = runLangevin
 #EXE = runActive
 #EXE = runActiveH
 #EXE = runActiveLJ
