@@ -82,10 +82,10 @@ INC_DIR = include
 # mechanics
 #EXE = linearShearFIRE
 #EXE = linearShearNVT
-#EXE = shearNVT
+#EXE = shearLangevin
 #EXE = linearExtendNVT
-#EXE = simpleNVT
-EXE = extendNVT
+EXE = simpleLangevin
+#EXE = extendLangevin
 #EXE = shearActive
 #EXE = linearExtendActive
 #EXE = simpleActive

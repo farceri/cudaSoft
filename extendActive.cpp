@@ -23,7 +23,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
-  bool saveFinal = true, logSave = false, linSave = true, savePacking = false;
+  bool saveFinal = true, logSave = true, linSave = false, savePacking = false;
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[10] + "/";
+  outDir = inDir + dirSample + argv[10] + "-" + argv[11] + "/";
   if(initialStep != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);

@@ -33,7 +33,11 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   ioSPFile ioSP(&sp);
-  outDir = inDir + "dynamics/";
+  if(logSave == true) {
+    outDir = inDir + "dynamics-log/";
+  } else {
+    outDir = inDir + "dynamics/";
+  }
   if(readSame == true) {
     if(std::experimental::filesystem::exists(outDir) == true) {
       cout << "reading existing directory" << endl;
