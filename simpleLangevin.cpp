@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, readSame = true, logSave, linSave = false, saveFinal = true;
+  bool readState = true, readSame = true, logSave = false, linSave = false, saveFinal = true;
   long numParticles = atol(argv[7]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[5]);
