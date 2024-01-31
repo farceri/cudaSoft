@@ -3,7 +3,7 @@
 ## USER SPECIFIC DIRECTORIES ##
 
 # CUDA directory:
-CUDA_ROOT_DIR=/usr/local/cuda-12.2
+CUDA_ROOT_DIR=/usr/local/cuda
 #CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.2.2
 
 ##########################################################
@@ -67,10 +67,10 @@ INC_DIR = include
 #EXE = runNVE
 #EXE = runNPT
 #EXE = runLangevin
-#EXE = runActive
 #EXE = runActiveH
 #EXE = runActiveLJ
 #EXE = runActiveWCA
+#EXE = runLangevinH
 #EXE = runLangevinLJ
 #EXE = runAdhesiveNVE
 #EXE = runAdhesiveNVT
@@ -81,15 +81,15 @@ INC_DIR = include
 
 # mechanics
 #EXE = linearShearFIRE
-#EXE = linearShearNVT
 #EXE = shearLangevin
-#EXE = linearExtendNVT
-EXE = simpleLangevin
+#EXE = linearShearLangevin
 #EXE = extendLangevin
+EXE = linearExtendLangevin
+#EXE = simpleLangevin
 #EXE = shearActive
+#EXE = extendActive
 #EXE = linearExtendActive
 #EXE = simpleActive
-#EXE = extendActive
 
 # Object files:
 OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o

@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -45,10 +45,10 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      //logSave = true;
-      //outDir = outDir + "dynamics-log/";
-      linSave = true;
-      outDir = outDir + "dynamics/";
+      logSave = true;
+      outDir = outDir + "dynamics-log/";
+      //linSave = true;
+      //outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         initialStep = atof(argv[5]);
         //if(initialStep != 0) {
@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  cutoff = cutDistance * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
@@ -94,15 +93,18 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleLangevin(Tinject, damping, readState);
-  // run integrator
-  waveQ = sp.getSoftWaveNumber();
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  sp.setDisplacementCutoff(cutoff, cutDistance);
+  sp.resetUpdateCount();
   sp.setInitialPositions();
+  waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+  // run integrator
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
@@ -112,12 +114,13 @@ int main(int argc, char **argv) {
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
+        updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
           cout << " no updates" << endl;
         }
-        updateCount = 0;
+        sp.resetUpdateCount();
         ioSP.saveParticlePacking(outDir);
       }
     }

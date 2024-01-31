@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  sp.setPotentialType(simControlStruct::potentialEnum::WCA);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       logSave = false;
-      outDir = outDir + "dynamics5/";
+      outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -89,7 +89,6 @@ int main(int argc, char **argv) {
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
-  // run integrator
   waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
@@ -97,6 +96,7 @@ int main(int argc, char **argv) {
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+  // run integrator
   while(step != maxStep) {
     sp.softParticleNVELoop();
     if(step % linFreq == 0) {

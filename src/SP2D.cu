@@ -267,7 +267,7 @@ void SP2D::applyExtension(double shifty_) {
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
-void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_) {
+void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shift_, long direction) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
 	auto r = thrust::counting_iterator<long>(0);
@@ -276,9 +276,9 @@ void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double
 
 	auto extendPosition = [=] __device__ (long particleId) {
 		double extendPos;
-		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
-		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
-		pPos[particleId * d_nDim + 1] = extendPos;
+		extendPos = (1 + shift_) * pPos[particleId * d_nDim + direction];
+		extendPos -= round(extendPos / boxSize[direction]) * boxSize[direction];
+		pPos[particleId * d_nDim + direction] = extendPos;
 	};
 
 	thrust::for_each(r, r+numParticles, extendPosition);
@@ -302,23 +302,6 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 	};
 
 	thrust::for_each(r, r+numParticles, biaxialPosition);
-}
-
-void SP2D::applyLinearCompression(thrust::host_vector<double> &newBoxSize_, double shiftx_) {
-  // first set the new boxSize
-  setBoxSize(newBoxSize_);
-	auto r = thrust::counting_iterator<long>(0);
-	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
-
-	auto extendPosition = [=] __device__ (long particleId) {
-		double extendPos;
-		extendPos = (1 + shiftx_) * pPos[particleId * d_nDim];
-		extendPos -= round(extendPos / boxSize[0]) * boxSize[0];
-		pPos[particleId * d_nDim] = extendPos;
-	};
-
-	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
 
@@ -557,7 +540,7 @@ void SP2D::setDisplacementCutoff(double cutoff_, double cutDistance_) {
 
 void SP2D::resetUpdateCount() {
   updateCount = double(0);
-  //cout << "DPM2D::resetUpdateCount - updatCount " << updateCount << endl;
+  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
 }
 
 long SP2D::getUpdateCount() {

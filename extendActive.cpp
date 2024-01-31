@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[10] + "-" + argv[11] + "/";
+  outDir = inDir + dirSample + argv[10] + "/";//+ "-" + argv[11]
   if(initialStep != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);

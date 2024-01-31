@@ -409,47 +409,50 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 
 // particle-wall interaction - across fictitious wall at half height in 2D
 __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPos, const double range, double* wallForce) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-	double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
-	double thisPos[MAXDIM], otherPos[MAXDIM], acrossForce[MAXDIM];
-	double thisHeight, otherHeight;
-	// zero out the force and get particle positions
-	for (long dim = 0; dim < d_nDim; dim++) {
-		acrossForce[dim] = 0;
-		thisPos[dim] = pPos[particleId * d_nDim + dim];
-	}
-	wallForce[particleId] = 0;
-	thisHeight = thisPos[1] - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
-	if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
-		thisRad = pRad[particleId];
-		// interaction between vertices of neighbor particles
-		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
-				otherHeight = otherPos[1] - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
-				if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
-					radSum = thisRad + otherRad;
-						switch (d_simControl.potentialType) {
-							case simControlStruct::potentialEnum::harmonic:
-							calcContactInteraction(thisPos, otherPos, radSum, acrossForce);
-							break;
-							case simControlStruct::potentialEnum::lennardJones:
-							calcLJInteraction(thisPos, otherPos, radSum, acrossForce);
-							break;
-							case simControlStruct::potentialEnum::WCA:
-							calcWCAInteraction(thisPos, otherPos, radSum, acrossForce);
-							break;
-							case simControlStruct::potentialEnum::adhesive:
-							calcAdhesiveInteraction(thisPos, otherPos, radSum, acrossForce);
-							break;
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
+		double thisPos[MAXDIM], otherPos[MAXDIM], acrossForce[MAXDIM];
+		double thisHeight, otherHeight;
+		// zero out the force and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			acrossForce[dim] = 0;
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		wallForce[particleId] = 0;
+		if(d_partMaxNeighborListPtr[particleId] > 5) {
+			thisHeight = thisPos[1] - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
+			if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
+				thisRad = pRad[particleId];
+				// interaction between vertices of neighbor particles
+				for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+					if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+						otherHeight = otherPos[1] - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
+						if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
+							radSum = thisRad + otherRad;
+							switch (d_simControl.potentialType) {
+								case simControlStruct::potentialEnum::harmonic:
+								calcContactInteraction(thisPos, otherPos, radSum, acrossForce);
+								break;
+								case simControlStruct::potentialEnum::lennardJones:
+								calcLJInteraction(thisPos, otherPos, radSum, acrossForce);
+								break;
+								case simControlStruct::potentialEnum::WCA:
+								calcWCAInteraction(thisPos, otherPos, radSum, acrossForce);
+								break;
+								case simControlStruct::potentialEnum::adhesive:
+								calcAdhesiveInteraction(thisPos, otherPos, radSum, acrossForce);
+								break;
+							}
+						//printf("particleId %ld otherId %ld \t thisHeight %lf \t otherHeight %lf \t wallForce %lf \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], thisHeight, otherHeight, acrossForce[1]);
 						}
-					//printf("particleId %ld otherId %ld \t thisHeight %lf \t otherHeight %lf \t wallForce %lf \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], thisHeight, otherHeight, acrossForce[1]);
 					}
 				}
 			}
+			wallForce[particleId] += acrossForce[1];
+			//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
 		}
-		wallForce[particleId] += acrossForce[1];
-		//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
+	
   	}
 }
 

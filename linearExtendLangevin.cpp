@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
-  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range;
@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + dirSample + argv[5] + "/strain" + std::to_string(initStrain) + "/";
+    outDir = inDir + dirSample + "/";
+    inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -88,14 +89,15 @@ int main(int argc, char **argv) {
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
     newBoxSize = initBoxSize;
-    newBoxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
+      newBoxSize[1] *= (1 + sign * strain);
       strainx = -strain/(1 + strain);
       newBoxSize[0] *= (1 + sign * strainx);
       cout << "strainx: " << strainx << endl;
       sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
     } else {
-      sp.applyLinearExtension(newBoxSize, sign * strainStep);
+      newBoxSize[direction] *= (1 + sign * strain);
+      sp.applyLinearExtension(newBoxSize, sign * strainStep, direction);
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;

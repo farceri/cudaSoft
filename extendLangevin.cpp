@@ -23,7 +23,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
-  bool saveFinal = true, logSave = false, linSave = true, savePacking = false;
+  bool saveFinal = true, logSave = false, linSave = true, savePacking = true;
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[8] + "/";
+  outDir = inDir + dirSample + argv[8] + "/";//+ "-" + argv[9]
   if(initialStep != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
           ioSP.saveParticleState(currentDir);
+          ioSP.saveParticleNeighbors(currentDir);
         }
       }
     }
@@ -155,6 +156,7 @@ int main(int argc, char **argv) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
           ioSP.saveParticleState(currentDir);
+          ioSP.saveParticleNeighbors(currentDir);
         }
       }
     }

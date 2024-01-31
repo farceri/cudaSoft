@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
-  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 1;
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0, strainx, strainStepx;
   double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), sign = 1;
@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
       cout << "strainx: " << strainx << endl;
       sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
     } else {
-      sp.applyLinearExtension(newBoxSize, sign * strainStep);
+      sp.applyLinearExtension(newBoxSize, sign * strainStep, direction);
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
