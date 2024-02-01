@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinFixedBoundaryLoop();
+    sp.softParticleLangevinLoop();
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {

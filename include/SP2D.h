@@ -242,7 +242,7 @@ public:
   // particle functions
   void calcParticleForceEnergy();
 
-  void calcParticleBoundaryForceEnergy();
+  //void calcParticleBoundaryForceEnergy();
 
   void makeExternalParticleForce(double externalForce);
 
@@ -314,10 +314,6 @@ public:
 
   void softParticleLangevinLoop();
 
-  void initSoftParticleLangevinFixedBoundary(double Temp, double gamma, bool readState);
-
-  void softParticleLangevinFixedBoundaryLoop();
-
   void initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
 
   void softParticleLangevinSubSetLoop();
@@ -335,18 +331,10 @@ public:
 
   void softParticleNVELoop();
 
-  void initSoftParticleNVEFixedBoundary(double Temp, bool readState);
-
-  void softParticleNVEFixedBoundaryLoop();
-
   // Active integrators
   void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
 
   void softParticleActiveLangevinLoop();
-
-  void initSoftParticleActiveFixedBoundary(double Temp, double Dr, double driving, double gamma, bool readState);
-
-  void softParticleActiveFixedBoundaryLoop();
 
   void initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
 

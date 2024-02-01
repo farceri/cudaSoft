@@ -765,16 +765,16 @@ double SP2D::setTimeStep(double dt_) {
   return dt;
 }
 
-void SP2D::calcParticleForceEnergy() {
+/*void SP2D::calcParticleForceEnergy() {
 	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   // compute particle interaction
   kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-}
+}*/
 
-void SP2D::calcParticleBoundaryForceEnergy() {
+void SP2D::calcParticleForceEnergy() {
 	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
@@ -1139,28 +1139,6 @@ void SP2D::softParticleLangevinLoop() {
   //cout << "velSum: " << thrust::reduce(d_particleVel.begin(), d_particleVel.end(), double(0), thrust::plus<double>()) << endl;
 }
 
-void SP2D::initSoftParticleLangevinFixedBoundary(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevinFixedBoundary(this, SimConfig(Temp, 0, 0));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-  }
-  cout << "SP2D::initSoftParticleLangevinFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleLangevinFixedBoundaryLoop() {
-  this->sim_->integrate();
-}
-
 void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
   this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
@@ -1249,19 +1227,6 @@ void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
 }
 
-void SP2D::initSoftParticleNVEFixedBoundary(double Temp, bool readState) {
-  this->sim_ = new SoftParticleNVEFixedBoundary(this, SimConfig(Temp, 0, 0));
-  resetLastPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-  }
-  cout << "SP2D::initSoftParticleNVEFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleNVEFixedBoundaryLoop() {
-  this->sim_->integrate();
-}
-
 //**************************** Active integrators ****************************//
 void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
   this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving));
@@ -1285,30 +1250,6 @@ void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving
 }
 
 void SP2D::softParticleActiveLangevinLoop() {
-  this->sim_->integrate();
-}
-
-void SP2D::initSoftParticleActiveFixedBoundary(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveFixedBoundary(this, SimConfig(Temp, Dr, driving));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(numParticles);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-    computeParticleAngleFromVel();
-  }
-  cout << "SP2D::initSoftParticleActiveFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleActiveFixedBoundaryLoop() {
   this->sim_->integrate();
 }
 

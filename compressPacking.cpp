@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    sp.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
     cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     // equilibrate dynamics
     step = 0;
     while(step != maxStep) {
-      sp.softParticleLangevinFixedBoundaryLoop();
+      sp.softParticleLangevinLoop();
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
         cout << "Langevin: current step: " << step;
@@ -125,8 +125,7 @@ int main(int argc, char **argv) {
       }
       step += 1;
     }
-    cout << "Langevin: current step: " << step;
-    cout << " T: " << sp.getParticleTemperature();
+    cout << "Final step - T: " << sp.getParticleTemperature();
     cout << " P: " << sp.getParticleDynamicalPressure();
     cout << " phi: " << sp.getParticlePhi() << endl;
     // save minimized configuration

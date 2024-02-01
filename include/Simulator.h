@@ -82,16 +82,6 @@ public:
   virtual void integrate();
 };
 
-// Soft particle Langevin integrator with repulsive and attractive forces child of SoftParticleLangevin2
-class SoftParticleLangevinFixedBoundary: public SoftParticleLangevin2
-{
-public:
-  SoftParticleLangevinFixedBoundary() = default;
-  SoftParticleLangevinFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
-
-  virtual void integrate();
-};
-
 // Soft particle Langevin integrator with massive particles child of SoftParticleLangevin2
 class SoftParticleLangevinSubSet: public SoftParticleLangevin
 {
@@ -136,16 +126,6 @@ public:
   virtual void integrate();
 };
 
-// Fixed boundary soft particle NVE integrator child of SoftParticleLangevin
-class SoftParticleNVEFixedBoundary: public SoftParticleLangevin
-{
-public:
-  SoftParticleNVEFixedBoundary() = default;
-  SoftParticleNVEFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
-
-  virtual void integrate();
-};
-
 // Soft particle Active Langevin integrator child of softParticleLangevin2
 class SoftParticleActiveLangevin: public SoftParticleLangevin2
 {
@@ -154,16 +134,6 @@ public:
   SoftParticleActiveLangevin(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
 
   virtual void updateThermalVel();
-  virtual void integrate();
-};
-
-// Soft particle Active Langevin integrator child of softParticleActiveLangevin
-class SoftParticleActiveFixedBoundary: public SoftParticleActiveLangevin
-{
-public:
-  SoftParticleActiveFixedBoundary() = default;
-  SoftParticleActiveFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
-
   virtual void integrate();
 };
 

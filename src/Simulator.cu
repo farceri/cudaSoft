@@ -269,17 +269,6 @@ void SoftParticleLangevinSubSet::conserveMomentum() {
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
-//****************** fixed boundary soft particle langevin *******************//
-void SoftParticleLangevinFixedBoundary::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoundaryForceEnergy();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
-
 //************************* soft particle langevin ***************************//
 void SoftParticleLangevinExtField::integrate() {
   updateThermalVel();
@@ -310,16 +299,6 @@ void SoftParticleNVE::integrate() {
   updatePosition(sp_->dt);
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
-  updateVelocity(0.5 * sp_->dt);
-  //conserveMomentum();
-}
-
-//********************* fixed boundary soft particle nve *********************//
-void SoftParticleNVEFixedBoundary::integrate() {
-  updateVelocity(0.5 * sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoundaryForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();
 }
@@ -429,17 +408,6 @@ void SoftParticleActiveSubSet::updateThermalVel() {
   };
 
   thrust::for_each(s + firstIndex, s + sp_->numParticles, addActiveParticleForce);
-}
-
-//************** fixed boundary soft particle active langevin ****************//
-void SoftParticleActiveFixedBoundary::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoundaryForceEnergy();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
 }
 
 //********************** soft particle active langevin ***********************//
