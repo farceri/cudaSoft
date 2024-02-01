@@ -43,6 +43,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNumParticles(numParticles);
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
+	simControl.gravityType = simControlStruct::gravityEnum::off;
 	syncSimControlToDevice();
   // default parameters
   dt = 1e-04;
@@ -51,6 +52,8 @@ SP2D::SP2D(long nParticles, long dim) {
 	l1 = 0;
 	l2 = 0;
   LEshift = 0;
+  gravity = 0;
+  ew = 100;
   cutDistance = 1;
   updateCount = 0;
   d_boxSize.resize(nDim);
@@ -156,7 +159,7 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedBox) {
     cout << "SP2D: setGeometryType: geometryType: fixedBox" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides) {
-    cout << "SP2D: setGeometryType: geometryType: leesSides" << endl;
+    cout << "SP2D: setGeometryType: geometryType: fixedSides" << endl;
   } else {
     cout << "SP2D: setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox or fixedSides" << endl;
   }
@@ -187,6 +190,23 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
 simControlStruct::potentialEnum SP2D::getPotentialType() {
 	syncSimControlFromDevice();
 	return simControl.potentialType;
+}
+
+void SP2D::setGravityType(simControlStruct::gravityEnum gravityType_) {
+	simControl.gravityType = gravityType_;
+  if(simControl.gravityType == simControlStruct::gravityEnum::on) {
+    cout << "SP2D: setGravityType: gravityType: gravity" << endl;
+  } else if(simControl.gravityType == simControlStruct::gravityEnum::off) {
+    cout << "SP2D: setGravityType: gravityType: off" << endl;
+  } else {
+    cout << "SP2D: setGravityType: please specify valid gravityType: on or off" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+simControlStruct::gravityEnum SP2D::getGravityType() {
+	syncSimControlFromDevice();
+	return simControl.gravityType;
 }
 
 bool SP2D::testSimControlSync() {
@@ -732,6 +752,13 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   //cout << "SP2D::setLJcutoff - LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
 }
 
+void SP2D::setGravity(double gravity_, double ew_) {
+  gravity = gravity_;
+  ew = ew_;
+  cudaMemcpyToSymbol(d_gravity, &gravity, sizeof(gravity));
+  cudaMemcpyToSymbol(d_ew, &ew, sizeof(ew));
+}
+
 double SP2D::setTimeStep(double dt_) {
   dt = dt_;
   cudaMemcpyToSymbol(d_dt, &dt, sizeof(dt));
@@ -747,24 +774,26 @@ void SP2D::calcParticleForceEnergy() {
   kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
 }
 
-void SP2D::calcParticleBoxForceEnergy() {
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
-  double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+void SP2D::calcParticleBoundaryForceEnergy() {
+	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   // compute particle interaction
   kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-  kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-}
-
-void SP2D::calcParticleSidesForceEnergy() {
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
-  double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
-  // compute particle interaction
-  kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-  kernelCalcParticleSidesInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+  switch (simControl.geometryType) {
+		case simControlStruct::geometryEnum::fixedBox:
+    kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+		break;
+		case simControlStruct::geometryEnum::fixedSides:
+    kernelCalcParticleSidesInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+		break;
+	}
+  switch (simControl.gravityType) {
+    case simControlStruct::gravityEnum::on:
+    kernelAddParticleGravity<<<dimGrid, dimBlock>>>(pPos, pForce, pEnergy);
+    break;
+  }
 }
 
  void SP2D::makeExternalParticleForce(double externalForce) {
@@ -1110,8 +1139,8 @@ void SP2D::softParticleLangevinLoop() {
   //cout << "velSum: " << thrust::reduce(d_particleVel.begin(), d_particleVel.end(), double(0), thrust::plus<double>()) << endl;
 }
 
-void SP2D::initSoftParticleLangevinFixedBox(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevinFixedBox(this, SimConfig(Temp, 0, 0));
+void SP2D::initSoftParticleLangevinFixedBoundary(double Temp, double gamma, bool readState) {
+  this->sim_ = new SoftParticleLangevinFixedBoundary(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1125,10 +1154,10 @@ void SP2D::initSoftParticleLangevinFixedBox(double Temp, double gamma, bool read
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleLangevinFixedBox:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleLangevinFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleLangevinFixedBoxLoop() {
+void SP2D::softParticleLangevinFixedBoundaryLoop() {
   this->sim_->integrate();
 }
 
@@ -1175,7 +1204,7 @@ void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool read
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleLangevinExtField:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
 void SP2D::softParticleLangevinExtFieldLoop() {
@@ -1199,7 +1228,7 @@ void SP2D::initSoftParticleLangevinPerturb(double Temp, double gamma, double ext
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleLangevinPerturb:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
 void SP2D::softParticleLangevinPerturbLoop() {
@@ -1220,16 +1249,16 @@ void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
 }
 
-void SP2D::initSoftParticleNVEFixedBox(double Temp, bool readState) {
-  this->sim_ = new SoftParticleNVEFixedBox(this, SimConfig(Temp, 0, 0));
+void SP2D::initSoftParticleNVEFixedBoundary(double Temp, bool readState) {
+  this->sim_ = new SoftParticleNVEFixedBoundary(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleNVEFixedBox:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleNVEFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleNVEFixedBoxLoop() {
+void SP2D::softParticleNVEFixedBoundaryLoop() {
   this->sim_->integrate();
 }
 
@@ -1259,8 +1288,8 @@ void SP2D::softParticleActiveLangevinLoop() {
   this->sim_->integrate();
 }
 
-void SP2D::initSoftParticleActiveFixedBox(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveFixedBox(this, SimConfig(Temp, Dr, driving));
+void SP2D::initSoftParticleActiveFixedBoundary(double Temp, double Dr, double driving, double gamma, bool readState) {
+  this->sim_ = new SoftParticleActiveFixedBoundary(this, SimConfig(Temp, Dr, driving));
   this->sim_->gamma = gamma;
   this->sim_->noiseVar = sqrt(2. * Temp * gamma);
   this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
@@ -1276,37 +1305,11 @@ void SP2D::initSoftParticleActiveFixedBox(double Temp, double Dr, double driving
     this->sim_->injectKineticEnergy();
     computeParticleAngleFromVel();
   }
-  cout << "SP2D::initSoftParticleActiveFixedBox:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleActiveFixedBoundary:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleActiveFixedBoxLoop() {
+void SP2D::softParticleActiveFixedBoundaryLoop() {
   this->sim_->integrate();
-
-}
-
-void SP2D::initSoftParticleActiveFixedSides(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveFixedSides(this, SimConfig(Temp, Dr, driving));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(numParticles);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-    computeParticleAngleFromVel();
-  }
-  cout << "SP2D::initSoftParticleActiveFixedSides:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleActiveFixedSidesLoop() {
-  this->sim_->integrate();
-
 }
 
 void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {

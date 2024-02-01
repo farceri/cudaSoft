@@ -163,17 +163,6 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticlePos);
 }
 
-//****************** fixed boundary soft particle langevin *******************//
-void SoftParticleLangevinFixedBox::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoxForceEnergy();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
-
 //************** soft particle langevin with massive particles ***************//
 void SoftParticleLangevinSubSet::integrate() {
   updateThermalVel();
@@ -280,6 +269,17 @@ void SoftParticleLangevinSubSet::conserveMomentum() {
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
+//****************** fixed boundary soft particle langevin *******************//
+void SoftParticleLangevinFixedBoundary::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleBoundaryForceEnergy();
+  updateVelocity(0.5*sp_->dt);
+  //conserveMomentum();
+}
+
 //************************* soft particle langevin ***************************//
 void SoftParticleLangevinExtField::integrate() {
   updateThermalVel();
@@ -315,11 +315,11 @@ void SoftParticleNVE::integrate() {
 }
 
 //********************* fixed boundary soft particle nve *********************//
-void SoftParticleNVEFixedBox::integrate() {
+void SoftParticleNVEFixedBoundary::integrate() {
   updateVelocity(0.5 * sp_->dt);
   updatePosition(sp_->dt);
   sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoxForceEnergy();
+  sp_->calcParticleBoundaryForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();
 }
@@ -371,28 +371,6 @@ void SoftParticleActiveLangevin::updateThermalVel() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise);
-}
-
-//************** fixed boundary soft particle active langevin ****************//
-void SoftParticleActiveFixedBox::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleBoxForceEnergy();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
-}
-
-//*************** fixed x sides soft particle active langevin ****************//
-void SoftParticleActiveFixedSides::integrate() {
-  updateThermalVel();
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleMaxDisplacement();
-  sp_->calcParticleSidesForceEnergy();
-  updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
 }
 
 //*********** soft particle active langevin with massive particles ***********//
@@ -451,6 +429,17 @@ void SoftParticleActiveSubSet::updateThermalVel() {
   };
 
   thrust::for_each(s + firstIndex, s + sp_->numParticles, addActiveParticleForce);
+}
+
+//************** fixed boundary soft particle active langevin ****************//
+void SoftParticleActiveFixedBoundary::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleBoundaryForceEnergy();
+  updateVelocity(0.5*sp_->dt);
+  //conserveMomentum();
 }
 
 //********************** soft particle active langevin ***********************//

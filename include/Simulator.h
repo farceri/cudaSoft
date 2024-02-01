@@ -83,11 +83,11 @@ public:
 };
 
 // Soft particle Langevin integrator with repulsive and attractive forces child of SoftParticleLangevin2
-class SoftParticleLangevinFixedBox: public SoftParticleLangevin2
+class SoftParticleLangevinFixedBoundary: public SoftParticleLangevin2
 {
 public:
-  SoftParticleLangevinFixedBox() = default;
-  SoftParticleLangevinFixedBox(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
+  SoftParticleLangevinFixedBoundary() = default;
+  SoftParticleLangevinFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
 
   virtual void integrate();
 };
@@ -137,11 +137,11 @@ public:
 };
 
 // Fixed boundary soft particle NVE integrator child of SoftParticleLangevin
-class SoftParticleNVEFixedBox: public SoftParticleLangevin
+class SoftParticleNVEFixedBoundary: public SoftParticleLangevin
 {
 public:
-  SoftParticleNVEFixedBox() = default;
-  SoftParticleNVEFixedBox(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+  SoftParticleNVEFixedBoundary() = default;
+  SoftParticleNVEFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
 
   virtual void integrate();
 };
@@ -158,21 +158,11 @@ public:
 };
 
 // Soft particle Active Langevin integrator child of softParticleActiveLangevin
-class SoftParticleActiveFixedBox: public SoftParticleActiveLangevin
+class SoftParticleActiveFixedBoundary: public SoftParticleActiveLangevin
 {
 public:
-  SoftParticleActiveFixedBox() = default;
-  SoftParticleActiveFixedBox(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
-
-  virtual void integrate();
-};
-
-// Soft particle Active Langevin integrator child of softParticleActiveLangevin
-class SoftParticleActiveFixedSides: public SoftParticleActiveLangevin
-{
-public:
-  SoftParticleActiveFixedSides() = default;
-  SoftParticleActiveFixedSides(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
+  SoftParticleActiveFixedBoundary() = default;
+  SoftParticleActiveFixedBoundary(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
 
   virtual void integrate();
 };

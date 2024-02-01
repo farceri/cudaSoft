@@ -26,17 +26,20 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave;
+  bool readState = true, saveFinal = true, logSave, linSave = true;
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 5.5, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, ew = 100, cutDistance = 2, cutoff, waveQ, timeStep = atof(argv[2]), gravity = 9.8e-03;
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  sp.setGeometryType(simControlStruct::geometryEnum::fixedSides);
+  sp.setPotentialType(simControlStruct::potentialEnum::harmonic);
+  sp.setGravityType(simControlStruct::gravityEnum::on);
+  sp.setGravity(gravity, ew);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -46,7 +49,7 @@ int main(int argc, char **argv) {
     if(runDynamics == true) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
-      //linSave = true;
+      linSave = true;
       outDir = outDir + "dynamics-test/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -69,7 +72,7 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  ioSP.readPBCParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -77,7 +80,6 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setLJcutoff(LJcut);
   sp.setEnergyCostant(ec);
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
@@ -93,7 +95,7 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleLangevin(Tinject, damping, readState);
+  sp.initSoftParticleLangevinFixedBoundary(Tinject, damping, readState);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
@@ -107,11 +109,11 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinLoop();
+    sp.softParticleLangevinFixedBoundaryLoop();
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "Langevin LJ: current step: " << step + initialStep;
+        cout << "Flow: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);

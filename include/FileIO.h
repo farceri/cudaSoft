@@ -228,7 +228,7 @@ public:
     sp_->setParticleRadii(pRad_);
     // set length scales
     sp_->setLengthScaleToOne();
-    cout << "FileIO::readPBCParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << endl;
+    cout << "FileIO::readPBCParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << endl;
   }
 
   void saveAthermalParticlePacking(string dirName) {
@@ -268,7 +268,7 @@ public:
     //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    //save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+    save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
     //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
     //sp_->calcParticleContacts(0.);
     //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);

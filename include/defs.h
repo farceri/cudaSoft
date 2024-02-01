@@ -23,6 +23,8 @@ const double falpha = 0.99;
 
 // WCA cutoff
 const double WCAcut = 1.122462048;
+// Gravity
+const double gravity = 9.81e-02;
 
 // thrust functors
 struct square {
