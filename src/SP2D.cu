@@ -14,6 +14,7 @@
 #include <cmath>
 #include <random>
 #include <time.h>
+#include <cuda.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/fill.h>
@@ -90,6 +91,19 @@ SP2D::~SP2D() {
   d_contactVectorList.clear();
   d_partNeighborList.clear();
   d_partMaxNeighborList.clear();
+}
+
+void SP2D::checkGPUMemory() {
+  int device;
+  cudaGetDevice(&device);
+  cout << "\nDevice: " << device << endl;
+  float free, total, used, mega = 1048576;
+  size_t freeInfo,totalInfo;
+  cudaMemGetInfo(&freeInfo,&totalInfo);
+  free =(uint)freeInfo / mega;
+  total =(uint)totalInfo / mega;
+  used = total - free;
+  cout << "Memory in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << "\n" << endl;
 }
 
 void SP2D::initParticleVariables(long numParticles_) {

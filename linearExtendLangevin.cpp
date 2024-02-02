@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   timeUnit = 1 / damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   //timeStep = sp.setTimeStep(timeStep);
-  cout << "Time step: " << timeStep << " sigma: " << sigma << "Tinject: " << Tinject << endl;
+  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   // strain by strainStep up to maxStrain

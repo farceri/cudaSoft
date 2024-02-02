@@ -29,8 +29,8 @@ int main(int argc, char **argv) {
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.1, previousPhi, currentPhi, deltaPhi = 4e-02, scaleFactor, isf = 1;
-  double cutDistance = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
-  double ec = 1, ew = 100, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.4;
+  double LJcut = 5.5, cutDistance = LJcut+0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double ec = 1, ew = 100, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.84;
   double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-03;
   std::string currentDir, outDir = argv[1], inDir;
   thrust::host_vector<double> boxSize(nDim);
@@ -38,8 +38,7 @@ int main(int argc, char **argv) {
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-  sp.setPotentialType(simControlStruct::potentialEnum::harmonic);
+  sp.setGeometryType(simControlStruct::geometryEnum::normal);
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
@@ -85,8 +84,10 @@ int main(int argc, char **argv) {
     cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
     cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << "\n" << endl;
   }
-  sp.setGravityType(simControlStruct::gravityEnum::on);
-  sp.setGravity(gravity, ew);
+  //sp.setGravityType(simControlStruct::gravityEnum::off);
+  //sp.setGravity(gravity, ew);
+  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  sp.setLJcutoff(LJcut);
   // quasistatic thermal compression
   currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
@@ -129,7 +130,7 @@ int main(int argc, char **argv) {
     cout << " P: " << sp.getParticleDynamicalPressure();
     cout << " phi: " << sp.getParticlePhi() << endl;
     // save minimized configuration
-    currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,7) + "-g/";
+    currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,5) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
     // check if target density is met

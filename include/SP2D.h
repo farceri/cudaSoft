@@ -103,6 +103,8 @@ public:
 	long partNeighborListSize;
   long neighborLimit;
 
+  void checkGPUMemory();
+
   void initParticleVariables(long numParticles_);
 
   void initParticleDeltaVariables(long numParticles_);
