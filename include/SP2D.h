@@ -69,6 +69,9 @@ public:
   double LEshift;
   // Gravity
   double gravity, ew;
+  // Fluid flow
+  double flowSpeed, flowDecay;
+  double flowViscosity, flowHeight;
   // neighbor update variables
   double cutoff, cutDistance;
   long updateCount;
@@ -82,6 +85,9 @@ public:
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
+  // hydrodynamical variables
+  thrust::device_vector<double> d_flowVel;
+  thrust::device_vector<double> d_surfaceHeight;
 
   // correlation variables
   thrust::device_vector<double> d_particleInitPos;
@@ -103,7 +109,7 @@ public:
 	long partNeighborListSize;
   long neighborLimit;
 
-  void checkGPUMemory();
+  double checkGPUMemory();
 
   void initParticleVariables(long numParticles_);
 
@@ -233,13 +239,21 @@ public:
   // force and energy
   void setEnergyCostant(double ec_);
 
+  double setTimeStep(double dt_);
+
   void setAttractionConstants(double l1_, double l2_);
 
   void setLJcutoff(double LJcutoff_);
 
   void setGravity(double gravity_, double ew_);
 
-  double setTimeStep(double dt_);
+  void setFluidFlow(double speed_, double viscosity_);
+
+  void calcSurfaceHeight();
+
+  double getSurfaceHeight();
+
+  void calcFlowVelocity();
 
   // particle functions
   void calcParticleForceEnergy();
@@ -327,6 +341,10 @@ public:
   void initSoftParticleLangevinPerturb(double Temp, double gamma, double extForce, long firstIndex, bool readState);
 
   void softParticleLangevinPerturbLoop();
+
+  void initSoftParticleLangevinFlow(double Temp, double gamma, bool readState);
+
+  void softParticleLangevinFlowLoop();
 
   // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);

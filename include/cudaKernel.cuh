@@ -37,6 +37,10 @@ __constant__ double d_LJecut;
 // Gravity
 __constant__ double d_gravity;
 __constant__ double d_ew; // wall
+// Fluid flow
+__constant__ double d_flowSpeed;
+__constant__ double d_flowDecay;
+__constant__ double d_flowViscosity;
 
 // particle neighborList
 __constant__ long* d_partNeighborListPtr;
@@ -543,6 +547,30 @@ __global__ void kernelAddParticleGravity(const double* pPos, double* pForce, dou
 	if (particleId < d_numParticles) {
 		pForce[particleId * d_nDim + 1] -= d_gravity;
 		pEnergy[particleId] += d_gravity * pPos[particleId * d_nDim + 1];
+	}
+}
+
+// compute particle-dependent surface height for fluid flow
+__global__ void kernelCalcSurfaceHeight(const double* pPos, double* sHeight) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		sHeight[particleId] = pPos[particleId * d_nDim + 1];
+	}
+}
+
+// compute flow velocity with law of the wall
+__global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight, double* flowVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		for (long dim = 0; dim < d_nDim; dim++) {
+			flowVel[particleId * d_nDim + dim] = 0;
+		}
+		//flowVel[particleId * d_nDim + 1] = d_flowSpeed * pPos[particleId * d_nDim + 1] / d_boxSizePtr[1];
+		if(pPos[particleId * d_nDim + 1] >= sHeight[particleId]) {
+			flowVel[particleId * d_nDim + 1] = d_flowSpeed * (log(1 + (pPos[particleId * d_nDim + 1] - sHeight[particleId]) * d_flowSpeed / d_flowViscosity) + 1);
+		} else {
+			flowVel[particleId * d_nDim + 1] = d_flowSpeed / exp(d_flowDecay * (sHeight[particleId] - pPos[particleId * d_nDim + 1]));
+		}
 	}
 }
 

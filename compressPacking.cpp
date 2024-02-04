@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
-  double polydispersity = 0.1, previousPhi, currentPhi, deltaPhi = 4e-02, scaleFactor, isf = 1;
+  double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-02, scaleFactor, isf = 1;
   double LJcut = 5.5, cutDistance = LJcut+0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 100, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.84;
   double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-03;
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
     // check if target density is met
-    if(currentPhi >= phiTh) {
+    if(currentPhi > phiTh) {
       cout << "\nTarget density met, current phi: " << currentPhi << endl;
       searchStep = maxSearchStep; // exit condition
     } else {

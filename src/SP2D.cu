@@ -55,6 +55,9 @@ SP2D::SP2D(long nParticles, long dim) {
   LEshift = 0;
   gravity = 0;
   ew = 100;
+  flowSpeed = 0;
+  flowDecay = 1;
+  flowViscosity = 1;
   cutDistance = 1;
   updateCount = 0;
   d_boxSize.resize(nDim);
@@ -93,17 +96,18 @@ SP2D::~SP2D() {
   d_partMaxNeighborList.clear();
 }
 
-void SP2D::checkGPUMemory() {
+double SP2D::checkGPUMemory() {
   int device;
   cudaGetDevice(&device);
-  cout << "\nDevice: " << device << endl;
-  float free, total, used, mega = 1048576;
+  //cout << "\nDevice: " << device << endl;
+  double free, total, used, mega = 1048576;
   size_t freeInfo,totalInfo;
   cudaMemGetInfo(&freeInfo,&totalInfo);
   free =(uint)freeInfo / mega;
   total =(uint)totalInfo / mega;
   used = total - free;
-  cout << "Memory in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << "\n" << endl;
+  cout << "Memory usage in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << endl;
+  return used;
 }
 
 void SP2D::initParticleVariables(long numParticles_) {
@@ -751,6 +755,12 @@ void SP2D::setEnergyCostant(double ec_) {
   cudaMemcpyToSymbol(d_ec, &ec, sizeof(ec));
 }
 
+double SP2D::setTimeStep(double dt_) {
+  dt = dt_;
+  cudaMemcpyToSymbol(d_dt, &dt, sizeof(dt));
+  return dt;
+}
+
 void SP2D::setAttractionConstants(double l1_, double l2_) {
   l1 = l1_;
   l2 = l2_;
@@ -773,10 +783,39 @@ void SP2D::setGravity(double gravity_, double ew_) {
   cudaMemcpyToSymbol(d_ew, &ew, sizeof(ew));
 }
 
-double SP2D::setTimeStep(double dt_) {
-  dt = dt_;
-  cudaMemcpyToSymbol(d_dt, &dt, sizeof(dt));
-  return dt;
+void SP2D::setFluidFlow(double speed_, double viscosity_) {
+  flowSpeed = speed_;
+  flowViscosity = viscosity_;
+  cudaMemcpyToSymbol(d_flowSpeed, &flowSpeed, sizeof(flowSpeed));
+  cudaMemcpyToSymbol(d_flowViscosity, &flowViscosity, sizeof(flowViscosity));
+  d_surfaceHeight.resize(numParticles);
+  thrust::fill(d_surfaceHeight.begin(), d_surfaceHeight.end(), double(0));
+  d_flowVel.resize(numParticles * nDim);
+  thrust::fill(d_flowVel.begin(), d_flowVel.end(), double(0));
+}
+
+void SP2D::calcSurfaceHeight() {
+  flowHeight = 0;
+  calcParticleNeighborList(0.1);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double *sHeight = thrust::raw_pointer_cast(&d_surfaceHeight[0]);
+  kernelCalcSurfaceHeight<<<dimGrid, dimBlock>>>(pPos, sHeight);
+  flowHeight = thrust::reduce(d_surfaceHeight.begin(), d_surfaceHeight.end(), double(-1), thrust::maximum<double>());
+  thrust::fill(d_surfaceHeight.begin(), d_surfaceHeight.end(), flowHeight);
+  // set flowDecay proportional to flowHeight
+  flowDecay = flowHeight / 10;
+  cudaMemcpyToSymbol(d_flowDecay, &flowDecay, sizeof(flowDecay));
+}
+
+double SP2D::getSurfaceHeight() {
+  return flowHeight;
+}
+
+void SP2D::calcFlowVelocity() {
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const double *sHeight = thrust::raw_pointer_cast(&d_surfaceHeight[0]);
+	double *flowVel = thrust::raw_pointer_cast(&d_flowVel[0]);
+  kernelCalcFlowVelocity<<<dimGrid, dimBlock>>>(pPos, sHeight, flowVel);
 }
 
 /*void SP2D::calcParticleForceEnergy() {
@@ -1227,7 +1266,32 @@ void SP2D::softParticleLangevinPerturbLoop() {
   this->sim_->integrate();
 }
 
-//***************************** NVE integrators ******************************//
+//************************** Fluid flow integrator ***************************//
+void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readState) {
+  this->sim_ = new SoftParticleLangevinFlow(this, SimConfig(Temp, 0, 0));
+  this->sim_->gamma = gamma;
+  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->d_rand.resize(numParticles * nDim);
+  this->sim_->d_rando.resize(numParticles * nDim);
+  this->sim_->d_thermalVel.resize(d_particleVel.size());
+  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  resetLastPositions();
+  calcSurfaceHeight();
+  calcFlowVelocity();
+  if(readState == false) {
+    this->sim_->injectKineticEnergy();
+  }
+  cout << "SP2D::initSoftParticleLangevinFlow:: current temperature: " << setprecision(10) << getParticleTemperature() << " surface height: " << getSurfaceHeight() << endl;
+}
+
+void SP2D::softParticleLangevinFlowLoop() {
+  this->sim_->integrate();
+}
+
+//***************************** NVE integrator *******************************//
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0));
   resetLastPositions();

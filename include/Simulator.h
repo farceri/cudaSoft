@@ -106,13 +106,24 @@ public:
   virtual void integrate();
 };
 
-// Soft particle Langevin integrator with external field child of softParticleLangevin2
+// Soft particle Langevin integrator with perturbation child of softParticleLangevin2
 class SoftParticleLangevinPerturb: public SoftParticleLangevin2
 {
 public:
   SoftParticleLangevinPerturb() = default;
   SoftParticleLangevinPerturb(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
 
+  virtual void integrate();
+};
+
+// Soft particle Langevin integrator with fluid flow child of softParticleLangevin2
+class SoftParticleLangevinFlow: public SoftParticleLangevin2
+{
+public:
+  SoftParticleLangevinFlow() = default;
+  SoftParticleLangevinFlow(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
+
+  virtual void updateVelocity(double timeStep);
   virtual void integrate();
 };
 

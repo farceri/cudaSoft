@@ -22,6 +22,7 @@ public:
   ifstream inputFile;
   ofstream outputFile;
   ofstream energyFile;
+  ofstream memoryFile;
   ofstream corrFile;
   SP2D * sp_;
 
@@ -61,6 +62,27 @@ public:
       cerr << "ioSPFile::openEnergyFile: error: could not open input file " << fileName << endl;
       exit(1);
     }
+  }
+
+  void openMemoryFile(string fileName) {
+    memoryFile = ofstream(fileName.c_str());
+    if (!memoryFile.is_open()) {
+      cerr << "ioSPFile::openMemoryFile: error: could not open input file " << fileName << endl;
+      exit(1);
+    }
+  }
+
+  void saveMemoryUsage(long step) {
+    memoryFile << step + 1 << "\t";
+    memoryFile << setprecision(precision) << sp_->checkGPUMemory() << endl;
+  }
+
+  void saveElapsedTime(double elapsedTime) {
+    memoryFile << "Elapsed time: " << setprecision(precision) << elapsedTime << endl;
+  }
+
+  void closeMemoryFile() {
+    memoryFile.close();
   }
 
   void saveParticleSimpleEnergy(long step, double timeStep, long numParticles) {

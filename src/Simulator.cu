@@ -171,7 +171,7 @@ void SoftParticleLangevinSubSet::integrate() {
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
-  conserveMomentum();
+  //conserveMomentum();
 }
 
 void SoftParticleLangevinSubSet::updateThermalVel() {
@@ -269,7 +269,7 @@ void SoftParticleLangevinSubSet::conserveMomentum() {
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
-//************************* soft particle langevin ***************************//
+//*************** soft particle langevin with external field *****************//
 void SoftParticleLangevinExtField::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
@@ -278,10 +278,10 @@ void SoftParticleLangevinExtField::integrate() {
   sp_->calcParticleForceEnergy();
   sp_->addExternalParticleForce();
   updateVelocity(0.5*sp_->dt);
-  conserveMomentum();
+  //conserveMomentum();
 }
 
-//************************* soft particle langevin ***************************//
+//******* soft particle langevin with perturbation on first particles ********//
 void SoftParticleLangevinPerturb::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
@@ -290,8 +290,45 @@ void SoftParticleLangevinPerturb::integrate() {
   sp_->calcParticleForceEnergy();
   sp_->addConstantParticleForce(extForce, firstIndex);
   updateVelocity(0.5*sp_->dt);
-  conserveMomentum();
+  //conserveMomentum();
 }
+
+//*************** soft particle langevin with fluid flow *********************//
+void SoftParticleLangevinFlow::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->calcFlowVelocity();
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleForceEnergy();
+  updateVelocity(0.5*sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleLangevinFlow::updateVelocity(double timeStep) {
+  long s_nDim(sp_->nDim);
+  double s_dt(timeStep);
+  double s_gamma(gamma);
+  auto r = thrust::counting_iterator<long>(0);
+  const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
+  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  const double *flowVel = thrust::raw_pointer_cast(&(sp_->d_flowVel[0]));
+	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+
+  auto langevinUpdateParticleFlowVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma);
+      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma) * s_gamma;
+      pVel[pId * s_nDim + dim] += rand[pId * s_nDim + dim] - thermalVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleFlowVel);
+  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+}
+
 
 //**************************** soft particle nve *****************************//
 void SoftParticleNVE::integrate() {

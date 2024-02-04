@@ -23,17 +23,18 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = true;
+  bool readState = true, saveFinal = true, logSave, linSave;
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, ew = 100, cutDistance = 2, cutoff, waveQ, timeStep = atof(argv[2]), gravity = 9.8e-03;
-  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
+  double ec = 1, cutDistance = 1, sigma, cutoff, waveQ, timeStep = atof(argv[2]), timeUnit;
+  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), forceUnit;
+  double ew = 100, gravity = 9.8e-04, viscosity = 1e-02, speed = atof(argv[8]);
+  std::string outDir, energyFile, memoryFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -41,6 +42,7 @@ int main(int argc, char **argv) {
   sp.setPotentialType(simControlStruct::potentialEnum::harmonic);
   sp.setGravityType(simControlStruct::gravityEnum::on);
   sp.setGravity(gravity, ew);
+  sp.setFluidFlow(speed, viscosity);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -80,6 +82,8 @@ int main(int argc, char **argv) {
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
+  memoryFile = outDir + "gpuUsage.dat";
+  ioSP.openMemoryFile(memoryFile);
   // initialization
   sp.setEnergyCostant(ec);
   sigma = sp.getMeanParticleSigma();
@@ -96,14 +100,12 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleLangevin(Tinject, damping, readState);
+  sp.initSoftParticleLangevinFlow(Tinject, damping, readState);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
-  // record GPU usage
-  sp.checkGPUMemory();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -112,14 +114,16 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinLoop();
+    sp.softParticleLangevinFlowLoop();
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
+        //sp.calcSurfaceHeight();
         cout << "Flow: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
+        cout << " height: " << sp.getSurfaceHeight();
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
@@ -129,6 +133,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
+          ioSP.saveMemoryUsage(step+initialStep);
         }
       }
     }
@@ -160,11 +165,13 @@ int main(int argc, char **argv) {
   cudaEventSynchronize(stop);
   cudaEventElapsedTime(&elapsed_time_ms, start, stop);
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
+  ioSP.saveElapsedTime(elapsed_time_ms);
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
+  ioSP.closeMemoryFile();
 
   return 0;
 }
