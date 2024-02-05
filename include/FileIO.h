@@ -74,11 +74,11 @@ public:
 
   void saveMemoryUsage(long step) {
     memoryFile << step + 1 << "\t";
-    memoryFile << setprecision(precision) << sp_->checkGPUMemory() << endl;
+    memoryFile << setprecision(12) << sp_->checkGPUMemory() << endl;
   }
 
   void saveElapsedTime(double elapsedTime) {
-    memoryFile << "Elapsed time: " << setprecision(precision) << elapsedTime << endl;
+    memoryFile << "Elapsed time - ms:" << setprecision(12) << elapsedTime << " min: " << elapsedTime / (1000*60) << " hr: " << elapsedTime / (1000*60*60) << endl;
   }
 
   void closeMemoryFile() {

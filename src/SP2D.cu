@@ -107,7 +107,7 @@ double SP2D::checkGPUMemory() {
   total =(uint)totalInfo / mega;
   used = total - free;
   cout << "Memory usage in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << endl;
-  return used;
+  return used / total;
 }
 
 void SP2D::initParticleVariables(long numParticles_) {

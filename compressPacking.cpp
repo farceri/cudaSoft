@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-02, scaleFactor, isf = 1;
-  double LJcut = 5.5, cutDistance = LJcut+0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double LJcut = 5.5, cutDistance = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 100, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.84;
-  double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-03;
+  double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
@@ -64,7 +64,9 @@ int main(int argc, char **argv) {
     sp.setParticleMassFIRE();
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    sp.resetLastPositions();
+    sp.setDisplacementCutoff(cutoff, cutDistance);
+    sp.resetUpdateCount();
+    sp.setInitialPositions();
     cout << "Generate initial configurations with FIRE \n" << endl;
     while((sp.getParticleMaxUnbalancedForce() > forceTollerance) && (iteration != maxIterations)) {
       sp.particleFIRELoop();
@@ -72,11 +74,8 @@ int main(int argc, char **argv) {
         cout << "FIRE: iteration: " << iteration;
         cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
         cout << " energy: " << sp.getParticleEnergy() << endl;
-      }
-      maxDelta = sp.getParticleMaxDisplacement();
-      if(3*maxDelta > cutoff) {
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
+        updateCount = sp.getUpdateCount();
+        sp.resetUpdateCount();
       }
       iteration += 1;
     }
@@ -84,10 +83,10 @@ int main(int argc, char **argv) {
     cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
     cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << "\n" << endl;
   }
-  //sp.setGravityType(simControlStruct::gravityEnum::off);
-  //sp.setGravity(gravity, ew);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-  sp.setLJcutoff(LJcut);
+  sp.setGravityType(simControlStruct::gravityEnum::on);
+  sp.setGravity(gravity, ew);
+  //sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  //sp.setLJcutoff(LJcut);
   // quasistatic thermal compression
   currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
