@@ -567,9 +567,9 @@ __global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight
 		}
 		//flowVel[particleId * d_nDim + 1] = d_flowSpeed * pPos[particleId * d_nDim + 1] / d_boxSizePtr[1];
 		if(pPos[particleId * d_nDim + 1] >= sHeight[particleId]) {
-			flowVel[particleId * d_nDim + 1] = d_flowSpeed * (log(1 + (pPos[particleId * d_nDim + 1] - sHeight[particleId]) * d_flowSpeed / d_flowViscosity) + 1);
+			flowVel[particleId * d_nDim] = d_flowSpeed * (log(1 + (pPos[particleId * d_nDim + 1] - sHeight[particleId]) * d_flowSpeed / d_flowViscosity) + 1);
 		} else {
-			flowVel[particleId * d_nDim + 1] = d_flowSpeed / exp(d_flowDecay * (sHeight[particleId] - pPos[particleId * d_nDim + 1]));
+			flowVel[particleId * d_nDim] = d_flowSpeed / exp(d_flowDecay * (sHeight[particleId] - pPos[particleId * d_nDim + 1]));
 		}
 	}
 }
