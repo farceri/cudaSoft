@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        //sp.calcSurfaceHeight();
+        sp.calcSurfaceHeight();
         cout << "Flow: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();

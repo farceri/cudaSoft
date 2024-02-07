@@ -551,10 +551,14 @@ __global__ void kernelAddParticleGravity(const double* pPos, double* pForce, dou
 }
 
 // compute particle-dependent surface height for fluid flow
-__global__ void kernelCalcSurfaceHeight(const double* pPos, double* sHeight) {
+__global__ void kernelCalcSurfaceHeight(const double* pPos, const long* numContacts, double* sHeight) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		sHeight[particleId] = pPos[particleId * d_nDim + 1];
+		if (numContacts[particleId]>=1) {
+			sHeight[particleId] = pPos[particleId * d_nDim + 1];
+		} else {
+			sHeight[particleId] = 0;
+		}
 	}
 }
 

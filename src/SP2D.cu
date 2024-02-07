@@ -796,14 +796,15 @@ void SP2D::setFluidFlow(double speed_, double viscosity_) {
 
 void SP2D::calcSurfaceHeight() {
   flowHeight = 0;
-  calcParticleNeighborList(0.1);
+  calcParticleContacts(0);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const long *numContacts = thrust::raw_pointer_cast(&d_numContacts[0]);
 	double *sHeight = thrust::raw_pointer_cast(&d_surfaceHeight[0]);
-  kernelCalcSurfaceHeight<<<dimGrid, dimBlock>>>(pPos, sHeight);
-  flowHeight = thrust::reduce(d_surfaceHeight.begin(), d_surfaceHeight.end(), double(-1), thrust::maximum<double>());
+  kernelCalcSurfaceHeight<<<dimGrid, dimBlock>>>(pPos, numContacts, sHeight);
+  flowHeight = 0.95 * thrust::reduce(d_surfaceHeight.begin(), d_surfaceHeight.end(), double(-1), thrust::maximum<double>());
   thrust::fill(d_surfaceHeight.begin(), d_surfaceHeight.end(), flowHeight);
   // set flowDecay proportional to flowHeight
-  flowDecay = flowHeight / 10;
+  flowDecay = flowHeight / 2;
   cudaMemcpyToSymbol(d_flowDecay, &flowDecay, sizeof(flowDecay));
 }
 
