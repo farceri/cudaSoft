@@ -293,7 +293,7 @@ void SoftParticleLangevinPerturb::integrate() {
   //conserveMomentum();
 }
 
-//*************** soft particle langevin with fluid flow *********************//
+//****************** soft particle langevin with fluid flow ******************//
 void SoftParticleLangevinFlow::integrate() {
   updateThermalVel();
   updateVelocity(0.5*sp_->dt);
@@ -329,6 +329,55 @@ void SoftParticleLangevinFlow::updateVelocity(double timeStep) {
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
+//*************** soft particle damped dynamics with fluid flow ***************//
+void SoftParticleFlow::integrate() {
+  updateThermalVel();
+  updateVelocity(0.5*sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->calcFlowVelocity();
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleForceEnergy();
+  updateVelocity(0.5*sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleFlow::updateVelocity(double timeStep) {
+  long s_nDim(sp_->nDim);
+  double s_dt(timeStep);
+  double s_gamma(gamma);
+  auto r = thrust::counting_iterator<long>(0);
+  const double *flowVel = thrust::raw_pointer_cast(&(sp_->d_flowVel[0]));
+	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+
+  auto updateParticleFlowVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma);
+      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma) * s_gamma;
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, updateParticleFlowVel);
+  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+}
+
+void SoftParticleFlow::updatePosition(double timeStep) {
+  long s_nDim(sp_->nDim);
+  double s_dt(timeStep);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
+	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+
+  auto updateParticleFlowPos = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, updateParticleFlowPos);
+}
 
 //**************************** soft particle nve *****************************//
 void SoftParticleNVE::integrate() {

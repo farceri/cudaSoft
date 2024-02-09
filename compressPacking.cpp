@@ -24,13 +24,13 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false;
-  long numParticles = atol(argv[5]), nDim = 2;
+  long numParticles = atol(argv[5]), nDim = 3;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e06, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 5e-02, scaleFactor, isf = 1;
   double LJcut = 5.5, cutDistance = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
-  double ec = 1, ew = 100, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.2, phiTh = 0.7;
+  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.01, phiTh = 0.4;
   double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir;
   thrust::host_vector<double> boxSize(nDim);
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setGeometryType(simControlStruct::geometryEnum::normal);
+  sp.setGeometryType(simControlStruct::geometryEnum::fixedSides3D);
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
@@ -132,17 +132,30 @@ int main(int argc, char **argv) {
     currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,5) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
+    ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     // check if target density is met
     if(currentPhi > phiTh) {
       cout << "\nTarget density met, current phi: " << currentPhi << endl;
       searchStep = maxSearchStep; // exit condition
     } else {
-      scaleFactor = sqrt((currentPhi + deltaPhi) / currentPhi);
+      if(nDim == 2) {
+        scaleFactor = sqrt((currentPhi + deltaPhi) / currentPhi);
+      } else if(nDim == 3) {
+        scaleFactor = cbrt((currentPhi + deltaPhi) / currentPhi);
+      } else {
+        cout << "ScaleFactor: only dimensions 2 and 3 are allowed!" << endl;
+      }
       sp.scaleParticles(scaleFactor);
       sp.scaleParticlePacking();
       boxSize = sp.getBoxSize();
       currentPhi = sp.getParticlePhi();
-      cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
+      if(nDim == 2) {
+        cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
+      } else if(nDim == 3) {
+        cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
+      } else {
+        cout << "BoxSize: only dimensions 2 and 3 are allowed!" << endl;
+      }
       searchStep += 1;
     }
   }

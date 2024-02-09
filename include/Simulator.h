@@ -127,6 +127,18 @@ public:
   virtual void integrate();
 };
 
+// Soft particle integrator with fluid flow child of softParticleLangevin2
+class SoftParticleFlow: public SoftParticleLangevin2
+{
+public:
+  SoftParticleFlow() = default;
+  SoftParticleFlow(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
+
+  virtual void updatePosition(double timeStep);
+  virtual void updateVelocity(double timeStep);
+  virtual void integrate();
+};
+
 // Soft particle NVE integrator child of SoftParticleLangevin
 class SoftParticleNVE: public SoftParticleLangevin
 {

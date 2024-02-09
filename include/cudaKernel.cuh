@@ -84,7 +84,7 @@ inline __device__ double calcNormSq(const double* segment) {
 }
 
 inline __device__ double calcDistance(const double* thisVec, const double* otherVec) {
-  double delta, distanceSq = 0., deltay, deltax, shifty;
+  double delta, distanceSq = 0., deltax, deltay, shifty;
 	switch (d_simControl.geometryType) {
 		case simControlStruct::geometryEnum::normal:
 		#pragma unroll (MAXDIM)
@@ -109,10 +109,19 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 			distanceSq += delta * delta;
 		}
 		break;
-		case simControlStruct::geometryEnum::fixedSides:
-		deltay = thisVec[1] - otherVec[1];
-		deltax = pbcDistance(thisVec[0], otherVec[0], 0);
-		distanceSq = deltax * deltax + deltay * deltay;
+		case simControlStruct::geometryEnum::fixedSides2D:
+		delta = thisVec[1] - otherVec[1];
+		distanceSq = delta * delta;
+		delta = pbcDistance(thisVec[0], otherVec[0], 0);
+		distanceSq += delta * delta;
+		break;
+		case simControlStruct::geometryEnum::fixedSides3D:
+		delta = thisVec[2] - otherVec[2];
+		distanceSq = delta * delta;
+		delta = pbcDistance(thisVec[1], otherVec[1], 1);
+		distanceSq += delta * delta;
+		delta = pbcDistance(thisVec[0], otherVec[0], 0);
+		distanceSq += delta * delta;
 		break;
 	}
   return sqrt(distanceSq);
@@ -146,10 +155,19 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 			distanceSq += delta * delta;
 		}
 		break;
-		case simControlStruct::geometryEnum::fixedSides:
+		case simControlStruct::geometryEnum::fixedSides2D:
 		deltaVec[1] = thisVec[1] - otherVec[1];
+		distanceSq = deltaVec[1] * deltaVec[1];
 		deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
-		distanceSq = deltaVec[0] * deltaVec[0] + deltaVec[1] * deltaVec[1];
+		distanceSq += deltaVec[0] * deltaVec[0];
+		break;
+		case simControlStruct::geometryEnum::fixedSides3D:
+		deltaVec[2] = thisVec[2] - otherVec[2];
+		distanceSq = deltaVec[2] * deltaVec[2];
+		deltaVec[1] = pbcDistance(thisVec[1], otherVec[1], 1);
+		distanceSq += deltaVec[1] * deltaVec[1];
+		deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
+		distanceSq += deltaVec[0] * deltaVec[0];
 		break;
 	}
   return sqrt(distanceSq);
@@ -305,11 +323,11 @@ inline __device__ double calcContactInteraction(const double* thisPos, const dou
 	return 0.;
 }
 
-inline __device__ double calcWallContactInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+inline __device__ double calcWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
   double distance, overlap, gradMultiple;
-	//overlap = calcOverlap(thisPos, otherPos, radSum);
-	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//overlap = calcOverlap(thisPos, wallPos, radSum);
+	distance = calcDeltaAndDistance(thisPos, wallPos, delta);
 	overlap = 1 - distance / radSum;
 	if (overlap > 0) {
 		gradMultiple = d_ew * overlap / radSum;
@@ -480,8 +498,8 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
   	}
 }
 
-// particle-sides contact interaction
-__global__ void kernelCalcParticleSidesInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+// particle-sides contact interaction in 2D
+__global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
@@ -494,12 +512,40 @@ __global__ void kernelCalcParticleSidesInteraction(const double* pRad, const dou
 		thisRad = pRad[particleId];
 		radSum = 2 * thisRad;
 		// check if particle is close to the wall at a distance less than its radius
-		if(thisPos[1] < thisRad) {
+		if(thisPos[1] <= thisRad) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
-		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+		} else if((d_boxSizePtr[1] - thisPos[1]) <= thisRad) {
 			wallPos[1] = d_boxSizePtr[1];
+			wallPos[0] = thisPos[0];
+			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+		}
+	}
+}
+
+// particle-sides contact interaction in 3D
+__global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		double thisRad, radSum;
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		thisRad = pRad[particleId];
+		radSum = 2 * thisRad;
+		// check if particle is close to the wall at a distance less than its radius
+		if(thisPos[2] < thisRad) {
+			wallPos[2] = 0;
+			wallPos[1] = thisPos[1];
+			wallPos[0] = thisPos[0];
+			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+		} else if((d_boxSizePtr[2] - thisPos[2]) < thisRad) {
+			wallPos[2] = d_boxSizePtr[2];
+			wallPos[1] = thisPos[1];
 			wallPos[0] = thisPos[0];
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 		}
@@ -545,8 +591,8 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 __global__ void kernelAddParticleGravity(const double* pPos, double* pForce, double* pEnergy) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		pForce[particleId * d_nDim + 1] -= d_gravity;
-		pEnergy[particleId] += d_gravity * pPos[particleId * d_nDim + 1];
+		pForce[particleId * d_nDim + d_nDim - 1] -= d_gravity;
+		pEnergy[particleId] += d_gravity * pPos[particleId * d_nDim + d_nDim - 1];
 	}
 }
 
@@ -554,8 +600,8 @@ __global__ void kernelAddParticleGravity(const double* pPos, double* pForce, dou
 __global__ void kernelCalcSurfaceHeight(const double* pPos, const long* numContacts, double* sHeight) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		if (numContacts[particleId]>=1) {
-			sHeight[particleId] = pPos[particleId * d_nDim + 1];
+		if (numContacts[particleId] >= 1) {
+			sHeight[particleId] = pPos[particleId * d_nDim + d_nDim - 1];
 		} else {
 			sHeight[particleId] = 0;
 		}
@@ -571,9 +617,9 @@ __global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight
 		}
 		//flowVel[particleId * d_nDim + 1] = d_flowSpeed * pPos[particleId * d_nDim + 1] / d_boxSizePtr[1];
 		if(pPos[particleId * d_nDim + 1] >= sHeight[particleId]) {
-			flowVel[particleId * d_nDim] = d_flowSpeed * (log(1 + (pPos[particleId * d_nDim + 1] - sHeight[particleId]) * d_flowSpeed / d_flowViscosity) + 1);
+			flowVel[particleId * d_nDim] = d_flowSpeed * (log(1 + (pPos[particleId * d_nDim + d_nDim - 1] - sHeight[particleId]) * d_flowSpeed / d_flowViscosity) + 1);
 		} else {
-			flowVel[particleId * d_nDim] = d_flowSpeed / exp(d_flowDecay * (sHeight[particleId] - pPos[particleId * d_nDim + 1]));
+			flowVel[particleId * d_nDim] = d_flowSpeed / exp(d_flowDecay * (sHeight[particleId] - pPos[particleId * d_nDim + d_nDim - 1]));
 		}
 	}
 }
@@ -820,6 +866,15 @@ __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const 
 			pPos[particleId * d_nDim + dim] += timeStep * pVel[particleId * d_nDim + dim];
 		}
   }
+}
+
+__global__ void kernelSetPBC(double* pPos) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		for (long dim = 0; dim < d_nDim; dim++) {
+			pPos[particleId * d_nDim + dim] -= floor(pPos[particleId * d_nDim + dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
+		}
+	}
 }
 
 __global__ void kernelCheckParticlePBC(double* pPosPBC, const double* pPos) {

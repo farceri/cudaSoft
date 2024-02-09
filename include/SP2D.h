@@ -20,7 +20,7 @@ using std::vector;
 using std::string;
 
 struct simControlStruct {
-  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides} geometryType;
+  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
   enum class potentialEnum {harmonic, lennardJones, WCA, adhesive} potentialType;
   enum class gravityEnum {on, off} gravityType;
 };
@@ -167,6 +167,8 @@ public:
 
   double getMinParticleSigma();
 
+  void setPBC();
+
   void setParticlePositions(thrust::host_vector<double> &particlePos_);
   void setPBCParticlePositions(thrust::host_vector<double> &particlePos_);
   thrust::host_vector<double> getParticlePositions();
@@ -201,8 +203,6 @@ public:
 
   double getParticlePhi();
 
-  double get3DParticlePhi();
-
   double getParticleMSD();
 
   double getParticleMaxDisplacement();
@@ -223,8 +223,6 @@ public:
   void setPolyRandomSoftParticles(double phi0, double polyDispersity);
 
   void setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, double lx);
-
-  void set3DPolyRandomSoftParticles(double phi0, double polyDispersity);
 
   void pressureScaleParticles(double pscale);
 
@@ -345,6 +343,10 @@ public:
   void initSoftParticleLangevinFlow(double Temp, double gamma, bool readState);
 
   void softParticleLangevinFlowLoop();
+
+  void initSoftParticleFlow(double gamma, bool readState);
+
+  void softParticleFlowLoop();
 
   // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);

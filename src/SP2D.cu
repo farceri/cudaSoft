@@ -106,7 +106,7 @@ double SP2D::checkGPUMemory() {
   free =(uint)freeInfo / mega;
   total =(uint)totalInfo / mega;
   used = total - free;
-  cout << "Memory usage in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << endl;
+  //cout << "Memory usage in MB - free: " << freeInfo << " total: " << totalInfo << " used: " << used << endl;
   return used / total;
 }
 
@@ -176,10 +176,12 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
     cout << "SP2D: setGeometryType: geometryType: leesEdwards" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedBox) {
     cout << "SP2D: setGeometryType: geometryType: fixedBox" << endl;
-  } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides) {
-    cout << "SP2D: setGeometryType: geometryType: fixedSides" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides2D) {
+    cout << "SP2D: setGeometryType: geometryType: fixedSides2D" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides3D) {
+    cout << "SP2D: setGeometryType: geometryType: fixedSides3D" << endl;
   } else {
-    cout << "SP2D: setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox or fixedSides" << endl;
+    cout << "SP2D: setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox, fixedSides2D or fixedSides3D" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -447,6 +449,11 @@ void SP2D::setParticlePositions(thrust::host_vector<double> &particlePos_) {
   d_particlePos = particlePos_;
 }
 
+void SP2D::setPBC() {
+  double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  kernelSetPBC<<<dimGrid, dimBlock>>>(pPos);
+}
+
 void SP2D::setPBCParticlePositions(thrust::host_vector<double> &particlePos_) {
   d_particlePos = particlePos_;
   // check pbc
@@ -543,15 +550,18 @@ void SP2D::printContacts() {
 }
 
 double SP2D::getParticlePhi() {
-  thrust::device_vector<double> d_radSquared(numParticles);
-  thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
-  return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
-}
-
-double SP2D::get3DParticlePhi() {
-  thrust::device_vector<double> d_radCubed(numParticles);
-  thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
-  return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 3 * PI / (4 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  if(nDim == 2) {
+    thrust::device_vector<double> d_radSquared(numParticles);
+    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
+    return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
+  } else if(nDim == 3) {
+    thrust::device_vector<double> d_radCubed(numParticles);
+    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
+    return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 3 * PI / (4 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  } else {
+    cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
+    return 0;
+  }
 }
 
 double SP2D::getParticleMSD() {
@@ -559,7 +569,7 @@ double SP2D::getParticleMSD() {
   const double *particleInitPos = thrust::raw_pointer_cast(&d_particleInitPos[0]);
   double *particleDelta = thrust::raw_pointer_cast(&d_particleDelta[0]);
   kernelCalcParticleDistanceSq<<<dimGrid,dimBlock>>>(particlePos, particleInitPos, particleDelta);
-  return thrust::reduce(d_particleDelta.begin(), d_particleDelta.end(), double(0), thrust::plus<double>()) / (numParticles * d_boxSize[0] * d_boxSize[1]);
+  return thrust::reduce(d_particleDelta.begin(), d_particleDelta.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 double SP2D::getParticleMaxDisplacement() {
@@ -599,10 +609,10 @@ void SP2D::checkParticleMaxDisplacement() {
 double SP2D::getSoftWaveNumber() {
   if(nDim == 2) {
     return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * getParticlePhi() / (PI * numParticles)));
-  } else if(nDim == 3) {
-    return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * get3DParticlePhi() / (PI * numParticles)));
+  } else if (nDim == 3) {
+    return PI / (2. * cbrt(d_boxSize[0] * d_boxSize[1] * d_boxSize[2] * getParticlePhi() / (PI * numParticles)));
   } else {
-    cout << "SP2D::getSoftWaveNumber: this function works only for dim = 2 and 3" << endl;
+    cout << "SP2D::getSoftWaveNumber: only dimensions 2 and 3 are allowed!" << endl;
     return 0;
   }
 }
@@ -629,7 +639,13 @@ void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
     randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
     d_particleRad[particleId] = exp(mean + randNum * sigma);
   }
-  scale = sqrt(getParticlePhi() / phi0);
+  if(nDim == 2) {
+    scale = sqrt(getParticlePhi() / phi0);
+  } else if(nDim == 3) {
+    scale = cbrt(getParticlePhi() / phi0);
+  } else {
+    cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
+  }
   for (long dim = 0; dim < nDim; dim++) {
     boxSize[dim] = boxLength;
   }
@@ -660,44 +676,24 @@ void SP2D::setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, 
     d_particleRad[particleId] = exp(mean + randNum * sigma);
   }
   boxSize[0] = lx;
-  boxSize[1] = 1;
+  for (long dim = 1; dim < nDim; dim++) {
+    boxSize[dim] = 1;
+  }
   setBoxSize(boxSize);
-  scale = sqrt(getParticlePhi() / phi0);
+  if(nDim == 2) {
+    scale = sqrt(getParticlePhi() / phi0);
+  } else if(nDim == 3) {
+    scale = cbrt(getParticlePhi() / phi0);
+  } else {
+    cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
+  }
   boxSize[0] = lx * scale;
-  boxSize[1] = scale;
-  setBoxSize(boxSize);
-  // extract random positions
-  for (long particleId = 0; particleId < numParticles; particleId++) {
-    for(long dim = 0; dim < nDim; dim++) {
-      d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
-    }
-  }
-  // need to set this otherwise forces are zeros
-  //setParticleLengthScale();
-  setLengthScaleToOne();
-}
-
-void SP2D::set3DPolyRandomSoftParticles(double phi0, double polyDispersity) {
-  thrust::host_vector<double> boxSize(nDim);
-  double r1, r2, randNum, mean, sigma, scale, boxLength = 1.;
-  mean = 0.;
-  sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
-  cout << "ok1" << endl;
-  // generate polydisperse particle size
-  for (long particleId = 0; particleId < numParticles; particleId++) {
-    r1 = drand48();
-    r2 = drand48();
-    randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
-    d_particleRad[particleId] = exp(mean + randNum * sigma);
-  }
-  scale = cbrt(get3DParticlePhi() / phi0);
-  for (long dim = 0; dim < nDim; dim++) {
-    boxSize[dim] = boxLength;
+  for (long dim = 1; dim < nDim; dim++) {
+    boxSize[dim] = scale;
   }
   setBoxSize(boxSize);
   // extract random positions
   for (long particleId = 0; particleId < numParticles; particleId++) {
-    d_particleRad[particleId] /= scale;
     for(long dim = 0; dim < nDim; dim++) {
       d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
     }
@@ -839,9 +835,12 @@ void SP2D::calcParticleForceEnergy() {
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
 		break;
-		case simControlStruct::geometryEnum::fixedSides:
-    kernelCalcParticleSidesInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-		break;
+		case simControlStruct::geometryEnum::fixedSides2D:
+    kernelCalcParticleSidesInteraction2D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
+    case simControlStruct::geometryEnum::fixedSides3D:
+    kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
 	}
   switch (simControl.gravityType) {
     case simControlStruct::gravityEnum::on:
@@ -921,13 +920,26 @@ void SP2D::calcParticleStressTensor() {
 }
 
 double SP2D::getParticleVirialPressure() {
-   calcParticleStressTensor();
-	 return (d_stress[0] + d_stress[3]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+  calcParticleStressTensor();
+  if(nDim == 2) {
+    return (d_stress[0] + d_stress[3]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+  } else if(nDim == 3) {
+    return (d_stress[0] + d_stress[4] + d_stress[8]) / (nDim * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  } else {
+    return 0;
+  }
+	 
 }
 
 double SP2D::getParticleShearStress() {
-   calcParticleStressTensor();
-	 return (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+  calcParticleStressTensor();
+  if(nDim == 2) {
+    return (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+  } else if(nDim == 3) {
+    return (d_stress[1] + d_stress[2] + d_stress[5]) / (nDim * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  } else {
+    return 0;
+  }
 }
 
 double SP2D::getParticleExtensileStress() {
@@ -1267,7 +1279,7 @@ void SP2D::softParticleLangevinPerturbLoop() {
   this->sim_->integrate();
 }
 
-//************************** Fluid flow integrator ***************************//
+//********************** Langevin fluid flow integrator *********************//
 void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevinFlow(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
@@ -1291,6 +1303,21 @@ void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readStat
 void SP2D::softParticleLangevinFlowLoop() {
   this->sim_->integrate();
 }
+
+//************************** Fluid flow integrator ***************************//
+void SP2D::initSoftParticleFlow(double gamma, bool readState) {
+  this->sim_ = new SoftParticleFlow(this, SimConfig(0, 0, 0));
+  this->sim_->gamma = gamma;
+  resetLastPositions();
+  calcSurfaceHeight();
+  calcFlowVelocity();
+  cout << "SP2D::initSoftParticleFlow:: current temperature: " << setprecision(10) << getParticleTemperature() << " surface height: " << getSurfaceHeight() << endl;
+}
+
+void SP2D::softParticleFlowLoop() {
+  this->sim_->integrate();
+}
+
 
 //***************************** NVE integrator *******************************//
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {

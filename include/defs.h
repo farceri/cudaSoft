@@ -12,7 +12,7 @@
 
 // global constants
 const double PI = 3.141592653589793238462643383279502884197;
-const long MAXDIM = 2;
+const long MAXDIM = 3;
 const long precision = 14;
 
 // FIRE constants

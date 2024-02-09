@@ -57,7 +57,6 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-#EXE = make3DPacking
 #EXE = compressPacking
 
 #EXE = measurePressure

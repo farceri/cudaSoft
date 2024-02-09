@@ -23,22 +23,23 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave;
-  long numParticles = atol(argv[7]), nDim = 2;
+  long numParticles = atol(argv[7]), nDim = 3;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, cutDistance = 1, sigma, cutoff, waveQ, timeStep = atof(argv[2]), timeUnit;
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), forceUnit;
-  double ew = 100, gravity = 9.8e-04, viscosity = 1e-02, speed = atof(argv[8]);
+  double ew = 1e02, gravity = 9.8e-04, viscosity = 1e-01, speed = atof(argv[8]);
   std::string outDir, energyFile, memoryFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
+  thrust::host_vector<double> pos(numParticles * nDim);
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setGeometryType(simControlStruct::geometryEnum::fixedSides);
+  sp.setGeometryType(simControlStruct::geometryEnum::fixedSides3D);
   sp.setPotentialType(simControlStruct::potentialEnum::harmonic);
   sp.setGravityType(simControlStruct::gravityEnum::on);
   sp.setGravity(gravity, ew);
@@ -100,7 +101,8 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleLangevinFlow(Tinject, damping, readState);
+  pos = sp.getParticlePositions();
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
@@ -114,7 +116,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinFlowLoop();
+    sp.softParticleLangevinLoop();
     if(step % linFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
@@ -134,6 +136,7 @@ int main(int argc, char **argv) {
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveMemoryUsage(step+initialStep);
+          ioSP.saveDumpPacking(outDir, numParticles, nDim, step*timeStep);
         }
       }
     }
@@ -149,6 +152,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step*timeStep);
       }
     }
     if(linSave == true) {
@@ -156,6 +160,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step*timeStep);
       }
     }
     step += 1;
@@ -169,6 +174,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
+    ioSP.saveDumpPacking(currentDir, numParticles, nDim, step*timeStep);
   }
   ioSP.closeEnergyFile();
   ioSP.closeMemoryFile();
