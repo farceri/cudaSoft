@@ -331,7 +331,6 @@ void SoftParticleLangevinFlow::updateVelocity(double timeStep) {
 
 //*************** soft particle damped dynamics with fluid flow ***************//
 void SoftParticleFlow::integrate() {
-  updateThermalVel();
   updateVelocity(0.5*sp_->dt);
   updatePosition(sp_->dt);
   sp_->calcFlowVelocity();
