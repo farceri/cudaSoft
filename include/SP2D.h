@@ -21,7 +21,7 @@ using std::string;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
-  enum class potentialEnum {harmonic, lennardJones, WCA, adhesive} potentialType;
+  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive} potentialType;
   enum class gravityEnum {on, off} gravityType;
 };
 
@@ -60,11 +60,15 @@ public:
   double dt;
   // dimensional factor
   double rho0;
-  double ec; // interaction
-  // attraction constants
+  // energy scale
+  double ec;
+  // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
   double LJcutoff, LJecut;
+  // Mie constants
+  double nPower, mPower;
+  double mieConstant, Miecut;
   // Lees-Edwards shift
   double LEshift;
   // Gravity
@@ -239,9 +243,11 @@ public:
 
   double setTimeStep(double dt_);
 
-  void setAttractionConstants(double l1_, double l2_);
+  void setAdhesionParams(double l1_, double l2_);
 
   void setLJcutoff(double LJcutoff_);
+
+  void setMieParams(double LJcutoff_, double nPower_, double mPower_);
 
   void setGravity(double gravity_, double ew_);
 

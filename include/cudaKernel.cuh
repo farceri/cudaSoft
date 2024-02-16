@@ -34,6 +34,11 @@ __constant__ double d_l2; // range
 // Lennard-Jones constants
 __constant__ double d_LJcutoff;
 __constant__ double d_LJecut;
+// Mie constants
+__constant__ double d_nPower;
+__constant__ double d_mPower;
+__constant__ double d_mieConstant;
+__constant__ double d_Miecut;
 // Gravity
 __constant__ double d_gravity;
 __constant__ double d_ew; // wall
@@ -254,16 +259,20 @@ inline __device__ void getNormalVector(const double* thisVec, double* normalVec)
   normalVec[1] = -thisVec[0];
 }
 
-inline __device__ double calcLJForceShift(const double radSum, const double radSum6) {
-	double distance, distance6;
-	distance = d_LJcutoff * radSum;
-	distance6 = pow(distance, 6);
-	return 24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
-	//return 24 * d_ec * (2 * radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) / distance;
+inline __device__ double calcLJForceShift(const double radSum) {
+	double ratio6 = pow(d_LJcutoff, 6);
+	return 24 * d_ec * (2 / ratio6 - 1) / (d_LJcutoff * radSum * ratio6);
+}
+
+inline __device__ double calcMieForceShift(const double radSum) {
+	double nRatio, mRatio;
+	nRatio = pow(d_LJcutoff, d_nPower);
+	mRatio = pow(d_LJcutoff, d_mPower);
+	return d_mieConstant * d_ec * (d_nPower / nRatio - d_mPower / mRatio) / (d_LJcutoff * radSum);
 }
 
 inline __device__ double calcGradMultiple(const double* thisPos, const double* otherPos, const double radSum) {
-	double distance, overlap, distance6, radSum6, forceShift;
+	double distance, overlap, ratio, ratio12, ratio6, ration, ratiom, forceShift;
 	distance = calcDistance(thisPos, otherPos);
 	switch (d_simControl.potentialType) {
 		case simControlStruct::potentialEnum::harmonic:
@@ -275,20 +284,33 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 		}
 		break;
 		case simControlStruct::potentialEnum::lennardJones:
-		distance6 = pow(distance, 6);
-		radSum6 = pow(radSum, 6);
+		ratio = radSum / distance;
+		ratio12 = pow(ratio, 12);
+		ratio6 = pow(ratio, 6);
 		if (distance <= (d_LJcutoff * radSum)) {
-			forceShift = calcLJForceShift(radSum, radSum6);
-			return -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance + forceShift;
+			forceShift = calcLJForceShift(radSum);
+			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		} else {
+			return 0;
+		}
+		break;
+		case simControlStruct::potentialEnum::Mie:
+		ratio = radSum / distance;
+		ration = pow(ratio, d_nPower);
+		ratiom = pow(ratio, d_mPower);
+		if (distance <= (d_LJcutoff * radSum)) {
+			forceShift = calcMieForceShift(radSum);
+			return d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
 		} else {
 			return 0;
 		}
 		break;
 		case simControlStruct::potentialEnum::WCA:
-		distance6 = pow(distance, 6);
-		radSum6 = pow(radSum, 6);
+		ratio = radSum / distance;
+		ratio12 = pow(ratio, 12);
+		ratio6 = pow(ratio, 6);
 		if (distance <= (WCAcut * radSum)) {
-			return -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
+			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
 		} else {
 			return 0;
 		}
@@ -308,7 +330,7 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 
 inline __device__ double calcContactInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
-  double distance, overlap, gradMultiple;
+  	double distance, overlap, gradMultiple = 0;
 	//overlap = calcOverlap(thisPos, otherPos, radSum);
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	overlap = 1 - distance / radSum;
@@ -325,7 +347,7 @@ inline __device__ double calcContactInteraction(const double* thisPos, const dou
 
 inline __device__ double calcWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
-  double distance, overlap, gradMultiple;
+  	double distance, overlap, gradMultiple = 0;
 	//overlap = calcOverlap(thisPos, wallPos, radSum);
 	distance = calcDeltaAndDistance(thisPos, wallPos, delta);
 	overlap = 1 - distance / radSum;
@@ -341,21 +363,45 @@ inline __device__ double calcWallContactInteraction(const double* thisPos, const
 }
 
 inline __device__ double calcLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  double distance, distance6, radSum6, forceShift, gradMultiple = 0, epot = 0.;
+  	double distance, ratio, ratio12, ratio6, forceShift, gradMultiple = 0, epot = 0;
 	double delta[MAXDIM];
 	//distance = calcDistance(thisPos, otherPos);
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
-	distance6 = pow(distance, 6);
-	radSum6 = pow(radSum, 6);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
 	if (distance <= (d_LJcutoff * radSum)) {
-		forceShift = calcLJForceShift(radSum, radSum6);
-		gradMultiple = -24 * d_ec * radSum6 * (1 / distance6 - 2 * radSum6 / (distance6 * distance6)) / distance + forceShift;
-		epot = 0.5 * d_ec * (4 * (radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) - d_LJecut);
-		epot -= 0.5 * abs(forceShift) * (distance - d_LJcutoff * radSum);
-		//gradMultiple = 24 * d_ec * (2 * radSum12 / distance12 - radSum6 / distance6) / distance - forceShift;
-		//epot = 0.5 * d_ec * (4 * (radSum12 / distance12 - radSum6 / distance6) - d_LJecut);
-		//epot -= 0.5 * abs(forceShift) * (distance - d_LJcutoff * radSum);
+		forceShift = calcLJForceShift(radSum);
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut);
+		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  }
+	}
+	return epot;
+}
+
+inline __device__ double calcMieInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  	double distance, ratio, ration, ratiom, forceShift, gradMultiple = 0, epot = 0;
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	ratio = radSum / distance;
+	ration = pow(ratio, d_nPower);
+	ratiom = pow(ratio, d_mPower);
+	if (distance <= (d_LJcutoff * radSum)) {
+		forceShift = calcMieForceShift(radSum);
+		gradMultiple =  d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
+		epot = 0.5 * d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut);
+		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
 	} else {
 		epot = 0.;
 	}
@@ -369,14 +415,41 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 }
 
 inline __device__ double calcWCAInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  double distance, distance6, radSum6, gradMultiple = 0, epot = 0;
+  	double distance, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
-	distance6 = pow(distance, 6);
-	radSum6 = pow(radSum, 6);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
 	if (distance <= (WCAcut * radSum)) {
-		gradMultiple = -24 * d_ec * radSum6 * (1 / distance6 - 2*radSum6 / (distance6 * distance6)) / distance;
-		epot = 0.5 * d_ec * (4 * (radSum6 * radSum6 / (distance6 * distance6) - radSum6 / distance6) + 1);
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  }
+	}
+	return epot;
+}
+
+inline __device__ double calcWCAAdhesiveInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  	double distance, overlap, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	overlap = 1 - distance / radSum;
+	if (distance < WCAcut * radSum) {
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance + d_ec * overlap / radSum;
+		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1) + 0.5 * d_ec * (overlap * overlap - (WCAcut - 1) * d_l2) * 0.5;
+	} else if (distance >= WCAcut * radSum && distance < (WCAcut + d_l2) * radSum) {
+		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) / radSum;
+		epot = -0.5 * d_ec *  ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) * (overlap + WCAcut + d_l2) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -390,7 +463,7 @@ inline __device__ double calcWCAInteraction(const double* thisPos, const double*
 }
 
 inline __device__ double calcAdhesiveInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  double overlap, distance, gradMultiple = 0, epot = 0.;
+  	double overlap, distance, gradMultiple = 0, epot = 0;
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	overlap = 1 - distance / radSum;
@@ -398,8 +471,8 @@ inline __device__ double calcAdhesiveInteraction(const double* thisPos, const do
 		gradMultiple = d_ec * overlap / radSum;
 		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
 	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
-		gradMultiple = -(d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
-		epot = -(0.5 * (d_ec * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2)) * 0.5;
+		gradMultiple = -d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
+		epot = -0.5 * d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -414,21 +487,21 @@ inline __device__ double calcAdhesiveInteraction(const double* thisPos, const do
 
 // particle-particle interaction
 __global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-    double thisRad, otherRad, radSum;
-	double thisPos[MAXDIM], otherPos[MAXDIM];
-	// zero out the force and get particle positions
-	for (long dim = 0; dim < d_nDim; dim++) {
-		pForce[particleId * d_nDim + dim] = 0;
-		thisPos[dim] = pPos[particleId * d_nDim + dim];
-	}
-    thisRad = pRad[particleId];
-    pEnergy[particleId] = 0;
-    // interaction between vertices of neighbor particles
-    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-      if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
-        radSum = thisRad + otherRad;
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the force and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			pForce[particleId * d_nDim + dim] = 0;
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		thisRad = pRad[particleId];
+		pEnergy[particleId] = 0;
+		// interaction between vertices of neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+				radSum = thisRad + otherRad;
 				switch (d_simControl.potentialType) {
 					case simControlStruct::potentialEnum::harmonic:
 					pEnergy[particleId] += calcContactInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
@@ -436,17 +509,20 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					case simControlStruct::potentialEnum::lennardJones:
 					pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					break;
+					case simControlStruct::potentialEnum::Mie:
+					pEnergy[particleId] += calcMieInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
 					case simControlStruct::potentialEnum::WCA:
 					pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					break;
 					case simControlStruct::potentialEnum::adhesive:
-					pEnergy[particleId] += calcAdhesiveInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					pEnergy[particleId] += calcWCAAdhesiveInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					break;
 				}
 				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
 			}
-    }
-  }
+		}
+  	}
 }
 
 // particle-wall interaction - across fictitious wall at half height in 2D
@@ -462,7 +538,7 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
 		wallForce[particleId] = 0;
-		if(d_partMaxNeighborListPtr[particleId] > 5) {
+		if(d_partMaxNeighborListPtr[particleId] > 0) {
 			thisHeight = thisPos[1] - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
 			if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
 				thisRad = pRad[particleId];

@@ -26,8 +26,8 @@ int main(int argc, char **argv) {
   bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strainx, strainStepx;
-  double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
     // range for computing force across fictitious wall
-    range = 2.5 * LJcut * sigma;
+    range *= LJcut * sigma;
     std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";

@@ -197,6 +197,8 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     cout << "SP2D: setPotentialType: potentialType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
     cout << "SP2D: setPotentialType: potentialType: lennardJones" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
+    cout << "SP2D: setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
     cout << "SP2D: setPotentialType: potentialType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
@@ -757,7 +759,7 @@ double SP2D::setTimeStep(double dt_) {
   return dt;
 }
 
-void SP2D::setAttractionConstants(double l1_, double l2_) {
+void SP2D::setAdhesionParams(double l1_, double l2_) {
   l1 = l1_;
   l2 = l2_;
   cudaMemcpyToSymbol(d_l1, &l1, sizeof(l1));
@@ -767,10 +769,27 @@ void SP2D::setAttractionConstants(double l1_, double l2_) {
 void SP2D::setLJcutoff(double LJcutoff_) {
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
-  LJecut = 4 * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
+  LJecut = 4 * ec * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  //cout << "SP2D::setLJcutoff - LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
+  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
 }
+
+void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
+  LJcutoff = LJcutoff_;
+  cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
+  nPower = nPower_;
+  mPower = mPower_;
+  cudaMemcpyToSymbol(d_nPower, &nPower, sizeof(nPower));
+  cudaMemcpyToSymbol(d_mPower, &mPower, sizeof(mPower));
+  double pRatio = nPower / mPower;
+  double pDiff = nPower - mPower;
+  double mieConstant = (nPower / pDiff) * pow(pRatio, mPower / pDiff);
+  cudaMemcpyToSymbol(d_mieConstant, &mieConstant, sizeof(mieConstant));
+  double Miecut = mieConstant * ec * (1 / pow(LJcutoff, nPower) - 1 / pow(LJcutoff, mPower));
+  cudaMemcpyToSymbol(d_Miecut, &Miecut, sizeof(Miecut));
+  cout << "SP2D::setMieParams: LJcutoff: " << LJcutoff << " Miecut: " << Miecut << " n: " << nPower << " m: " << mPower << endl;
+}
+
 
 void SP2D::setGravity(double gravity_, double ew_) {
   gravity = gravity_;

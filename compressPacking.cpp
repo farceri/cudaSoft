@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   bool read = false, readState = false;
   long numParticles = atol(argv[5]), nDim = 3;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e07, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.16, previousPhi, currentPhi, deltaPhi = 5e-02, scaleFactor, isf = 1;
   double LJcut = 5.5, cutDistance = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);

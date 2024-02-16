@@ -70,9 +70,8 @@ INC_DIR = include
 #EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinH
-#EXE = runLangevinLJ
-#EXE = runAdhesiveNVE
-#EXE = runAdhesiveNVT
+EXE = runLangevinLJ
+#EXE = runLangevinAdh
 #EXE = runExternalField
 
 # mechanics
@@ -88,7 +87,7 @@ INC_DIR = include
 #EXE = simpleActive
 
 # hydrodynamics
-EXE = runFlow
+#EXE = runFlow
 
 # Object files:
 OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simulator.o
