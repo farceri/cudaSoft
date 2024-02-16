@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -46,8 +46,8 @@ int main(int argc, char **argv) {
     if(runDynamics == true) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
-      //linSave = true;
-      outDir = outDir + "dynamics/";
+      linSave = true;
+      outDir = outDir + "dynamics-short/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  //sp.setLJcutoff(LJcut);
-  sp.setMieParams(LJcut, n, m);
+  sp.setLJcutoff(LJcut);
+  //sp.setMieParams(LJcut, n, m);
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
