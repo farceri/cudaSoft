@@ -440,11 +440,11 @@ thrust::host_vector<double> SP2D::getParticleRadii() {
 }
 
 double SP2D::getMeanParticleSigma() {
-  return 2 * thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>()) / numParticles;
+  return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 double SP2D::getMinParticleSigma() {
-  return 2 * thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(1), thrust::minimum<double>());
+  return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(1), thrust::minimum<double>());
 }
 
 void SP2D::setParticlePositions(thrust::host_vector<double> &particlePos_) {
