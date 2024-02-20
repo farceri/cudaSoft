@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   sp.setLJcutoff(LJcut);
   //sp.setMieParams(LJcut, n, m);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleLangevin(Tinject, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();

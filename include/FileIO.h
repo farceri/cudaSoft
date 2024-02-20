@@ -441,13 +441,21 @@ public:
     outputFile << "ITEM: BOX BOUNDS pp pp fixed" << endl;
     outputFile << 0 << "\t" << boxSize[0] << endl;
     outputFile << 0 << "\t" << boxSize[1] << endl;
-    outputFile << 0 << "\t" << boxSize[2] << endl;
-    outputFile << "ITEM: ATOMS id radius xu yu zu" << endl;
+    if(nDim_ == 3) {
+      outputFile << 0 << "\t" << boxSize[2] << endl;
+      outputFile << "ITEM: ATOMS id radius xu yu zu" << endl;
+    } else {
+      outputFile << "ITEM: ATOMS id radius xu yu" << endl;
+    }
     for (long particleId = 0; particleId < numParticles_; particleId++) {
       //outputFile << particleId + 1 << "\t" << 1 << "\t" << particleId + 1 << "\t";
       //outputFile << rad[particleId] << "\t" << pos[particleId * nDim] << "\t" << pos[particleId * nDim + 1] << "\t" << pos[particleId * nDim + 2] << endl;
       outputFile << particleId + 1 << "\t" << rad[particleId] << "\t";
-      outputFile << pos[particleId * nDim_] << "\t" << pos[particleId * nDim_ + 1] << "\t" << pos[particleId * nDim_ + 2] << endl;
+      if(nDim_ == 3) {
+        outputFile << pos[particleId * nDim_] << "\t" << pos[particleId * nDim_ + 1] << "\t" << pos[particleId * nDim_ + 2] << endl;
+      } else {
+        outputFile << pos[particleId * nDim_] << "\t" << pos[particleId * nDim_ + 1] << endl;
+      }
     }
   }
 

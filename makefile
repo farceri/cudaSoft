@@ -57,7 +57,7 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-#EXE = compressPacking
+EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -79,7 +79,7 @@ INC_DIR = include
 #EXE = shearLangevin
 #EXE = linearShearLangevin
 #EXE = extendLangevin
-EXE = linearExtendLangevin
+#EXE = linearExtendLangevin
 #EXE = simpleLangevin
 #EXE = shearActive
 #EXE = extendActive

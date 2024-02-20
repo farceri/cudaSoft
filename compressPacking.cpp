@@ -47,9 +47,9 @@ int main(int argc, char **argv) {
     inDir = argv[6];
     inDir = outDir + inDir;
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-    sigma = sp.getMeanParticleSigma();
+    sigma = 2 * sp.getMeanParticleSigma();
     sp.setEnergyCostant(ec);
-    cutoff = cutDistance * sp.getMinParticleSigma();
+    cutoff = 2 * cutDistance * sp.getMinParticleSigma();
     if(readState == true) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
@@ -58,9 +58,9 @@ int main(int argc, char **argv) {
     sp.setScaledPolyRandomSoftParticles(phi0, polydispersity, lx);
     sp.scaleParticlePacking();
     //sp.scaleParticlesAndBoxSize();
-    sigma = sp.getMeanParticleSigma();
+    sigma = 2 * sp.getMeanParticleSigma();
     sp.setEnergyCostant(ec);
-    cutoff = cutDistance * sp.getMinParticleSigma();
+    cutoff = 2 * cutDistance * sp.getMinParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
     sp.calcParticleNeighborList(cutDistance);
@@ -95,13 +95,13 @@ int main(int argc, char **argv) {
   // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
     timeUnit = sigma / sqrt(ec);
-    damping = (inertiaOverDamping / sigma);
+    damping = sqrt(inertiaOverDamping) / sigma;
     timeStep = sp.setTimeStep(dt*timeUnit);
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     sp.initSoftParticleLangevin(Tinject, damping, readState);
-    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+    cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     sp.setInitialPositions();
