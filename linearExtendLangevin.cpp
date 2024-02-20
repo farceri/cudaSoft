@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  //outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
