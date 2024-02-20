@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   // range for computing force across fictitious wall
-  range = 2.5 * LJcut * sigma;
+  range = 3 * LJcut * sigma;
   // run integrator
   while(step != maxStep) {
     sp.softParticleLangevinLoop();

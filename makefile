@@ -70,7 +70,7 @@ INC_DIR = include
 #EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinH
-EXE = runLangevinLJ
+#EXE = runLangevinLJ
 #EXE = runLangevinAdh
 #EXE = runExternalField
 
@@ -79,7 +79,7 @@ EXE = runLangevinLJ
 #EXE = shearLangevin
 #EXE = linearShearLangevin
 #EXE = extendLangevin
-#EXE = linearExtendLangevin
+EXE = linearExtendLangevin
 #EXE = simpleLangevin
 #EXE = shearActive
 #EXE = extendActive

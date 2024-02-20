@@ -440,11 +440,11 @@ thrust::host_vector<double> SP2D::getParticleRadii() {
 }
 
 double SP2D::getMeanParticleSigma() {
-  return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>()) / numParticles;
+  return 2 * thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 double SP2D::getMinParticleSigma() {
-  return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(1), thrust::minimum<double>());
+  return 2 * thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(1), thrust::minimum<double>());
 }
 
 void SP2D::setParticlePositions(thrust::host_vector<double> &particlePos_) {
@@ -639,7 +639,7 @@ void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
     r1 = drand48();
     r2 = drand48();
     randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
-    d_particleRad[particleId] = exp(mean + randNum * sigma);
+    d_particleRad[particleId] = 0.5 * exp(mean + randNum * sigma);
   }
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
@@ -675,7 +675,7 @@ void SP2D::setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, 
     r1 = drand48();
     r2 = drand48();
     randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
-    d_particleRad[particleId] = exp(mean + randNum * sigma);
+    d_particleRad[particleId] = 0.5 * exp(mean + randNum * sigma);
   }
   boxSize[0] = lx;
   for (long dim = 1; dim < nDim; dim++) {

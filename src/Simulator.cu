@@ -1,5 +1,5 @@
 //
-// Author: Yuxuan Cheng
+// Author: Francesco Arceri
 // Date:   10-09-2021
 //
 // DEFINITION OF INTEGRATION FUNCTIONS

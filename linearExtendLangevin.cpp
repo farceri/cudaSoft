@@ -23,12 +23,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true;
+  bool readState = true, save = true, saveSame = false, lj = false, adh = true, wca = false, compress = true, biaxial = true;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
-  double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
+  double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -36,8 +36,10 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
-    sign = -1;
-    dirSample = "compress";
+    if(biaxial == true) {
+      sign = -1;
+      dirSample = "biaxial-comp";
+    }
   } else if(biaxial == true) {
     dirSample = "biaxial";
   }
@@ -50,13 +52,19 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
     cutDistance = 1;
+  } else if(adh == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::adhesive);
+    cout << "Setting Adhesive potential" << endl;
+    cutDistance = l2+0.5;
+    sp.setAdhesionParams(l1, l2);
   } else {
     cout << "Setting Harmonic potential" << endl;
     cutDistance = 0.5;
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  //outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);

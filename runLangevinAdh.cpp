@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave, linSave;
   long numParticles = atol(argv[8]), nDim = 2;
   long maxStep = atof(argv[5]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, l1 = pow(2, 1/6), l2 = atof(argv[4]), cutDistance = l2+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[7]), sigma, forceUnit, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-adh/";
@@ -48,7 +48,6 @@ int main(int argc, char **argv) {
       //linSave = true;
       outDir = outDir + "dynamics-adh/";
       if(std::experimental::filesystem::exists(outDir) == true) {
-        initialStep = atof(argv[6]);
         //if(initialStep != 0) {
         inDir = outDir;
         //}
