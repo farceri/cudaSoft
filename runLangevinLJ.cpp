@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, n = 12, m = 6, LJcut = 5.5, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, n = 12, m = 6, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       //logSave = true;
       //outDir = outDir + "dynamics-log/";
       linSave = true;
-      outDir = outDir + "dynamics/";
+      outDir = outDir + "dynamics-test/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -142,6 +142,8 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir, LJcut);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     if(linSave == true) {
@@ -149,6 +151,8 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir, LJcut);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;

@@ -395,7 +395,8 @@ public:
     save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
-  void saveParticleNeighbors(string dirName) {
+  void saveParticleNeighbors(string dirName, double cutoff_) {
+    sp_->calcParticleNeighborList(cutoff_);
     save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 

@@ -22,16 +22,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave;
+  bool readState = true, saveFinal = true, logSave, linSave = true;
   long numParticles = atol(argv[8]), nDim = 2;
   long maxStep = atof(argv[5]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, l1 = pow(2, 1/6), l2 = atof(argv[4]), cutDistance = l2+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[7]), sigma, forceUnit, timeUnit;
+  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[7]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-adh/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
@@ -95,6 +95,7 @@ int main(int argc, char **argv) {
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
+  range *= l2 * sigma;
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -106,7 +107,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
     if(step % linFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "NVT-u: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;

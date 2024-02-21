@@ -525,16 +525,86 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
   	}
 }
 
+inline __device__ double calcContactYforce(const double* thisPos, const double* otherPos, const double radSum) {
+	double delta[MAXDIM];
+  	double distance, overlap, gradMultiple = 0;
+	//overlap = calcOverlap(thisPos, otherPos, radSum);
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	overlap = 1 - distance / radSum;
+	if (overlap > 0) {
+		gradMultiple = d_ec * overlap / radSum;
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0;
+	}
+}
+
+inline __device__ double calcLJYforce(const double* thisPos, const double* otherPos, const double radSum) {
+  	double distance, ratio, ratio12, ratio6, forceShift, gradMultiple = 0;
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (d_LJcutoff * radSum)) {
+		forceShift = calcLJForceShift(radSum);
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+	}
+	if (gradMultiple != 0) {
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0;
+	}
+}
+
+inline __device__ double calcWCAYforce(const double* thisPos, const double* otherPos, const double radSum) {
+  	double distance, ratio, ratio12, ratio6, gradMultiple = 0;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (WCAcut * radSum)) {
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+	}
+	if (gradMultiple != 0) {
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0;
+	}
+}
+
+inline __device__ double calcWCAAdhesiveYforce(const double* thisPos, const double* otherPos, const double radSum) {
+  	double distance, overlap, ratio, ratio12, ratio6, gradMultiple = 0;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	overlap = 1 - distance / radSum;
+	if (distance < WCAcut * radSum) {
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance + d_ec * overlap / radSum;
+	} else if (distance >= WCAcut * radSum && distance < (WCAcut + d_l2) * radSum) {
+		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) / radSum;
+	}
+	if (gradMultiple != 0) {
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0;
+	}
+}
+
 // particle-wall interaction - across fictitious wall at half height in 2D
 __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPos, const double range, double* wallForce) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
-		double thisPos[MAXDIM], otherPos[MAXDIM], acrossForce[MAXDIM];
+		double thisPos[MAXDIM], otherPos[MAXDIM];
 		double thisHeight, otherHeight;
 		// zero out the force and get particle positions
 		for (long dim = 0; dim < d_nDim; dim++) {
-			acrossForce[dim] = 0;
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
 		wallForce[particleId] = 0;
@@ -550,16 +620,16 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 							radSum = thisRad + otherRad;
 							switch (d_simControl.potentialType) {
 								case simControlStruct::potentialEnum::harmonic:
-								calcContactInteraction(thisPos, otherPos, radSum, acrossForce);
+								wallForce[particleId] += calcContactYforce(thisPos, otherPos, radSum);
 								break;
 								case simControlStruct::potentialEnum::lennardJones:
-								calcLJInteraction(thisPos, otherPos, radSum, acrossForce);
+								wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
 								break;
 								case simControlStruct::potentialEnum::WCA:
-								calcWCAInteraction(thisPos, otherPos, radSum, acrossForce);
+								wallForce[particleId] += calcWCAAdhesiveYforce(thisPos, otherPos, radSum);
 								break;
 								case simControlStruct::potentialEnum::adhesive:
-								calcAdhesiveInteraction(thisPos, otherPos, radSum, acrossForce);
+								wallForce[particleId] += calcWCAAdhesiveYforce(thisPos, otherPos, radSum);
 								break;
 							}
 						//printf("particleId %ld otherId %ld \t thisHeight %lf \t otherHeight %lf \t wallForce %lf \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], thisHeight, otherHeight, acrossForce[1]);
@@ -567,7 +637,6 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 					}
 				}
 			}
-			wallForce[particleId] += acrossForce[1];
 			//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
 		}
 	

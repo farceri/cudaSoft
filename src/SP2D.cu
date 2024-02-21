@@ -968,6 +968,7 @@ double SP2D::getParticleExtensileStress() {
 
 double SP2D::getParticleWallForce(double range) {
   d_wallForce.resize(d_particleEnergy.size());
+  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);

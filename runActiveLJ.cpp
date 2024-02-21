@@ -145,6 +145,8 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir, LJcut);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     if(linSave == true) {
@@ -152,6 +154,8 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleNeighbors(currentDir, LJcut);
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;
