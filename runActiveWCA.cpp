@@ -112,7 +112,8 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
     if(step % linFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active LJ: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
