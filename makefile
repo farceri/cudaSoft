@@ -68,10 +68,10 @@ INC_DIR = include
 #EXE = runLangevin
 #EXE = runActiveH
 #EXE = runActiveLJ
-#EXE = runActiveWCA
+EXE = runActiveWCA
 #EXE = runLangevinH
 #EXE = runLangevinLJ
-EXE = runLangevinAdh
+#EXE = runLangevinAdh
 #EXE = runExternalField
 
 # mechanics

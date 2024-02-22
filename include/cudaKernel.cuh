@@ -862,55 +862,55 @@ __global__ void kernelCalcParticleActivePressure(const double* pAngle, const dou
 
 //************************** neighbors and contacts **************************//
 __global__ void kernelCalcParticleNeighborList(const double* pPos, const double* pRad, const double cutDistance) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-    long addedNeighbor = 0;
-    double thisRad, otherRad, radSum;
-    double thisPos[MAXDIM], otherPos[MAXDIM];
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		long addedNeighbor = 0;
+		double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
-    thisRad = pRad[particleId];
+		thisRad = pRad[particleId];
 
-    for (long otherId = 0; otherId < d_numParticles; otherId++) {
-      if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
-        bool isNeighbor = false;
-        radSum = thisRad + otherRad;
-        isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
-				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum);
-        if (addedNeighbor < d_partNeighborListSize) {
+		for (long otherId = 0; otherId < d_numParticles; otherId++) {
+			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
+				bool isNeighbor = false;
+				radSum = thisRad + otherRad;
+				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
+				isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
+				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
 				}
 				addedNeighbor += isNeighbor;
-      }
-    }
-    d_partMaxNeighborListPtr[particleId] = addedNeighbor;
-  }
+			}
+		}
+		d_partMaxNeighborListPtr[particleId] = addedNeighbor;
+  	}
 }
 
 __global__ void kernelCalcParticleBoxNeighborList(const double* pPos, const double* pRad, const double cutDistance) {
-  long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  if (particleId < d_numParticles) {
-    long addedNeighbor = 0;
-    double thisRad, otherRad, radSum;
-    double thisPos[MAXDIM], otherPos[MAXDIM];
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		long addedNeighbor = 0;
+		double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
-    thisRad = pRad[particleId];
+		thisRad = pRad[particleId];
 
-    for (long otherId = 0; otherId < d_numParticles; otherId++) {
-      if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
-        bool isNeighbor = false;
-        radSum = thisRad + otherRad;
-        isNeighbor = (-calcFixedBoundaryOverlap(thisPos, otherPos, radSum) < cutDistance);
-				//isNeighbor = (calcFixedBoundaryDistance(thisPos, otherPos) < cutDistance);
-        if (addedNeighbor < d_partNeighborListSize) {
+		for (long otherId = 0; otherId < d_numParticles; otherId++) {
+			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
+				bool isNeighbor = false;
+				radSum = thisRad + otherRad;
+				//isNeighbor = (-calcFixedBoundaryOverlap(thisPos, otherPos, radSum) < cutDistance);
+				isNeighbor = (calcFixedBoundaryDistance(thisPos, otherPos) < (cutDistance * radSum));
+				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor==true) printf("particleId %ld \t otherId: %ld \t overlap: %lf \n", particleId, otherId, calcOverlap(thisPos, otherPos, radSum));
 				}
 				addedNeighbor += isNeighbor;
-      }
-    }
-    d_partMaxNeighborListPtr[particleId] = addedNeighbor;
-  }
+			}
+		}
+		d_partMaxNeighborListPtr[particleId] = addedNeighbor;
+	}
 }
 
 __global__ void kernelCalcParticleContacts(const double* pPos, const double* pRad, const double gapSize, const long contactLimit, long* contactList, long* numContacts) {

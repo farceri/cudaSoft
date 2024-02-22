@@ -334,6 +334,30 @@ public:
     //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
+  void saveParticleActivePacking(string dirName) {
+  // save scalars
+  string fileParams = dirName + "params.dat";
+  ofstream saveParams(fileParams.c_str());
+  openOutputFile(fileParams);
+  saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
+  saveParams << "dt" << "\t" << sp_->dt << endl;
+  saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
+  saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+  saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
+  saveParams.close();
+  // save vectors
+  save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+  save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
+  save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+  //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+  save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
+  save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+  save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+  //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+  //sp_->calcParticleContacts(0.);
+  //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+}
+
   void savePBCParticlePacking(string dirName) {
     // save scalars
     string fileParams = dirName + "params.dat";

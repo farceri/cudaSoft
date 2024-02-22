@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave;
   long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 5.5, cutDistance = LJcut+0.5, cutoff, sigma, damping, waveQ;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
         }
         sp.resetUpdateCount();
         if(saveFinal == true) {
-          ioSP.saveParticlePacking(outDir);
+          ioSP.saveParticleActivePacking(outDir);
         }
       }
     }
@@ -146,7 +146,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
         ioSP.saveParticleNeighbors(currentDir, LJcut);
-        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     if(linSave == true) {
@@ -155,7 +154,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
         ioSP.saveParticleNeighbors(currentDir, LJcut);
-        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;
@@ -167,7 +165,8 @@ int main(int argc, char **argv) {
   printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticlePacking(outDir);
+    ioSP.saveParticleActivePacking(outDir);
+    ioSP.saveParticleNeighbors(outDir, LJcut);
   }
   ioSP.closeEnergyFile();
 

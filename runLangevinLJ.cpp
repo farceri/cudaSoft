@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, n = 12, m = 6, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -143,7 +143,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         ioSP.saveParticleNeighbors(currentDir, LJcut);
-        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     if(linSave == true) {
@@ -152,7 +151,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         ioSP.saveParticleNeighbors(currentDir, LJcut);
-        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;
@@ -165,6 +163,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
+    ioSP.saveParticleNeighbors(outDir, LJcut);
   }
   ioSP.closeEnergyFile();
 
