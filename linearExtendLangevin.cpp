@@ -23,10 +23,10 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = false, adh = true, wca = false, compress = false, biaxial = true;
+  bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   ioSP.saveParticlePacking(outDir);
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+    cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     step = 0;
@@ -154,9 +154,6 @@ int main(int argc, char **argv) {
     }
     strain += strainStep;
     ioSP.closeEnergyFile();
-  }
-  if(saveSame == true) {
-    ioSP.saveParticlePacking(outDir);
   }
   return 0;
 }
