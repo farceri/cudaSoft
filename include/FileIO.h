@@ -95,8 +95,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
@@ -104,8 +103,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     //energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
     energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
@@ -115,15 +113,15 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
+    //energyFile << setprecision(precision) << sp_->getParticleSurfaceTension() << endl;
   }
 
   void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleVirialPressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleDynamicalPressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
@@ -300,7 +298,7 @@ public:
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
     saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
-    saveParams << "pressure" << "\t" << sp_->getParticleVirialPressure() << endl;
+    saveParams << "pressure" << "\t" << sp_->getParticlePressure() << endl;
     saveParams.close();
     // save vectors
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
@@ -428,7 +426,6 @@ public:
     string fileParams = dirName + "dynParams.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
-    saveParams << "pressure" << "\t" << sp_->getParticleDynamicalPressure() << endl;
     saveParams << "sigma" << "\t" << sigma << endl;
     saveParams << "damping" << "\t" << damping << endl;
     saveParams << "Dr" << "\t" << Dr << endl;

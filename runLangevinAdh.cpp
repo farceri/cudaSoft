@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[8]), nDim = 2;
   long maxStep = atof(argv[5]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, l1 = pow(2, 1/6), l2 = atof(argv[4]), cutDistance = l2+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, l1 = pow(2, 1/6) - 1, l2 = l1 + atof(argv[4]), cutDistance = l2+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[7]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-adh/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -45,8 +45,8 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       //logSave = false;
-      //linSave = true;
-      outDir = outDir + "dynamics-adh/";
+      linSave = true;
+      outDir = outDir + "dynamics/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;

@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = false, adh = true, wca = false, compress = true, biaxial = true;
+  bool readState = true, save = true, saveSame = false, lj = false, adh = true, wca = false, compress = false, biaxial = true;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strainx, strainStepx;
@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
-  outDir = inDir + dirSample + "/";
+  //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);

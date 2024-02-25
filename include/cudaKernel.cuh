@@ -443,13 +443,13 @@ inline __device__ double calcWCAAdhesiveInteraction(const double* thisPos, const
 	ratio = radSum / distance;
 	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
-	overlap = 1 - distance / radSum;
-	if (distance < WCAcut * radSum) {
+	overlap = 1 - (distance + WCAcut * radSum) / radSum;
+	if (distance < 2 * WCAcut * radSum) {
 		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance + d_ec * overlap / radSum;
 		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1) + 0.5 * d_ec * (overlap * overlap - (WCAcut - 1) * d_l2) * 0.5;
-	} else if (distance >= WCAcut * radSum && distance < (WCAcut + d_l2) * radSum) {
-		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) / radSum;
-		epot = -0.5 * d_ec *  ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) * (overlap + WCAcut + d_l2) * 0.5;
+	} else if ((distance >= 2 * WCAcut * radSum) && (distance < (1 + d_l2) * radSum)) {
+		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + d_l2) / radSum;
+		epot = -0.5 * d_ec *  ((WCAcut - 1) / d_l2) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -769,17 +769,23 @@ __global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight
 	}
 }
 
-__global__ void kernelCalcParticleStressTensor(const double* pRad, const double* pPos, double* pStress) {
+__global__ void kernelCalcParticleStressTensor(const double* pRad, const double* pPos, const double* pVel, double* pStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisRad, otherRad, radSum;
 		double gradMultiple, distance;
 		double thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], forces[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
-    thisRad = pRad[particleId];
-    // stress between neighbor particles
-    for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-      if(extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+		thisRad = pRad[particleId];
+		// thermal stress
+		pStress[0] += pVel[particleId * d_nDim] * pVel[particleId * d_nDim + 1];
+		pStress[3] += pVel[particleId * d_nDim + 1] * pVel[particleId * d_nDim + 1];
+		// cross terms
+		pStress[1] += pVel[particleId * d_nDim] * pVel[particleId * d_nDim + 1];
+		pStress[2] += pVel[particleId * d_nDim + 1] * pVel[particleId * d_nDim];
+		// stress between neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if(extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
 				radSum = thisRad + otherRad;
 				gradMultiple = calcGradMultiple(thisPos, otherPos, radSum);
 				if(gradMultiple > 0) {
@@ -788,11 +794,11 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 						forces[dim] = gradMultiple * delta[dim] / distance;
 					}
 					//diagonal terms
-					pStress[0] = delta[0] * forces[0];
-					pStress[3] = delta[1] * forces[1];
+					pStress[0] += delta[0] * forces[0];
+					pStress[3] += delta[1] * forces[1];
 					// cross terms
-					pStress[1] -= delta[0] * forces[1];
-					pStress[2] -= delta[1] * forces[0];
+					pStress[1] += delta[0] * forces[1];
+					pStress[2] += delta[1] * forces[0];
 				}
 			}
 		}

@@ -934,28 +934,33 @@ void SP2D::calcParticleStressTensor() {
   thrust::fill(d_stress.begin(), d_stress.end(), double(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *pStress = thrust::raw_pointer_cast(&d_stress[0]);
-  kernelCalcParticleStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pStress);
+  kernelCalcParticleStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pStress);
 }
 
-double SP2D::getParticleVirialPressure() {
+double SP2D::getParticlePressure() {
   calcParticleStressTensor();
   if(nDim == 2) {
     return (d_stress[0] + d_stress[3]) / (nDim * d_boxSize[0] * d_boxSize[1]);
-  } else if(nDim == 3) {
-    return (d_stress[0] + d_stress[4] + d_stress[8]) / (nDim * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
   } else {
     return 0;
   }
-	 
+}
+
+double SP2D::getParticleSurfaceTension() {
+  calcParticleStressTensor();
+  if(nDim == 2) {
+    return 0.5 * d_boxSize[0] * (d_stress[0] - d_stress[3]) / (d_boxSize[0] * d_boxSize[1]);
+  } else {
+    return 0;
+  }
 }
 
 double SP2D::getParticleShearStress() {
   calcParticleStressTensor();
   if(nDim == 2) {
     return (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
-  } else if(nDim == 3) {
-    return (d_stress[1] + d_stress[2] + d_stress[5]) / (nDim * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
   } else {
     return 0;
   }
@@ -986,18 +991,6 @@ double SP2D::getParticleWallPressure() {
    kernelCalcParticleBoxPressure<<<dimGrid, dimBlock>>>(pRad, pPos, wallWork);
 	 return wallWork / (nDim * volume);
 	 //return totalStress;
-}
-
-double SP2D::getParticleDynamicalPressure() {
-  double volume = 1;
-  for (long dim = 0; dim < nDim; dim++) {
-    volume *= d_boxSize[dim];
-  }
-  return getParticleTemperature() * numParticles / volume;
-}
-
-double SP2D::getParticleTotalPressure() {
-  return getParticleVirialPressure() + getParticleDynamicalPressure();
 }
 
 double SP2D::getParticleActivePressure(double driving) {

@@ -277,7 +277,9 @@ public:
 
   void calcParticleStressTensor();
 
-  double getParticleVirialPressure();
+  double getParticlePressure();
+
+  double getParticleSurfaceTension();
 
   double getParticleShearStress();
 
@@ -286,10 +288,6 @@ public:
   double getParticleWallForce(double range);
 
   double getParticleWallPressure();
-
-  double getParticleDynamicalPressure();
-
-  double getParticleTotalPressure();
 
   double getParticleActivePressure(double driving);
 
