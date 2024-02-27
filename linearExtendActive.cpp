@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   ioSP.saveParticlePacking(outDir);
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+    cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     step = 0;

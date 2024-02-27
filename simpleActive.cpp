@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[7]);
-  double ec = 1, LJcut = 5.5, cutDistance = LJcut+0.5, cutoff, sigma, damping;
+  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, sigma, damping;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), waveQ, range;
   std::string outDir, energyFile, currentDir, inDir = argv[1];
@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
   // initialization
   sp.setLJcutoff(LJcut);
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
