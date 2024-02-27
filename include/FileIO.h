@@ -460,7 +460,11 @@ public:
     outputFile << timeStep_ << endl;
     outputFile << "ITEM: NUMBER OF ATOMS" << endl;
     outputFile << numParticles_ << endl;
-    outputFile << "ITEM: BOX BOUNDS pp pp fixed" << endl;
+    if(nDim_ == 3) {
+      outputFile << "ITEM: BOX BOUNDS pp pp fixed" << endl;
+    } else {
+      outputFile << "ITEM: BOX BOUNDS pp pp" << endl;
+    }
     outputFile << 0 << "\t" << boxSize[0] << endl;
     outputFile << 0 << "\t" << boxSize[1] << endl;
     if(nDim_ == 3) {

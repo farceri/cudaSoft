@@ -67,10 +67,10 @@ INC_DIR = include
 #EXE = runNPT
 #EXE = runLangevin
 #EXE = runActiveH
-#EXE = runActiveLJ
+EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinH
-EXE = runLangevinLJ
+#EXE = runLangevinLJ
 #EXE = runLangevinAdh
 #EXE = runExternalField
 

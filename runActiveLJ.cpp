@@ -22,13 +22,13 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave;
-  long numParticles = atol(argv[9]), nDim = 2;
-  long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, sigma, damping, waveQ;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
@@ -45,10 +45,11 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      //logSave = true;
-      //outDir = outDir + "dynamics-log/";
-      linSave = true;
-      outDir = outDir + "dynamics/";
+      if(logSave == true) {
+        outDir = outDir + "dynamics-log/";
+      } else if(linSave == true) {
+        outDir = outDir + "dynamics/";
+      }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -113,7 +114,7 @@ int main(int argc, char **argv) {
   // run integrator
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
-    if(step % linFreq == 0) {
+    if(step % saveEnergyFreq == 0) {
       //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
@@ -145,7 +146,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir, LJcut);
+        //ioSP.saveParticleNeighbors(currentDir, LJcut);
       }
     }
     if(linSave == true) {
@@ -154,6 +155,7 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
         //ioSP.saveParticleNeighbors(currentDir, LJcut);
+        //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;
@@ -166,7 +168,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticleActivePacking(outDir);
-    //ioSP.saveParticleNeighbors(outDir, LJcut);
+    ioSP.saveParticleNeighbors(outDir, LJcut);
   }
   ioSP.closeEnergyFile();
 

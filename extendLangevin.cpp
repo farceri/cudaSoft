@@ -23,20 +23,22 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
-  bool saveFinal = true, logSave = false, linSave = true, savePacking = true;
-  long numParticles = atol(argv[7]), nDim = 2;
+  bool saveFinal = false, logSave = true, linSave = false, savePacking = false, samples = true;
+  long numParticles = atol(argv[7]), nDim = 2, direction = 0;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;
-  double cutDistance, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1, range;
+  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 4, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;
+  double cutDistance, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
-    sign = -1;
-    dirSample = "compress";
+    if(biaxial == true) {
+      sign = -1;
+      dirSample = "biaxial-comp";
+    }
   } else if(biaxial == true) {
     dirSample = "biaxial";
   }
@@ -55,7 +57,11 @@ int main(int argc, char **argv) {
     ec = 240;
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[8] + "/";//+ "-" + argv[9]
+  outDir = inDir + dirSample + argv[8] + "/";
+  if(samples == true) {
+    std::experimental::filesystem::create_directory(outDir);
+    outDir = outDir + argv[9] + "/";
+  }
   if(initialStep != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
@@ -81,18 +87,17 @@ int main(int argc, char **argv) {
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
   damping /= timeUnit;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  //ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   if(initialStep == 0) {
     strainx = -strain / (1 + strain);
     boxSize = sp.getBoxSize();
     boxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
-      strainx = -strain/(1 + strain);
       boxSize[0] *= (1 + sign * strainx);
       cout << "strainx: " << strainx << endl;
       sp.applyBiaxialExtension(boxSize, sign * strain, sign * strainx);
     } else {
-      sp.applyLinearExtension(boxSize, sign * strain);
+      sp.applyLinearExtension(boxSize, sign * strain, direction);
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
@@ -111,7 +116,7 @@ int main(int argc, char **argv) {
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
   // range for computing force across fictitious wall
-  range = 5 * LJcut * sigma;
+  range *= LJcut * sigma;
   // run integrator
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
@@ -145,7 +150,7 @@ int main(int argc, char **argv) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
           ioSP.saveParticleState(currentDir);
-          ioSP.saveParticleNeighbors(currentDir);
+          //ioSP.saveParticleNeighbors(currentDir);
         }
       }
     }
@@ -156,7 +161,7 @@ int main(int argc, char **argv) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
           ioSP.saveParticleState(currentDir);
-          ioSP.saveParticleNeighbors(currentDir);
+          //ioSP.saveParticleNeighbors(currentDir);
         }
       }
     }

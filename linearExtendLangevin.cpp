@@ -23,9 +23,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true;
-  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 0;
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
+  bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true, centered = true;
+  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
@@ -36,12 +36,15 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
+    sign = -1;
     if(biaxial == true) {
-      sign = -1;
       dirSample = "biaxial-comp";
     }
   } else if(biaxial == true) {
     dirSample = "biaxial";
+    if(centered == true) {
+      dirSample = dirSample + "-centered";
+    }
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -96,15 +99,18 @@ int main(int argc, char **argv) {
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
-    newBoxSize = initBoxSize;
     if(biaxial == true) {
-      newBoxSize[1] *= (1 + sign * strain);
+      newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -strain/(1 + strain);
-      newBoxSize[0] *= (1 + sign * strainx);
+      newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
-      sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
+      if(centered == true) {
+        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
+      } else {
+        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
+      }
     } else {
-      newBoxSize[direction] *= (1 + sign * strain);
+      newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
       sp.applyLinearExtension(newBoxSize, sign * strainStep, direction);
     }
     boxSize = sp.getBoxSize();

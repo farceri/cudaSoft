@@ -346,6 +346,25 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 	thrust::for_each(r, r+numParticles, biaxialPosition);
 }
 
+void SP2D::applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto centeredBiaxialPosition = [=] __device__ (long particleId) {
+		double extendPos, compressPos;
+		extendPos = pPos[particleId * d_nDim + 1] + shifty_ * (pPos[particleId * d_nDim + 1] - boxSize[1] * 0.5);
+		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		pPos[particleId * d_nDim + 1] = extendPos;
+		compressPos = pPos[particleId * d_nDim] + shiftx_ * (pPos[particleId * d_nDim] - boxSize[0] * 0.5);
+		compressPos -= round(compressPos / boxSize[0]) * boxSize[0];
+		pPos[particleId * d_nDim] = compressPos;
+	};
+
+	thrust::for_each(r, r+numParticles, centeredBiaxialPosition);
+}
 
 // TODO: add error checks for all the getters and setters
 void SP2D::setDimBlock(long dimBlock_) {
@@ -715,7 +734,7 @@ void SP2D::scaleParticles(double scale) {
 }
 
 void SP2D::scaleParticlePacking() {
-  double sigma = getMeanParticleSigma();
+  double sigma = 2 * getMeanParticleSigma();
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
   thrust::host_vector<double> boxSize_(nDim);

@@ -147,6 +147,8 @@ public:
   void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
 
   void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
+
+  void applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
   
   void setDimBlock(long dimBlock_);
   long getDimBlock();
