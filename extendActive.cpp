@@ -22,12 +22,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
+  bool readState = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
   bool saveFinal = true, logSave = true, linSave = false, savePacking = false;
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, cutDistance, LJcut = 5.5, cutoff, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
+  double ec = 1, cutDistance, LJcut = 4, cutoff, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
   double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]), strainx;
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
@@ -37,9 +37,16 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
     sign = -1;
-    dirSample = "compress";
+    if(biaxial == true) {
+      dirSample = "biaxial-comp";
+    } else {
+      dirSample = "compress";
+    }
   } else if(biaxial == true) {
     dirSample = "biaxial";
+  }
+  if(centered == true) {
+    dirSample = dirSample + "-centered";
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -75,7 +82,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // save initial configuration
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
@@ -92,12 +99,19 @@ int main(int argc, char **argv) {
     boxSize = sp.getBoxSize();
     boxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
-      strainx = -strain/(1 + strain);
       boxSize[0] *= (1 + sign * strainx);
       cout << "strainx: " << strainx << endl;
-      sp.applyBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      if(centered == true) {
+        sp.applyCenteredBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      } else {
+        sp.applyBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      }
     } else {
-      sp.applyLinearExtension(boxSize, sign * strain);
+      if(centered == true) {
+        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+      } else {
+        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+      }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
@@ -110,7 +124,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();

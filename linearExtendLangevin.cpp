@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true, centered = true;
+  bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true, centered = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
@@ -39,12 +39,14 @@ int main(int argc, char **argv) {
     sign = -1;
     if(biaxial == true) {
       dirSample = "biaxial-comp";
+    } else {
+      dirSample = "compress";
     }
   } else if(biaxial == true) {
     dirSample = "biaxial";
-    if(centered == true) {
-      dirSample = dirSample + "-centered";
-    }
+  }
+  if(centered == true) {
+    dirSample = dirSample + "-centered";
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -111,7 +113,11 @@ int main(int argc, char **argv) {
       }
     } else {
       newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
-      sp.applyLinearExtension(newBoxSize, sign * strainStep, direction);
+      if(centered == true) {
+        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+      } else {
+        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+      }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;

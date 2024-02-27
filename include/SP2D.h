@@ -144,7 +144,9 @@ public:
 
   void applyExtension(double shifty_);
 
-  void applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
+  void applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
+
+  void applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
 
   void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
 

@@ -39,12 +39,14 @@ int main(int argc, char **argv) {
     sign = -1;
     if(biaxial == true) {
       dirSample = "biaxial-comp";
+    } else {
+      dirSample = "compress";
     }
   } else if(biaxial == true) {
     dirSample = "biaxial";
-    if(centered == true) {
-      dirSample = dirSample + "-centered";
-    }
+  }
+  if(centered == true) {
+    dirSample = dirSample + "-centered";
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -97,11 +99,10 @@ int main(int argc, char **argv) {
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
-    newBoxSize = initBoxSize;
-    newBoxSize[1] *= (1 + sign * strain);
     if(biaxial == true) {
+      newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -strain/(1 + strain);
-      newBoxSize[0] *= (1 + sign * strainx);
+      newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
         sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
@@ -109,7 +110,12 @@ int main(int argc, char **argv) {
         sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
       }
     } else {
-      sp.applyLinearExtension(newBoxSize, sign * strainStep, direction);
+      newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
+      if(centered == true) {
+        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+      } else {
+        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+      }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;

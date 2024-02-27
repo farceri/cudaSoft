@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, compress = false, biaxial = true, lj = true, wca = false;
+  bool readState = true, lj = true, wca = false, compress = false, biaxial = true, centered = true;
   bool saveFinal = false, logSave = true, linSave = false, savePacking = false, samples = true;
   long numParticles = atol(argv[7]), nDim = 2, direction = 0;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
@@ -35,12 +35,17 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
+    sign = -1;
     if(biaxial == true) {
-      sign = -1;
       dirSample = "biaxial-comp";
+    } else {
+      dirSample = "compress";
     }
   } else if(biaxial == true) {
     dirSample = "biaxial";
+  }
+  if(centered == true) {
+    dirSample = dirSample + "-centered";
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -80,7 +85,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
@@ -95,9 +100,17 @@ int main(int argc, char **argv) {
     if(biaxial == true) {
       boxSize[0] *= (1 + sign * strainx);
       cout << "strainx: " << strainx << endl;
-      sp.applyBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      if(centered == true) {
+        sp.applyCenteredBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      } else {
+        sp.applyBiaxialExtension(boxSize, sign * strain, sign * strainx);
+      }
     } else {
-      sp.applyLinearExtension(boxSize, sign * strain, direction);
+      if(centered == true) {
+        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+      } else {
+        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+      }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
@@ -110,7 +123,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleLangevin(Tinject, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();

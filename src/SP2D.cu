@@ -309,7 +309,7 @@ void SP2D::applyExtension(double shifty_) {
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
-void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double shift_, long direction) {
+void SP2D::applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shift_, long direction) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
 	auto r = thrust::counting_iterator<long>(0);
@@ -319,6 +319,23 @@ void SP2D::applyLinearExtension(thrust::host_vector<double> &newBoxSize_, double
 	auto extendPosition = [=] __device__ (long particleId) {
 		double extendPos;
 		extendPos = (1 + shift_) * pPos[particleId * d_nDim + direction];
+		extendPos -= round(extendPos / boxSize[direction]) * boxSize[direction];
+		pPos[particleId * d_nDim + direction] = extendPos;
+	};
+
+	thrust::for_each(r, r+numParticles, extendPosition);
+}
+
+void SP2D::applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shift_, long direction) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto extendPosition = [=] __device__ (long particleId) {
+		double extendPos;
+		extendPos = pPos[particleId * d_nDim + direction] + shift_ * (pPos[particleId * d_nDim + direction] - boxSize[direction] * 0.5);
 		extendPos -= round(extendPos / boxSize[direction]) * boxSize[direction];
 		pPos[particleId * d_nDim + direction] = extendPos;
 	};
