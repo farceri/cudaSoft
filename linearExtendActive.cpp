@@ -80,8 +80,7 @@ int main(int argc, char **argv) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // save initial configuration
-  sp.calcParticleNeighborList(cutDistance);
-  ioSP.saveParticlePacking(outDir);
+  ioSP.saveParticleActivePacking(outDir);
   sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
@@ -101,7 +100,7 @@ int main(int argc, char **argv) {
   while (strain < (maxStrain + strainStep)) {
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
-      strainx = -strain/(1 + strain);
+      strainx = -strain / (1 + strain);
       newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
@@ -110,11 +109,12 @@ int main(int argc, char **argv) {
         sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
       }
     } else {
+      newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
       if(centered == true) {
-        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+        sp.applyCenteredUniaxialExtension(boxSize, sign * strainStep, direction);
       } else {
-        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+        sp.applyUniaxialExtension(boxSize, sign * strainStep, direction);
       }
     }
     boxSize = sp.getBoxSize();

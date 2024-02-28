@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance = 1, sigma, cutoff, maxDelta, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -74,8 +74,8 @@ int main(int argc, char **argv) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    outDir = inDir + dirSample + "/";
-    inDir = inDir + dirSample + "/strain" + argv[8] + "/";
+    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/strain" + argv[8] + "/";
+    //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -86,8 +86,6 @@ int main(int argc, char **argv) {
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
-  // save initial configuration
-  sp.calcParticleNeighborList(cutDistance);
   ioSP.saveParticlePacking(outDir);
   sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
@@ -97,13 +95,12 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
-  sp.initSoftParticleLangevin(Tinject, damping, readState);
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
-      strainx = -strain/(1 + strain);
+      strainx = -strain / (1 + strain);
       newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
@@ -112,17 +109,19 @@ int main(int argc, char **argv) {
         sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
       }
     } else {
+      newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
       if(centered == true) {
-        sp.applyCenteredUniaxialExtension(boxSize, sign * strain, direction);
+        sp.applyCenteredUniaxialExtension(newBoxSize, sign * strainStep, direction);
       } else {
-        sp.applyUniaxialExtension(boxSize, sign * strain, direction);
+        sp.applyUniaxialExtension(newBoxSize, sign * strainStep, direction);
       }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
@@ -133,7 +132,7 @@ int main(int argc, char **argv) {
     sp.setInitialPositions();
     // range for computing force across fictitious wall
     range *= LJcut * sigma;
-    std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
+    currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
@@ -146,6 +145,7 @@ int main(int argc, char **argv) {
         cout << "Extend Langevin: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
+        //cout << " F: " << sp.getParticleWallForce(range);
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
@@ -156,6 +156,10 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
+          //timeDir = currentDir + "/t" + std::to_string(step) + "/";
+          //std::experimental::filesystem::create_directory(timeDir);
+          //ioSP.saveParticlePacking(timeDir);
+          //ioSP.saveParticleNeighbors(timeDir, LJcut);
         }
       }
       step += 1;

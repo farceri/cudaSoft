@@ -282,7 +282,7 @@ void SP2D::applyLEShear(double LEshift_) {
 	auto shearPosition = [=] __device__ (long particleId) {
 		double shearPos;
 		shearPos = pPos[particleId * d_nDim] + LEshift_ * pPos[particleId * d_nDim + 1];
-		shearPos -= round(shearPos / boxSize[0]) * boxSize[0];
+		shearPos -= floor(shearPos / boxSize[0]) * boxSize[0];
 		pPos[particleId * d_nDim] = shearPos;
 	};
 
@@ -302,7 +302,7 @@ void SP2D::applyExtension(double shifty_) {
 	auto extendPosition = [=] __device__ (long particleId) {
 		double extendPos;
 		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
-		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		extendPos -= floor(extendPos / boxSize[1]) * boxSize[1];
 		pPos[particleId * d_nDim + 1] = extendPos;
 	};
 
@@ -319,7 +319,7 @@ void SP2D::applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, doub
 	auto extendPosition = [=] __device__ (long particleId) {
 		double extendPos;
 		extendPos = (1 + shift_) * pPos[particleId * d_nDim + direction];
-		extendPos -= round(extendPos / boxSize[direction]) * boxSize[direction];
+		extendPos -= floor(extendPos / boxSize[direction]) * boxSize[direction];
 		pPos[particleId * d_nDim + direction] = extendPos;
 	};
 
@@ -336,7 +336,7 @@ void SP2D::applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSiz
 	auto extendPosition = [=] __device__ (long particleId) {
 		double extendPos;
 		extendPos = pPos[particleId * d_nDim + direction] + shift_ * (pPos[particleId * d_nDim + direction] - boxSize[direction] * 0.5);
-		extendPos -= round(extendPos / boxSize[direction]) * boxSize[direction];
+		extendPos -= floor(extendPos / boxSize[direction]) * boxSize[direction];
 		pPos[particleId * d_nDim + direction] = extendPos;
 	};
 
@@ -353,10 +353,10 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 	auto biaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
 		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
-		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		extendPos -= floor(extendPos / boxSize[1]) * boxSize[1];
 		pPos[particleId * d_nDim + 1] = extendPos;
 		compressPos = (1 + shiftx_) * pPos[particleId * d_nDim];
-		compressPos -= round(compressPos / boxSize[0]) * boxSize[0];
+		compressPos -= floor(compressPos / boxSize[0]) * boxSize[0];
 		pPos[particleId * d_nDim] = compressPos;
 	};
 
@@ -373,10 +373,10 @@ void SP2D::applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize
 	auto centeredBiaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
 		extendPos = pPos[particleId * d_nDim + 1] + shifty_ * (pPos[particleId * d_nDim + 1] - boxSize[1] * 0.5);
-		extendPos -= round(extendPos / boxSize[1]) * boxSize[1];
+		extendPos -= floor(extendPos / boxSize[1]) * boxSize[1];
 		pPos[particleId * d_nDim + 1] = extendPos;
 		compressPos = pPos[particleId * d_nDim] + shiftx_ * (pPos[particleId * d_nDim] - boxSize[0] * 0.5);
-		compressPos -= round(compressPos / boxSize[0]) * boxSize[0];
+		compressPos -= floor(compressPos / boxSize[0]) * boxSize[0];
 		pPos[particleId * d_nDim] = compressPos;
 	};
 
@@ -488,8 +488,12 @@ void SP2D::setParticlePositions(thrust::host_vector<double> &particlePos_) {
 }
 
 void SP2D::setPBC() {
-  double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  kernelSetPBC<<<dimGrid, dimBlock>>>(pPos);
+  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
+  kernelCheckParticlePBC<<<dimGrid, dimBlock>>>(pPosPBC, pPos);
+  // copy to device
+  d_particlePos = d_particlePosPBC;
 }
 
 void SP2D::setPBCParticlePositions(thrust::host_vector<double> &particlePos_) {
@@ -1008,12 +1012,16 @@ double SP2D::getParticleExtensileStress() {
 }
 
 double SP2D::getParticleWallForce(double range) {
+  // first get pbc positions
+  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
+  d_particlePosPBC = getPBCParticlePositions();
+  // then use them to compute the force across the wall
   d_wallForce.resize(d_particleEnergy.size());
   thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
   double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
-  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPos, range, wallForce);
+  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce);
   return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
 }
 

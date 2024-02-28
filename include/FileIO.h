@@ -247,7 +247,7 @@ public:
     } else {
       cout << "FileIO::readParticlePackingFromDirectory: only dimensions 2 and 3 are allowed!" << endl;
     }
-    sp_->setPBCParticlePositions(pPos_);
+    sp_->setParticlePositions(pPos_);
     pRad_ = read1DFile(dirName + "particleRad.dat", numParticles_);
     sp_->setParticleRadii(pRad_);
     // set length scales
