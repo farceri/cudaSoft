@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   }
   std::experimental::filesystem::create_directory(outDir);
   if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleActiveState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
       }
       sp.resetUpdateCount();
       if(saveFinal == true) {
-        ioSP.saveParticlePacking(outDir);
+        ioSP.saveParticleActivePacking(outDir);
       }
     }
     if(logSave == true) {
@@ -181,7 +181,7 @@ int main(int argc, char **argv) {
   }
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticlePacking(outDir);
+    ioSP.saveParticleActivePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

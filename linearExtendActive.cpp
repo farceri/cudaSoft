@@ -23,12 +23,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveSame = false, lj = true, wca = false, compress = false, biaxial = true, centered = false;
-  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100), direction = 1;
-  long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10, strain, initStrain = 0, strainx, strainStepx;
-  double ec = 1, cutDistance = 1, polydispersity = 0.20, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), sign = 1;
-  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
+  bool readState = true, save = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
+  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, initStrain = atof(argv[10]);
+  double ec = 1, cutDistance = 1, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), strainx, strainStepx, range = 3;
+  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), sign = 1;
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
   }
   std::experimental::filesystem::create_directory(outDir);
   if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleActiveState(inDir, numParticles, nDim);
   }
   // save initial configuration
   ioSP.saveParticleActivePacking(outDir);
@@ -94,10 +94,16 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = 1/(tp * timeUnit);
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  range *= LJcut * sigma;
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
+    // record simulation time
+    float elapsed_time_ms = 0;
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+    cudaEventRecord(start, 0);
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -strain / (1 + strain);
@@ -121,6 +127,7 @@ int main(int argc, char **argv) {
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
+    sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);  
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
@@ -130,8 +137,6 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
     // range for computing force across fictitious wall
-    range *= LJcut * sigma;
-    // make directory and energy file at each strain step
     std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
@@ -145,6 +150,7 @@ int main(int argc, char **argv) {
         cout << "Extend Active: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
+        cout << " F: " << sp.getParticleWallForce(range);
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
@@ -154,20 +160,22 @@ int main(int argc, char **argv) {
         }
         sp.resetUpdateCount();
         if(save == true) {
-          ioSP.saveParticlePacking(currentDir);
+          ioSP.saveParticleActivePacking(currentDir);
         }
       }
       step += 1;
     }
     // save minimized configuration
     if(save == true) {
-      ioSP.saveParticlePacking(currentDir);
+      ioSP.saveParticleActivePacking(currentDir);
     }
     strain += strainStep;
     ioSP.closeEnergyFile();
-  }
-  if(saveSame == true) {
-    ioSP.saveParticlePacking(outDir);
+    // instrument code to measure end time
+    cudaEventRecord(stop, 0);
+    cudaEventSynchronize(stop);
+    cudaEventElapsedTime(&elapsed_time_ms, start, stop);
+    printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   }
   return 0;
 }

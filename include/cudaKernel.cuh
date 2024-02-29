@@ -643,9 +643,9 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 			}
 			//printf("particleId %ld \t acrossForce %lf \t wallForce[particleId] %lf \n", particleId, acrossForce[1], wallForce[particleId]);
 		}
-	
   	}
 }
+
 
 // particle-sides contact interaction in 2D
 __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {

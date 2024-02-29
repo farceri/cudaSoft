@@ -79,11 +79,11 @@ INC_DIR = include
 #EXE = shearLangevin
 #EXE = linearShearLangevin
 #EXE = extendLangevin
-EXE = linearExtendLangevin
+#EXE = linearExtendLangevin
 #EXE = simpleLangevin
 #EXE = shearActive
 #EXE = extendActive
-#EXE = linearExtendActive
+EXE = linearExtendActive
 #EXE = simpleActive
 
 # hydrodynamics
