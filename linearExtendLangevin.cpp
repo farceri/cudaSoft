@@ -95,6 +95,7 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  range *= LJcut * sigma;
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
@@ -131,7 +132,6 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
     // range for computing force across fictitious wall
-    range *= LJcut * sigma;
     currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
         cout << "Extend Langevin: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        //cout << " F: " << sp.getParticleWallForce(range);
+        cout << " F: " << sp.getParticleWallForce(range);
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
           //timeDir = currentDir + "/t" + std::to_string(step) + "/";
           //std::experimental::filesystem::create_directory(timeDir);
           //ioSP.saveParticlePacking(timeDir);
-          //ioSP.saveParticleNeighbors(timeDir, LJcut);
+          //ioSP.saveParticleNeighbors(timeDir);
         }
       }
       step += 1;
