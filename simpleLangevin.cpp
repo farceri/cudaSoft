@@ -34,9 +34,9 @@ int main(int argc, char **argv) {
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   ioSPFile ioSP(&sp);
   if(logSave == true) {
-    outDir = inDir + "dynamics-log/";
+    outDir = inDir + "simple-log/";
   } else {
-    outDir = inDir + "dynamics/";
+    outDir = inDir + "simple/";
   }
   if(readSame == true) {
     if(std::experimental::filesystem::exists(outDir) == true) {
