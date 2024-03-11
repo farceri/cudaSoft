@@ -113,8 +113,17 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
+    energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
-    //energyFile << setprecision(precision) << sp_->getParticleSurfaceTension() << endl;
+  }
+
+  void saveParticleActiveWallEnergy(long step, double timeStep, long numParticles, double range, double driving) {
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleActiveWallForce(range, driving) << "\t";
+    energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
   void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {

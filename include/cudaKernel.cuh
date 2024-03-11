@@ -596,8 +596,8 @@ inline __device__ double calcWCAAdhesiveYforce(const double* thisPos, const doub
 	}
 }
 
-// particle-wall interaction - across fictitious wall at half height in 2D
-__global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce) {
+// particle-particle interaction across fictitious wall at half height in 2D
+__global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
@@ -608,19 +608,21 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
 		}
 		wallForce[particleId] = 0;
+		wallCount[particleId] = 0;
 		if(d_partMaxNeighborListPtr[particleId] > 0) {
+			thisRad = pRad[particleId];
 			thisHeight = thisPos[1];// - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
 			//thisDistance = thisPos[1] - midHeight;
 			//if(thisDistance < 0) {
-			if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
-				thisRad = pRad[particleId];
+			if(thisHeight < (midHeight - thisRad) && thisHeight > (midHeight - range)) {
 				// interaction between vertices of neighbor particles
 				for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 					if (extractParticleNeighbor(particleId, nListId, pPosPBC, pRad, otherPos, otherRad)) {
 						otherHeight = otherPos[1];// - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
 						//otherDistance = otherPos[1] - midHeight;
 						//if(otherDistance > 0) {
-						if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
+						if(otherHeight > (midHeight + otherRad) && otherHeight < (midHeight + range)) {
+							wallCount[particleId] += 1;
 							radSum = thisRad + otherRad;
 							switch (d_simControl.potentialType) {
 								case simControlStruct::potentialEnum::harmonic:
@@ -646,6 +648,16 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
   	}
 }
 
+// particle-particle interaction across fictitious wall at half height in 2D
+__global__ void kernelAddParticleWallActiveForce(const double* pAngle, const double driving, double* wallForce, long* wallCount) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		// zero out the force and get particle positions
+		if(wallCount[particleId] > 0) {
+			wallForce[particleId] += driving * sin(pAngle[particleId]);
+		}
+  	}
+}
 
 // particle-sides contact interaction in 2D
 __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {

@@ -84,11 +84,13 @@ public:
   thrust::device_vector<double> d_particlePos;
   thrust::device_vector<double> d_particleRad;
   thrust::device_vector<double> d_particleVel;
+  thrust::device_vector<double> d_particleLastVel;
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
+  thrust::device_vector<long> d_wallCount;
   // hydrodynamical variables
   thrust::device_vector<double> d_flowVel;
   thrust::device_vector<double> d_surfaceHeight;
@@ -190,6 +192,8 @@ public:
 
   thrust::host_vector<double> getLastPositions();
 
+  void resetLastVelocities();
+
   void setParticleVelocities(thrust::host_vector<double> &particleVel_);
   thrust::host_vector<double> getParticleVelocities();
 
@@ -290,6 +294,12 @@ public:
   double getParticleExtensileStress();
 
   double getParticleWallForce(double range);
+
+  double getParticleActiveWallForce(double range, double driving);
+
+  long getTotalParticleWallCount();
+
+  double getWallForceFromVel(double range, double timeStep);
 
   double getParticleWallPressure();
 

@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
   long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
+  long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, initStrain = atof(argv[10]);
   double ec = 1, cutDistance = 1, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), strainx, strainStepx, range = 3;
   double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), sign = 1;
@@ -98,12 +98,6 @@ int main(int argc, char **argv) {
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
   while (strain < (maxStrain + strainStep)) {
-    // record simulation time
-    float elapsed_time_ms = 0;
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, 0);
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -strain / (1 + strain);
@@ -171,11 +165,6 @@ int main(int argc, char **argv) {
     }
     strain += strainStep;
     ioSP.closeEnergyFile();
-    // instrument code to measure end time
-    cudaEventRecord(stop, 0);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsed_time_ms, start, stop);
-    printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   }
   return 0;
 }

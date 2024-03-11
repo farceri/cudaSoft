@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
   bool saveFinal = false, logSave = true, linSave = false, savePacking = false, samples = true;
-  long numParticles = atol(argv[7]), nDim = 2, direction = 0;
+  long numParticles = atol(argv[7]), nDim = 2, direction = 1;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 4, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;

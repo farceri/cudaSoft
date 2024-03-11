@@ -539,6 +539,10 @@ thrust::host_vector<double> SP2D::getLastPositions() {
   return lastPosFromDevice;
 }
 
+void SP2D::resetLastVelocities() {
+  d_particleLastVel = d_particleVel;
+}
+
 void SP2D::setParticleVelocities(thrust::host_vector<double> &particleVel_) {
   d_particleVel = particleVel_;
 }
@@ -1017,12 +1021,38 @@ double SP2D::getParticleWallForce(double range) {
   d_particlePosPBC = getPBCParticlePositions();
   // then use them to compute the force across the wall
   d_wallForce.resize(d_particleEnergy.size());
+  d_wallCount.resize(d_particleEnergy.size());
   thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
+  thrust::fill(d_wallCount.begin(), d_wallCount.end(), long(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
   double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
-  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce);
+  long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
+  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
   return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
+}
+
+double SP2D::getParticleActiveWallForce(double range, double driving) {
+  // first get pbc positions
+  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
+  d_particlePosPBC = getPBCParticlePositions();
+  // then use them to compute the force across the wall
+  d_wallForce.resize(d_particleEnergy.size());
+  d_wallCount.resize(d_particleEnergy.size());
+  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
+  thrust::fill(d_wallCount.begin(), d_wallCount.end(), long(0));
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
+  double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+  long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
+  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  kernelAddParticleWallActiveForce<<<dimGrid, dimBlock>>>(pAngle, driving, wallForce, wallCount);
+  return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
+}
+
+long SP2D::getTotalParticleWallCount() {
+  return thrust::reduce(d_wallCount.begin(), d_wallCount.end(), long(0), thrust::plus<long>());
 }
 
 double SP2D::getParticleWallPressure() {
