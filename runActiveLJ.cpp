@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = true;
   long numParticles = atol(argv[9]), nDim = 2, maxStep = atof(argv[6]);
-  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 1), saveEnergyFreq = int(linFreq / 10);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, sigma, damping, waveQ;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        outDir = outDir + "dynamics-test/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleActiveState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
         //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
