@@ -21,7 +21,8 @@ using std::string;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
-  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive} potentialType;
+  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ} potentialType;
+  enum class boxEnum {harmonic, WCA} boxType;
   enum class gravityEnum {on, off} gravityType;
 };
 
@@ -66,6 +67,8 @@ public:
   double l1, l2;
   // Lennard-Jones constants
   double LJcutoff, LJecut;
+  // double Lennard-Jones constants
+  double eAA, eAB, eBB;
   // Mie constants
   double nPower, mPower;
   double mieConstant, Miecut;
@@ -135,6 +138,9 @@ public:
 
   void setPotentialType(simControlStruct::potentialEnum potentialType_);
 	simControlStruct::potentialEnum getPotentialType();
+
+  void setBoxType(simControlStruct::boxEnum boxType_);
+	simControlStruct::boxEnum getBoxType();
 
   void setGravityType(simControlStruct::gravityEnum gravityType_);
 	simControlStruct::gravityEnum getGravityType();
@@ -255,7 +261,11 @@ public:
 
   void setLJcutoff(double LJcutoff_);
 
+  void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_);
+
   void setMieParams(double LJcutoff_, double nPower_, double mPower_);
+
+  void setBoxEnergyScale(double ew_);
 
   void setGravity(double gravity_, double ew_);
 

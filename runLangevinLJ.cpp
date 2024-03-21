@@ -26,17 +26,22 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false;
+  bool readState = true, saveFinal = true, logSave, linSave = false, fixedSides = false;
   long numParticles = atol(argv[7]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
+  double ew = 1e-03, ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 2;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+  if(fixedSides == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+    sp.setBoxType(simControlStruct::boxEnum::WCA);
+  }
+  sp.setBoxEnergyScale(ew);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -70,7 +75,7 @@ int main(int argc, char **argv) {
     }
     std::experimental::filesystem::create_directory(outDir);
   }
-  ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
+  ioSP.readPBCParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -80,13 +85,10 @@ int main(int argc, char **argv) {
   // initialization
   sp.setEnergyCostant(ec);
   sp.setLJcutoff(LJcut);
-  //sp.setMieParams(LJcut, n, m);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
-  //timeUnit = 1 / damping;
-  //forceUnit = inertiaOverDamping / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
@@ -115,6 +117,7 @@ int main(int argc, char **argv) {
     if(step % saveEnergyFreq == 0) {
       //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
+      //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin LJ: current step: " << step + initialStep;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;

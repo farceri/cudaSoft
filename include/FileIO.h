@@ -108,6 +108,14 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
+  void saveParticleFixedBoxEnergy(long step, double timeStep, long numParticles) {
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallPressure() << endl;
+  }
+
   void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";

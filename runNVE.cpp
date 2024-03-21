@@ -22,21 +22,21 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = false, saveFinal = true, logSave, linSave = false;
-  long numParticles = atol(argv[6]), nDim = 2;
-  long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  bool readState = true, saveFinal = true, logSave, linSave = true;
+  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 5.5, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), sigma, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve-2lj/";
+  dirSample = whichDynamics + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -44,8 +44,11 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      logSave = false;
-      outDir = outDir + "dynamics/";
+      if(logSave == true) {
+        outDir = outDir + "dynamics-log/";
+      } else {
+        outDir = outDir + "dynamics/";
+      }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -74,9 +77,9 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setLJcutoff(LJcut);
-  sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  //sp.setLJcutoff(LJcut);
+  sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  sigma = 2 * sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
@@ -85,7 +88,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleNVE(Tinject, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
@@ -99,7 +102,7 @@ int main(int argc, char **argv) {
   // run integrator
   while(step != maxStep) {
     sp.softParticleNVELoop();
-    if(step % linFreq == 0) {
+    if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;

@@ -44,6 +44,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNumParticles(numParticles);
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
+	simControl.boxType = simControlStruct::boxEnum::harmonic;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
 	syncSimControlToDevice();
   // default parameters
@@ -203,8 +204,10 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     cout << "SP2D: setPotentialType: potentialType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
     cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
+    cout << "SP2D: setPotentialType: potentialType: doubleLJ" << endl;
   } else {
-    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA or adhesive" << endl;
+    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive or doubleLJ" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -214,10 +217,27 @@ simControlStruct::potentialEnum SP2D::getPotentialType() {
 	return simControl.potentialType;
 }
 
+void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
+	simControl.boxType = boxType_;
+  if(simControl.boxType == simControlStruct::boxEnum::harmonic) {
+    cout << "SP2D: setBoxType: boxType: harmonic" << endl;
+  } else if(simControl.boxType == simControlStruct::boxEnum::WCA) {
+    cout << "SP2D: setBoxType: boxType: WCA" << endl;
+  } else {
+    cout << "SP2D: setBoxType: please specify valid boxType: on or off" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+simControlStruct::boxEnum SP2D::getBoxType() {
+	syncSimControlFromDevice();
+	return simControl.boxType;
+}
+
 void SP2D::setGravityType(simControlStruct::gravityEnum gravityType_) {
 	simControl.gravityType = gravityType_;
   if(simControl.gravityType == simControlStruct::gravityEnum::on) {
-    cout << "SP2D: setGravityType: gravityType: gravity" << endl;
+    cout << "SP2D: setGravityType: gravityType: on" << endl;
   } else if(simControl.gravityType == simControlStruct::gravityEnum::off) {
     cout << "SP2D: setGravityType: gravityType: off" << endl;
   } else {
@@ -818,6 +838,20 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
 }
 
+void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_) {
+  LJcutoff = LJcutoff_;
+  cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
+  eAA = eAA_;
+  eAB = eAB_;
+  eBB = eBB_;
+  cudaMemcpyToSymbol(d_eAA, &eAA, sizeof(eAA));
+  cudaMemcpyToSymbol(d_eAB, &eAB, sizeof(eAB));
+  cudaMemcpyToSymbol(d_eBB, &eBB, sizeof(eBB));
+  LJecut = 4 * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
+  cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
+  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
+}
+
 void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
@@ -834,6 +868,10 @@ void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
   cout << "SP2D::setMieParams: LJcutoff: " << LJcutoff << " Miecut: " << Miecut << " n: " << nPower << " m: " << mPower << endl;
 }
 
+void SP2D::setBoxEnergyScale(double ew_) {
+  ew = ew_;
+  cudaMemcpyToSymbol(d_ew, &ew, sizeof(ew));
+}
 
 void SP2D::setGravity(double gravity_, double ew_) {
   gravity = gravity_;
@@ -1056,15 +1094,24 @@ long SP2D::getTotalParticleWallCount() {
 }
 
 double SP2D::getParticleWallPressure() {
-	 double wallWork = 0, volume = 1;
+	 double volume = 1;
 	 for (long dim = 0; dim < nDim; dim++) {
      volume *= d_boxSize[dim];
 	 }
-   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-   kernelCalcParticleBoxPressure<<<dimGrid, dimBlock>>>(pRad, pPos, wallWork);
-	 return wallWork / (nDim * volume);
-	 //return totalStress;
+  thrust::fill(d_stress.begin(), d_stress.end(), double(0));
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *wallStress = thrust::raw_pointer_cast(&d_stress[0]);
+  switch (simControl.geometryType) {
+		case simControlStruct::geometryEnum::fixedBox:
+    kernelCalcParticleBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+		break;
+		case simControlStruct::geometryEnum::fixedSides2D:
+    kernelCalcParticleSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    break;
+	}
+	return (d_stress[0] + d_stress[3]) / (nDim * volume);
+	//return totalStress;
 }
 
 double SP2D::getParticleActivePressure(double driving) {

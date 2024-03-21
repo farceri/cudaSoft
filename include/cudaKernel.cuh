@@ -27,13 +27,18 @@ __constant__ long d_numParticles;
 __constant__ double d_dt;
 // dimensionality factor
 __constant__ double d_rho0;
-// energy costs
-__constant__ double d_ec; // interaction
-__constant__ double d_l1; // depth
-__constant__ double d_l2; // range
+// energy costant
+__constant__ double d_ec;
+// adhesive constants
+__constant__ double d_l1;
+__constant__ double d_l2;
 // Lennard-Jones constants
 __constant__ double d_LJcutoff;
 __constant__ double d_LJecut;
+// Double Lennard-Jones
+__constant__ double d_eAA;
+__constant__ double d_eAB;
+__constant__ double d_eBB;
 // Mie constants
 __constant__ double d_nPower;
 __constant__ double d_mPower;
@@ -325,6 +330,17 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 			return 0;
 		}
 		break;
+		case simControlStruct::potentialEnum::doubleLJ:
+		ratio = radSum / distance;
+		ratio12 = pow(ratio, 12);
+		ratio6 = pow(ratio, 6);
+		if (distance <= (d_LJcutoff * radSum)) {
+			forceShift = calcLJForceShift(radSum);
+			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		} else {
+			return 0;
+		}
+		break;
 	}
 }
 
@@ -360,6 +376,28 @@ inline __device__ double calcWallContactInteraction(const double* thisPos, const
 	  return (0.5 * d_ew * overlap * overlap);
 	}
 	return 0.;
+}
+
+inline __device__ double calcWallWCAInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce) {
+	double distance, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, wallPos, delta);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (WCAcut * radSum)) {
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  }
+	}
+	return epot;
 }
 
 inline __device__ double calcLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
@@ -436,20 +474,17 @@ inline __device__ double calcWCAInteraction(const double* thisPos, const double*
 	return epot;
 }
 
-inline __device__ double calcWCAAdhesiveInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  	double distance, overlap, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
+inline __device__ double calcAdhesiveInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  	double overlap, distance, gradMultiple = 0, epot = 0;
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
-	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
-	ratio6 = pow(ratio, 6);
-	overlap = 1 - (distance + WCAcut * radSum) / radSum;
-	if (distance < 2 * WCAcut * radSum) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance + d_ec * overlap / radSum;
-		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1) + 0.5 * d_ec * (overlap * overlap - (WCAcut - 1) * d_l2) * 0.5;
-	} else if ((distance >= 2 * WCAcut * radSum) && (distance < (1 + d_l2) * radSum)) {
-		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + d_l2) / radSum;
-		epot = -0.5 * d_ec *  ((WCAcut - 1) / d_l2) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
+	overlap = 1 - distance / radSum;
+	if (distance < (1 + d_l1) * radSum) {
+		gradMultiple = d_ec * overlap / radSum;
+		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
+	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
+		gradMultiple = -d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
+		epot = -0.5 * d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -462,17 +497,34 @@ inline __device__ double calcWCAAdhesiveInteraction(const double* thisPos, const
 	return epot;
 }
 
-inline __device__ double calcAdhesiveInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  	double overlap, distance, gradMultiple = 0, epot = 0;
-	double delta[MAXDIM];
+inline __device__ double calcDoubleLJInteraction(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId, double* currentForce) {
+  	double distance, ratio, ratio12, ratio6, forceShift, gradMultiple = 0, epot = 0;
+	double delta[MAXDIM], epsilon = 0;
+	// set energy scale based on particle indices
+	if(particleId < d_numParticles) {
+		if(otherId < d_numParticles) {
+			epsilon = d_eAA;
+		} else {
+			epsilon = d_eAB;
+		}
+	} else {
+		if(otherId < d_numParticles) {
+			epsilon = d_eAB;
+		} else {
+			epsilon = d_eBB;
+		}
+	}
+	//distance = calcDistance(thisPos, otherPos);
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
-	overlap = 1 - distance / radSum;
-	if (distance < (1 + d_l1) * radSum) {
-		gradMultiple = d_ec * overlap / radSum;
-		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
-	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
-		gradMultiple = -d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
-		epot = -0.5 * d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
+	//printf("distance %lf \n", distance);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (d_LJcutoff * radSum)) {
+		forceShift = calcLJForceShift(radSum);
+		gradMultiple = 4 * epsilon * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut);
+		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
 	} else {
 		epot = 0.;
 	}
@@ -515,8 +567,9 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					case simControlStruct::potentialEnum::WCA:
 					pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					break;
-					case simControlStruct::potentialEnum::adhesive:
-					pEnergy[particleId] += calcWCAAdhesiveInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					case simControlStruct::potentialEnum::doubleLJ:
+					long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
 					break;
 				}
 				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
@@ -671,16 +724,30 @@ __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const d
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
 		thisRad = pRad[particleId];
-		radSum = 2 * thisRad;
+		radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
-		if(thisPos[1] <= thisRad) {
+		if(thisPos[1] < thisRad) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
-		} else if((d_boxSizePtr[1] - thisPos[1]) <= thisRad) {
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
 		}
 	}
 }
@@ -697,7 +764,7 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
 		thisRad = pRad[particleId];
-		radSum = 2 * thisRad;
+		radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
 		if(thisPos[2] < thisRad) {
 			wallPos[2] = 0;
@@ -725,25 +792,53 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
 		thisRad = pRad[particleId];
-		radSum = 2 * thisRad;
+		radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
 		if(thisPos[0] < thisRad) {
 			wallPos[0] = 0;
 			wallPos[1] = thisPos[1];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			wallPos[0] = d_boxSizePtr[0];
 			wallPos[1] = thisPos[1];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
 		}
 		if(thisPos[1] < thisRad) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			}
 		}
 	}
 }
@@ -821,8 +916,8 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 	}
 }
 
-inline __device__ void calcParticleStressFixedBox(const double* thisPos, const double* wallPos, const double radSum, double wallWork) {
-  double overlap, gradMultiple, distance, distanceSq = 0.;
+inline __device__ void calcWallContactStress(const double* thisPos, const double* wallPos, const double radSum, double* wallStress) {
+  	double overlap, gradMultiple = 0, distance, distanceSq = 0;
 	double delta[MAXDIM], force[MAXDIM];
 	for (long dim = 0; dim < d_nDim; dim++) {
 		delta[dim] = thisPos[dim] - wallPos[dim];
@@ -831,41 +926,125 @@ inline __device__ void calcParticleStressFixedBox(const double* thisPos, const d
 	distance = sqrt(distanceSq);
 	overlap = 1 - distance / radSum;
 	if (overlap > 0) {
-		gradMultiple = d_ec * overlap / radSum;
-	  for (long dim = 0; dim < d_nDim; dim++) {
-	    force[dim] = gradMultiple * delta[dim] / distance;
-			wallWork -= force[dim] * thisPos[dim];
-	  }
+		gradMultiple = d_ew * overlap / radSum;
+		#pragma unroll (MAXDIM)
+	  	for (long dim = 0; dim < d_nDim; dim++) {
+	    	force[dim] = gradMultiple * delta[dim] / distance;
+			wallStress[dim * d_nDim + dim] += force[dim] * delta[dim];
+	  	}
 	}
 }
 
-__global__ void kernelCalcParticleBoxPressure(const double* pRad, const double* pPos, double wallWork) {
+inline __device__ double calcWallWCAStress(const double* thisPos, const double* wallPos, const double radSum, double* wallStress) {
+	double ratio, ratio12, ratio6, gradMultiple = 0, distance, distanceSq = 0;
+	double delta[MAXDIM], force[MAXDIM];
+	for (long dim = 0; dim < d_nDim; dim++) {
+		delta[dim] = thisPos[dim] - wallPos[dim];
+		distanceSq += delta[dim] * delta[dim];
+	}
+	distance = sqrt(distanceSq);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (WCAcut * radSum)) {
+		gradMultiple = 4 * d_ew * (12 * ratio12 - 6 * ratio6) / distance;
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    	force[dim] += gradMultiple * delta[dim] / distance;
+			wallStress[dim * d_nDim + dim] += force[dim] * delta[dim];
+	  	}
+	}
+}
+
+__global__ void kernelCalcParticleBoxStress(const double* pRad, const double* pPos, double* wallStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
 		double thisRad, radSum;
 		getParticlePos(particleId, pPos, thisPos);
-    thisRad = pRad[particleId];
+    	thisRad = pRad[particleId];
 		radSum = thisRad;
-		wallWork = 0;
 		// check if particle is close to the wall at a distance less than its radius
 		if(thisPos[0] < thisRad) {
 			wallPos[0] = 0;
 			wallPos[1] = thisPos[1];
-			calcParticleStressFixedBox(thisPos, wallPos, radSum, wallWork);
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			wallPos[0] = d_boxSizePtr[0];
 			wallPos[1] = thisPos[1];
-			calcParticleStressFixedBox(thisPos, wallPos, radSum, wallWork);
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
 		}
 		if(thisPos[1] < thisRad) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
-			calcParticleStressFixedBox(thisPos, wallPos, radSum, wallWork);
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
-			calcParticleStressFixedBox(thisPos, wallPos, radSum, wallWork);
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
+		}
+	}
+}
+
+__global__ void kernelCalcParticleSides2DStress(const double* pRad, const double* pPos, double* wallStress) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		double thisRad, radSum;
+		getParticlePos(particleId, pPos, thisPos);
+    	thisRad = pRad[particleId];
+		radSum = thisRad;
+		// check if particle is close to the wall at a distance less than its radius
+		if(thisPos[1] < thisRad) {
+			wallPos[1] = 0;
+			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			wallPos[1] = d_boxSizePtr[1];
+			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			calcWallContactStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			calcWallWCAStress(thisPos, wallPos, radSum, wallStress);
+			break;
+			}
 		}
 	}
 }
