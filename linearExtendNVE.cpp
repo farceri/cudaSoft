@@ -1,6 +1,6 @@
 //
 // Author: Francesco Arceri
-// Date:   10-25-2021
+// Date:   03-22-2024
 //
 // Include C++ header files
 
@@ -23,13 +23,13 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
-  long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 1;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, initStrain = atof(argv[10]);
-  double ec = 1, cutDistance = 1, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), strainx, strainStepx, range = 3;
-  double cutoff, sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), sign = 1;
-  std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false;
+  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double ec = 1, eAA = 1, eAB = 0.25, eBB = 1, cutDistance = LJcut+0.5, sigma, cutoff, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
+  double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -48,27 +48,18 @@ int main(int argc, char **argv) {
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  if(lj == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
-    sp.setLJcutoff(LJcut);
-  } else if(wca == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
-  } else {
-    cout << "Setting Harmonic potential" << endl;
-    cutDistance = 0.5;
-    ec = 240;
-  }
+  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+  cout << "Setting double Lennard-Jones potential" << endl;
+  sp.setDoubleLJconstants(LJcut, ea, eab, eb);
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[7] + "-tmax" + argv[8] + "/";
+  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + dirSample + argv[7] + "-tmax" + argv[8] + "/strain" + argv[10] + "/";
+    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/strain" + argv[8] + "/";
+    //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -77,23 +68,16 @@ int main(int argc, char **argv) {
   }
   std::experimental::filesystem::create_directory(outDir);
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
-  // save initial configuration
-  ioSP.saveParticleActivePacking(outDir);
+  ioSP.saveParticlePacking(outDir);
   sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
-  timeUnit = sigma / sqrt(ec);
-  forceUnit = ec / sigma;
+  timeUnit = 1 / damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
-  cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
-  damping /= timeUnit;
-  driving = driving*forceUnit;
-  Dr = 1/(tp * timeUnit);
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   range *= LJcut * sigma;
   // strain by strainStep up to maxStrain
   strainStepx = -strainStep / (1 + strainStep);
@@ -112,16 +96,16 @@ int main(int argc, char **argv) {
       newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
       if(centered == true) {
-        sp.applyCenteredUniaxialExtension(boxSize, sign * strainStep, direction);
+        sp.applyCenteredUniaxialExtension(newBoxSize, sign * strainStep, direction);
       } else {
-        sp.applyUniaxialExtension(boxSize, sign * strainStep, direction);
+        sp.applyUniaxialExtension(newBoxSize, sign * strainStep, direction);
       }
     }
     boxSize = sp.getBoxSize();
     cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
-    sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);  
+    sp.initSoftParticleNVE(Tinject, readState);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
@@ -131,7 +115,7 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     sp.setInitialPositions();
     // range for computing force across fictitious wall
-    std::string currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
+    currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
@@ -139,9 +123,9 @@ int main(int argc, char **argv) {
       if(step % linFreq == 0) {
         ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
       }
-      sp.softParticleActiveLangevinLoop();
+      sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
-        cout << "Extend Active: current step: " << step;
+        cout << "Extend Langevin: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " F: " << sp.getParticleWallForce(range);
@@ -154,14 +138,18 @@ int main(int argc, char **argv) {
         }
         sp.resetUpdateCount();
         if(save == true) {
-          ioSP.saveParticleActivePacking(currentDir);
+          ioSP.saveParticlePacking(currentDir);
+          //timeDir = currentDir + "/t" + std::to_string(step) + "/";
+          //std::experimental::filesystem::create_directory(timeDir);
+          //ioSP.saveParticlePacking(timeDir);
+          //ioSP.saveParticleNeighbors(timeDir);
         }
       }
       step += 1;
     }
     // save minimized configuration
     if(save == true) {
-      ioSP.saveParticleActivePacking(currentDir);
+      ioSP.saveParticlePacking(currentDir);
     }
     strain += strainStep;
     ioSP.closeEnergyFile();
