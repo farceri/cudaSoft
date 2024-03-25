@@ -315,9 +315,11 @@ public:
 
   double getParticleActivePressure(double driving);
 
-  double getParticleEnergy();
+  double getParticlePotentialEnergy();
 
   double getParticleKineticEnergy();
+
+  double getParticleEnergy();
 
   double getParticleTemperature();
 

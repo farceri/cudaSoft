@@ -87,13 +87,13 @@ public:
 
   void saveParticleSimpleEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << endl;
   }
 
   void saveParticleEnergy(long step, double timeStep, double waveNumber, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
@@ -101,7 +101,7 @@ public:
 
   void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     //energyFile << setprecision(precision) << sp_->getParticleShearStress() << endl;
@@ -110,7 +110,7 @@ public:
 
   void saveParticleFixedBoxEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallPressure() << endl;
@@ -118,7 +118,7 @@ public:
 
   void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
     energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << "\t";
@@ -127,7 +127,7 @@ public:
 
   void saveParticleActiveWallEnergy(long step, double timeStep, long numParticles, double range, double driving) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleActiveWallForce(range, driving) << "\t";
     energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << "\t";
@@ -136,7 +136,7 @@ public:
 
   void saveParticleActiveEnergy(long step, double timeStep, double waveNumber, double driving, double numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleEnergy() / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
@@ -314,7 +314,7 @@ public:
     saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-    saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+    saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
     saveParams << "pressure" << "\t" << sp_->getParticlePressure() << endl;
     saveParams.close();
     // save vectors
@@ -333,7 +333,7 @@ public:
     saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-    saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+    saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
     saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
     saveParams.close();
     // save vectors
@@ -357,7 +357,7 @@ public:
   saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
   saveParams << "dt" << "\t" << sp_->dt << endl;
   saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-  saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+  saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
   saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
   saveParams.close();
   // save vectors
@@ -381,7 +381,7 @@ public:
     saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-    saveParams << "energy" << "\t" << sp_->getParticleEnergy() / sp_->getNumParticles() << endl;
+    saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
     saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
     saveParams.close();
     // save vectors

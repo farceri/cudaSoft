@@ -1126,7 +1126,7 @@ double SP2D::getParticleActivePressure(double driving) {
   return activeWork / (nDim * volume);
 }
 
-double SP2D::getParticleEnergy() {
+double SP2D::getParticlePotentialEnergy() {
   return thrust::reduce(d_particleEnergy.begin(), d_particleEnergy.end(), double(0), thrust::plus<double>());
 }
 
@@ -1134,6 +1134,13 @@ double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+}
+
+double SP2D::getParticleEnergy() {
+  double etot = 0;
+  etot = getParticlePotentialEnergy();
+  etot += getParticleKineticEnergy();
+  return etot;
 }
 
 double SP2D::getParticleTemperature() {

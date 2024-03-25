@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
       ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active LJ: current step: " << step + initialStep;
-        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
