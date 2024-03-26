@@ -22,58 +22,34 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
-  // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
-  // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = false, saveFinal = true, logSave, linSave = true;
+  bool readState = true, readSame = true, logSave = false, linSave = false, saveFinal = true;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
-  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
-  dirSample = whichDynamics + "/T" + argv[3] + "/";
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[5]);
+  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, sigma, Tinject = atof(argv[3]);
+  double ea = 1, eb = 1, eab = 0.25, forceUnit, timeUnit, timeStep = atof(argv[2]), waveQ, range;
+  std::string outDir, energyFile, currentDir, inDir = argv[1];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
   sp.setDoubleLJconstants(LJcut, ea, eab, eb);
   ioSPFile ioSP(&sp);
-  // set input and output
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      if(logSave == true) {
-        outDir = outDir + "dynamics-log/";
-      } else {
-        outDir = outDir + "dynamics/";
-      }
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        //if(initialStep != 0) {
-        inDir = outDir;
-        //}
-      } else {
-        std::experimental::filesystem::create_directory(outDir);
-      }
+  if(logSave == true) {
+    outDir = inDir + "simple-log/";
+  } else {
+    outDir = inDir + "simple/";
+  }
+  if(readSame == true) {
+    if(std::experimental::filesystem::exists(outDir) == true) {
+      cout << "reading existing directory" << endl;
+      inDir = outDir;
     }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
-      readState = true;
-      outDir = inDir + "../../" + dirSample;
-    } else {
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
-      }
-      outDir = inDir + dirSample;
-    }
-    std::experimental::filesystem::create_directory(outDir);
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
+  std::experimental::filesystem::create_directory(outDir);
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
@@ -92,19 +68,16 @@ int main(int argc, char **argv) {
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
-  // record simulation time
-  float elapsed_time_ms = 0;
-  cudaEvent_t start, stop;
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-  cudaEventRecord(start, 0);
+  // range for computing force across fictitious wall
+  range = 3 * LJcut * sigma;
   // run integrator
   while(step != maxStep) {
     sp.softParticleNVELoop();
-    if(step % saveEnergyFreq == 0) {
+    if(step % linFreq == 0) {
+      //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "NVE: current step: " << step;
+        cout << "NVE LJ: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -143,11 +116,6 @@ int main(int argc, char **argv) {
     }
     step += 1;
   }
-  // instrument code to measure end time
-  cudaEventRecord(stop, 0);
-  cudaEventSynchronize(stop);
-  cudaEventElapsedTime(&elapsed_time_ms, start, stop);
-  printf("Time to calculate results on GPU: %f ms.\n", elapsed_time_ms); // exec. time
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);

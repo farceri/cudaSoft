@@ -115,8 +115,8 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
-      ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
+      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin LJ: current step: " << step + initialStep;

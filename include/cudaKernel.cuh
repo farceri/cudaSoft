@@ -341,6 +341,9 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 			return 0;
 		}
 		break;
+		default:
+		return 0;
+		break;
 	}
 }
 
@@ -935,7 +938,7 @@ inline __device__ void calcWallContactStress(const double* thisPos, const double
 	}
 }
 
-inline __device__ double calcWallWCAStress(const double* thisPos, const double* wallPos, const double radSum, double* wallStress) {
+inline __device__ void calcWallWCAStress(const double* thisPos, const double* wallPos, const double radSum, double* wallStress) {
 	double ratio, ratio12, ratio6, gradMultiple = 0, distance, distanceSq = 0;
 	double delta[MAXDIM], force[MAXDIM];
 	for (long dim = 0; dim < d_nDim; dim++) {

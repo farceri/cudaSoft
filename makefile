@@ -68,13 +68,14 @@ INC_DIR = include
 #EXE = runLangevin
 #EXE = runActiveLJ
 #EXE = runActiveWCA
-EXE = runLangevinLJ
+#EXE = runLangevinLJ
 #EXE = runLangevin2LJ
 #EXE = runExternalField
 
 # mechanics
 #EXE = linearShearFIRE
 #EXE = linearExtendNVE
+EXE = simpleNVE
 #EXE = shearLangevin
 #EXE = linearShearLangevin
 #EXE = extendLangevin
