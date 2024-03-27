@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long step, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0, initialStep = atof(argv[7]);
   double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, sigma, damping;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
-  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), waveQ, range;
+  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), waveQ, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -72,13 +72,13 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   // range for computing force across fictitious wall
-  range = 2.5 * LJcut * sigma;
+  range *= LJcut * sigma;
   // run integrator
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();

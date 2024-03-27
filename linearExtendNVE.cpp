@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     sp.initSoftParticleNVE(Tinject, readState);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
+    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     step = 0;

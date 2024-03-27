@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();

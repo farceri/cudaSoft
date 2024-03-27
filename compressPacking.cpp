@@ -23,10 +23,10 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false;
+  bool read = false, readState = false, lj = true, wca = false, gforce = false, alltoall = false;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor, isf = 1;
   double LJcut = 4, cutDistance = LJcut+0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
@@ -38,8 +38,12 @@ int main(int argc, char **argv) {
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setGeometryType(simControlStruct::geometryEnum::normal);
-  //sp.setGeometryType(simControlStruct::geometryEnum::fixedSides3D);
+  if(alltoall == true) {
+    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
+  }
+  if(gforce == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+  }
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
@@ -55,7 +59,8 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    sp.setScaledPolyRandomSoftParticles(phi0, polydispersity, lx);
+    //sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
+    sp.setScaledMonoRandomParticles(phi0, lx);
     sp.scaleParticlePacking();
     //sp.scaleParticlesAndBoxSize();
     sigma = 2 * sp.getMeanParticleSigma();
@@ -84,10 +89,24 @@ int main(int argc, char **argv) {
     cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
     cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << "\n" << endl;
   }
-  //sp.setGravityType(simControlStruct::gravityEnum::on);
-  //sp.setGravity(gravity, ew);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-  sp.setLJcutoff(LJcut);
+  if(lj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+    cout << "Setting Lennard-Jones potential" << endl;
+    cutDistance = LJcut+0.5;
+    sp.setLJcutoff(LJcut);
+  } else if(wca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+    cout << "Setting WCA potential" << endl;
+    cutDistance = 1;
+  } else {
+    cout << "Setting Harmonic potential" << endl;
+    cutDistance = 0.5;
+    ec = 1;
+  }
+  if(gforce == true) {
+    sp.setGravityType(simControlStruct::gravityEnum::on);
+    sp.setGravity(gravity, ew);
+  }
   // quasistatic thermal compression
   currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
@@ -100,8 +119,9 @@ int main(int argc, char **argv) {
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    sp.initSoftParticleLangevin(Tinject, damping, readState);
-    cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
+    //sp.initSoftParticleLangevin(Tinject, damping, readState);
+    sp.initSoftParticleNVE(Tinject, readState);
+    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
     sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     sp.setInitialPositions();
@@ -109,11 +129,13 @@ int main(int argc, char **argv) {
     // equilibrate dynamics
     step = 0;
     while(step != maxStep) {
-      sp.softParticleLangevinLoop();
+      //sp.softParticleLangevinLoop();
+      sp.softParticleNVELoop();
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
         cout << "Langevin: current step: " << step;
-        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
         cout << " K/N: " << sp.getParticleKineticEnergy() / numParticles;
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();

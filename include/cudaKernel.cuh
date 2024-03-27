@@ -142,11 +142,11 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 	switch (d_simControl.geometryType) {
 		case simControlStruct::geometryEnum::normal:
 		#pragma unroll (MAXDIM)
-	  for (long dim = 0; dim < d_nDim; dim++) {
-	    delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
+	  	for (long dim = 0; dim < d_nDim; dim++) {
+	    	delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
 			deltaVec[dim] = delta;
-	    distanceSq += delta * delta;
-	  }
+	    	distanceSq += delta * delta;
+	 	}
 		break;
 		case simControlStruct::geometryEnum::leesEdwards:
 		deltaVec[1] = thisVec[1] - otherVec[1];
@@ -159,7 +159,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 		break;
 		case simControlStruct::geometryEnum::fixedBox:
 		#pragma unroll (MAXDIM)
-	  for (long dim = 0; dim < d_nDim; dim++) {
+	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
 			deltaVec[dim] = delta;
 			distanceSq += delta * delta;
@@ -184,26 +184,26 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 }
 
 inline __device__ double calcFixedBoundaryDistance(const double* thisVec, const double* otherVec) {
-  double distanceSq = 0.;
-  double delta;
+  	double distanceSq = 0.;
+  	double delta;
 	#pragma unroll (MAXDIM)
-  for (long dim = 0; dim < d_nDim; dim++) {
-    delta = thisVec[dim] - otherVec[dim];
-    distanceSq += delta * delta;
-  }
-  return sqrt(distanceSq);
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	delta = thisVec[dim] - otherVec[dim];
+    	distanceSq += delta * delta;
+  	}
+  	return sqrt(distanceSq);
 }
 
 inline __device__ void getSegment(const double* thisVec, const double* otherVec, double* segment) {
 	#pragma unroll (MAXDIM)
-  for (long dim = 0; dim < d_nDim; dim++) {
-    segment[dim] = thisVec[dim] - otherVec[dim];
-  }
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	segment[dim] = thisVec[dim] - otherVec[dim];
+  	}
 }
 
 inline __device__ void getParticlePos(const long pId, const double* pPos, double* tPos) {
 	#pragma unroll (MAXDIM)
-  for (long dim = 0; dim < d_nDim; dim++) {
+  	for (long dim = 0; dim < d_nDim; dim++) {
 		tPos[dim] = pPos[pId * d_nDim + dim];
 	}
 }
@@ -212,42 +212,42 @@ inline __device__ bool extractOtherParticle(const long particleId, const long ot
 	if ((particleId != otherId) && (otherId != -1)) {
 		getParticlePos(otherId, pPos, otherPos);
 		otherRad = pRad[particleId];
-    return true;
-  }
-  return false;
+    	return true;
+  	}
+  	return false;
 }
 
 inline __device__ bool extractOtherParticlePos(const long particleId, const long otherId, const double* pPos, double* otherPos) {
 	if ((particleId != otherId) && (otherId != -1)) {
 		getParticlePos(otherId, pPos, otherPos);
-    return true;
-  }
-  return false;
+    	return true;
+  	}
+  	return false;
 }
 
 inline __device__ bool extractParticleNeighbor(const long particleId, const long nListId, const double* pPos, const double* pRad, double* otherPos, double& otherRad) {
 	long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
-  if ((particleId != otherId) && (otherId != -1)) {
+  	if ((particleId != otherId) && (otherId != -1)) {
 		#pragma unroll (MAXDIM)
-    for (long dim = 0; dim < d_nDim; dim++) {
-      otherPos[dim] = pPos[otherId * d_nDim + dim];
-    }
-    otherRad = pRad[otherId];
-    return true;
-  }
-  return false;
+    	for (long dim = 0; dim < d_nDim; dim++) {
+      		otherPos[dim] = pPos[otherId * d_nDim + dim];
+    	}
+    	otherRad = pRad[otherId];
+    	return true;
+  	}
+  	return false;
 }
 
 inline __device__ bool extractParticleNeighborPos(const long particleId, const long nListId, const double* pPos, double* otherPos) {
 	long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
-  if ((particleId != otherId) && (otherId != -1)) {
+  	if ((particleId != otherId) && (otherId != -1)) {
 		#pragma unroll (MAXDIM)
-    for (long dim = 0; dim < d_nDim; dim++) {
-      otherPos[dim] = pPos[otherId * d_nDim + dim];
-    }
+    	for (long dim = 0; dim < d_nDim; dim++) {
+      		otherPos[dim] = pPos[otherId * d_nDim + dim];
+    	}
     return true;
-  }
-  return false;
+  	}
+  	return false;
 }
 
 //***************************** force and energy *****************************//
@@ -410,13 +410,34 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
-	ratio6 = pow(ratio, 6);
+	ratio6 = pow(ratio, 6.);
+	ratio12 = ratio6 * ratio6;// pow(ratio, 12.);
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
 		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
-		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut);
-		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
+		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut + forceShift * (distance - d_LJcutoff * radSum));
+	} else {
+		epot = 0.;
+	}
+	if (gradMultiple != 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  }
+	}
+	return epot;
+}
+
+inline __device__ double calcWCAInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
+  	double distance, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
+	double delta[MAXDIM];
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	ratio = radSum / distance;
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
+	if (distance <= (WCAcut * radSum)) {
+		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
 	} else {
 		epot = 0.;
 	}
@@ -443,28 +464,6 @@ inline __device__ double calcMieInteraction(const double* thisPos, const double*
 		gradMultiple =  d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
 		epot = 0.5 * d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut);
 		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
-	} else {
-		epot = 0.;
-	}
-	if (gradMultiple != 0) {
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-	    currentForce[dim] += gradMultiple * delta[dim] / distance;
-	  }
-	}
-	return epot;
-}
-
-inline __device__ double calcWCAInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
-  	double distance, ratio, ratio12, ratio6, gradMultiple = 0, epot = 0;
-	double delta[MAXDIM];
-	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
-	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
-	ratio6 = pow(ratio, 6);
-	if (distance <= (WCAcut * radSum)) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
-		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
 	} else {
 		epot = 0.;
 	}
@@ -572,6 +571,45 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					break;
 					case simControlStruct::potentialEnum::doubleLJ:
 					long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
+					break;
+				}
+				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+		}
+  	}
+}
+
+__global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisRad, otherRad, radSum;
+		double thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the force and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			pForce[particleId * d_nDim + dim] = 0;
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		thisRad = pRad[particleId];
+		pEnergy[particleId] = 0;
+		// interaction between vertices of neighbor particles
+		for (long otherId = 0; otherId < d_numParticles; otherId++) {
+			if (extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
+				radSum = thisRad + otherRad;
+				switch (d_simControl.potentialType) {
+					case simControlStruct::potentialEnum::harmonic:
+					pEnergy[particleId] += calcContactInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::lennardJones:
+					pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::Mie:
+					pEnergy[particleId] += calcMieInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::WCA:
+					pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::doubleLJ:
 					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
 					break;
 				}
@@ -1078,8 +1116,8 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
-				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
-				isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
+				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance); // the cutoff needs to be (1 + cutDistance) * minParticleRad
+				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum); // the cutoff needs to be cutDistance * minParticleRad
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);

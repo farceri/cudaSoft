@@ -17,6 +17,7 @@
 #include <cuda.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
+#include <thrust/sort.h>
 #include <thrust/fill.h>
 #include <thrust/copy.h>
 #include <thrust/transform.h>
@@ -43,6 +44,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNDim(nDim);
   setNumParticles(numParticles);
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
+	simControl.interactionType = simControlStruct::interactionEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
 	simControl.boxType = simControlStruct::boxEnum::harmonic;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
@@ -190,6 +192,23 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
 simControlStruct::geometryEnum SP2D::getGeometryType() {
 	syncSimControlFromDevice();
 	return simControl.geometryType;
+}
+
+void SP2D::setInteractionType(simControlStruct::interactionEnum interactionType_) {
+	simControl.interactionType = interactionType_;
+  if(simControl.interactionType == simControlStruct::interactionEnum::neighbor) {
+    cout << "SP2D: setInteractionType: interactionType: neighbor" << endl;
+  } else if(simControl.interactionType == simControlStruct::interactionEnum::allToAll) {
+    cout << "SP2D: setInteractionType: interactionType: allToAll" << endl;
+  } else {
+    cout << "SP2D: setInteractionType: please specify valid interactionType: neighbor or allToAll" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+simControlStruct::interactionEnum SP2D::getInteractionType() {
+	syncSimControlFromDevice();
+	return simControl.interactionType;
 }
 
 void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
@@ -503,6 +522,10 @@ double SP2D::getMinParticleSigma() {
   return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(1), thrust::minimum<double>());
 }
 
+double SP2D::getMaxParticleSigma() {
+  return thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(-1), thrust::maximum<double>());
+}
+
 void SP2D::setParticlePositions(thrust::host_vector<double> &particlePos_) {
   d_particlePos = particlePos_;
 }
@@ -664,11 +687,34 @@ long SP2D::getUpdateCount() {
 void SP2D::checkParticleMaxDisplacement() {
   double maxDelta;
   maxDelta = getParticleMaxDisplacement();
-  if(3*maxDelta > cutoff) {
+  if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta: " << maxDelta << " cutoff: " << cutoff << endl;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta1: " << maxDelta1 << " cutoff: " << cutoff << endl;
+  }
+}
+
+void SP2D::checkParticleMaxDisplacement2() {
+  double maxDelta1, maxDelta2;
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+  double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
+  kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
+  thrust::sort(d_particleDisp.begin(), d_particleDisp.end(), thrust::greater<double>());
+  thrust::host_vector<double> sorted_Disp = d_particleDisp;
+  maxDelta1 = sorted_Disp[0];
+  maxDelta2 = sorted_Disp[1];
+  if(3 * maxDelta1 > cutoff) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    updateCount += 1;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta1: " << maxDelta1 << " cutoff: " << cutoff << endl;
+  } else if(3 * maxDelta2 > cutoff) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    updateCount += 1;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2: " << maxDelta2 << " cutoff: " << cutoff << endl;
   }
 }
 
@@ -693,7 +739,7 @@ double SP2D::getParticleISF(double waveNumber_) {
 }
 
 //************************ initialization functions **************************//
-void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
+void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean, sigma, scale, boxLength = 1.;
   mean = 0.;
@@ -728,8 +774,7 @@ void SP2D::setPolyRandomSoftParticles(double phi0, double polyDispersity) {
   setLengthScaleToOne();
 }
 
-//************************ initialization functions **************************//
-void SP2D::setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, double lx) {
+void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean, sigma, scale;
   mean = 0.;
@@ -740,6 +785,41 @@ void SP2D::setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, 
     r2 = drand48();
     randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
     d_particleRad[particleId] = 0.5 * exp(mean + randNum * sigma);
+  }
+  boxSize[0] = lx;
+  for (long dim = 1; dim < nDim; dim++) {
+    boxSize[dim] = 1;
+  }
+  setBoxSize(boxSize);
+  if(nDim == 2) {
+    scale = sqrt(getParticlePhi() / phi0);
+  } else if(nDim == 3) {
+    scale = cbrt(getParticlePhi() / phi0);
+  } else {
+    cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
+  }
+  boxSize[0] = lx * scale;
+  for (long dim = 1; dim < nDim; dim++) {
+    boxSize[dim] = scale;
+  }
+  setBoxSize(boxSize);
+  // extract random positions
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    for(long dim = 0; dim < nDim; dim++) {
+      d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
+    }
+  }
+  // need to set this otherwise forces are zeros
+  //setParticleLengthScale();
+  setLengthScaleToOne();
+}
+
+void SP2D::setScaledMonoRandomParticles(double phi0, double lx) {
+  thrust::host_vector<double> boxSize(nDim);
+  double scale;
+  // generate polydisperse particle size
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    d_particleRad[particleId] = 0.5;
   }
   boxSize[0] = lx;
   for (long dim = 1; dim < nDim; dim++) {
@@ -931,7 +1011,14 @@ void SP2D::calcParticleForceEnergy() {
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   // compute particle interaction
-  kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+  switch (simControl.interactionType) {
+    case simControlStruct::interactionEnum::neighbor:
+    kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
+    case simControlStruct::interactionEnum::allToAll:
+    kernelCalcAllToAllParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
+  }
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);

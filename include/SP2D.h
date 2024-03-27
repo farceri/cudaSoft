@@ -21,6 +21,7 @@ using std::string;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
+  enum class interactionEnum {neighbor, allToAll} interactionType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ} potentialType;
   enum class boxEnum {harmonic, WCA} boxType;
   enum class gravityEnum {on, off} gravityType;
@@ -136,6 +137,9 @@ public:
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
 
+  void setInteractionType(simControlStruct::interactionEnum interactionType_);
+	simControlStruct::interactionEnum getInteractionType();
+
   void setPotentialType(simControlStruct::potentialEnum potentialType_);
 	simControlStruct::potentialEnum getPotentialType();
 
@@ -182,6 +186,8 @@ public:
   double getMeanParticleSigma();
 
   double getMinParticleSigma();
+
+  double getMaxParticleSigma();
 
   void setPBC();
 
@@ -233,14 +239,18 @@ public:
 
   void checkParticleMaxDisplacement();
 
+  void checkParticleMaxDisplacement2();
+
   double getSoftWaveNumber();
 
   double getParticleISF(double waveNumber_);
 
   // initialization functions
-  void setPolyRandomSoftParticles(double phi0, double polyDispersity);
+  void setPolyRandomParticles(double phi0, double polyDispersity);
 
-  void setScaledPolyRandomSoftParticles(double phi0, double polyDispersity, double lx);
+  void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx);
+
+  void setScaledMonoRandomParticles(double phi0, double lx);
 
   void pressureScaleParticles(double pscale);
 

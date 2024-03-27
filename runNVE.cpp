@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = false, saveFinal = true, logSave, linSave = true;
+  bool readState = true, saveFinal = true, logSave, linSave = false, lj = true, wca = false, doublelj = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -36,8 +36,25 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "/T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  sp.setEnergyCostant(ec);
+  //sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
+  if(lj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+    cout << "Setting Lennard-Jones potential" << endl;
+    cutDistance = LJcut+0.5;
+    sp.setLJcutoff(LJcut);
+  } else if(wca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+    cout << "Setting WCA potential" << endl;
+    cutDistance = 1;
+  } else if(doublelj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    cutDistance = LJcut+0.5;
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  } else {
+    cout << "Setting Harmonic potential - params: " << argv[2] << " " << argv[3] << " " << argv[4] << " " << argv[5] << " " << argv[6] << endl;
+    cutDistance = 0.5;
+  }
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -87,7 +104,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.initSoftParticleNVE(Tinject, readState);
-  cutoff = 2 * (1 + cutDistance) * sp.getMinParticleSigma();
+  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
