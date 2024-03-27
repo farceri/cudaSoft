@@ -27,8 +27,8 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2, direction = 1;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 4, sigma, timeUnit, timeStep = atof(argv[2]), waveQ;
-  double cutDistance, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1, range = 3;
+  double ec = 1, Tinject = atof(argv[3]), LJcut = 4, sigma, timeUnit, timeStep = atof(argv[2]), waveQ, range = 3;
+  double cutDistance, cutoff = 1, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]), strainx, sign = 1;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -50,16 +50,13 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
   } else {
     cout << "Setting Harmonic potential" << endl;
-    cutDistance = 0.5;
-    ec = 240;
+    cutoff = 2;
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[8] + "/";
@@ -120,11 +117,10 @@ int main(int argc, char **argv) {
     cout << "restarting configuration - energy.dat will be overridden" << endl;
   }
   // initialize simulation
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleLangevin(Tinject, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-  sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();

@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, repetition;
   long printIter = int(maxIterations / 10), printFreq = int(maxStep / 10), updateFreq = 1e03;
   double polydispersity = 0.20, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, newTimeStep;
-  double cutDistance = 1., forceTollerance0 = 1e-10, pressureTollerance = 1e-08, phi1 = 0.4, phi2 = 0.84;
+  double cutDistance, cutoff = 2, forceTollerance0 = 1e-10, pressureTollerance = 1e-08, phi1 = 0.4, phi2 = 0.84;
   double forceCheck, previousForceCheck, energyCheck, energyTollerance = 1e-20, forceTollerance;
-  double FIREStep = 2e-03, dt = 5e-03, phi0 = 0.2, phiTh = 0.88, pressure, cutoff, maxDelta;
+  double FIREStep = 2e-03, dt = 5e-03, phi0 = 0.2, phiTh = 0.88, pressure, maxDelta;
   double ec = 240, Tinject = 1e-03, sigma, damping, inertiaOverDamping = 10, timeStep, timeUnit;
   bool jamCheck = 0, overJamCheck = 0, underJamCheck = 0;
   std::string currentDir, outDir = argv[1], inDir;
@@ -60,10 +60,10 @@ int main(int argc, char **argv) {
   currentPhi = sp.getParticlePhi();
   cout << "Current phi: " << currentPhi << endl;
   previousPhi = currentPhi;
-  cutoff = cutDistance * sp.getMinParticleSigma();
   while (searchStep < maxSearchStep) {
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
+    cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
     iteration = 0;

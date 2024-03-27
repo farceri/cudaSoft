@@ -661,6 +661,33 @@ double SP2D::getParticleMSD() {
   return thrust::reduce(d_particleDelta.begin(), d_particleDelta.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
+double SP2D::setDisplacementCutoff(double cutoff_) {
+  switch (simControl.potentialType) {
+    case simControlStruct::potentialEnum::harmonic:
+    cutDistance = 1;
+    break;
+    case simControlStruct::potentialEnum::lennardJones:
+    cutDistance = LJcutoff;
+    break;
+    case simControlStruct::potentialEnum::WCA:
+    cutDistance = WCAcut;
+    break;
+    case simControlStruct::potentialEnum::Mie:
+    cutDistance = LJcutoff;
+    break;
+    case simControlStruct::potentialEnum::adhesive:
+    cutDistance = l2;
+    break;
+    case simControlStruct::potentialEnum::doubleLJ:
+    cutDistance = LJcutoff;
+    break;
+  }
+  cutDistance += cutoff_;
+  cutoff = cutoff_ * 2 * getMeanParticleSigma();
+  cout << "DPM2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
+  return cutDistance;
+}
+
 double SP2D::getParticleMaxDisplacement() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
@@ -669,25 +696,10 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
-void SP2D::setDisplacementCutoff(double cutoff_, double cutDistance_) {
-  cutoff = cutoff_;
-  cutDistance = cutDistance_;
-  cout << "DPM2D::setDisplacementCutoff - cutoff: " << cutoff << " cutDistance: " << cutDistance << endl;
-}
-
-void SP2D::resetUpdateCount() {
-  updateCount = double(0);
-  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
-}
-
-long SP2D::getUpdateCount() {
-  return updateCount;
-}
-
 void SP2D::checkParticleMaxDisplacement() {
   double maxDelta;
   maxDelta = getParticleMaxDisplacement();
-  if(3 * maxDelta > cutoff) {
+  if(2 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     updateCount += 1;
@@ -716,6 +728,15 @@ void SP2D::checkParticleMaxDisplacement2() {
     updateCount += 1;
     //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2: " << maxDelta2 << " cutoff: " << cutoff << endl;
   }
+}
+
+void SP2D::resetUpdateCount() {
+  updateCount = double(0);
+  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
+}
+
+long SP2D::getUpdateCount() {
+  return updateCount;
 }
 
 double SP2D::getSoftWaveNumber() {
@@ -1220,13 +1241,12 @@ double SP2D::getParticlePotentialEnergy() {
 double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+  return thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
 
 double SP2D::getParticleEnergy() {
-  double etot = 0;
-  etot = getParticlePotentialEnergy();
-  etot += getParticleKineticEnergy();
+  double etot = getParticlePotentialEnergy();
+  etot = etot + getParticleKineticEnergy();
   return etot;
 }
 

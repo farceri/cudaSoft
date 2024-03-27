@@ -31,12 +31,11 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 3;
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, cutDistance = 1, sigma, cutoff, waveQ, timeStep = atof(argv[2]), timeUnit;
+  double ec = 1, cutDistance, cutoff = 1, sigma, waveQ, timeStep = atof(argv[2]), timeUnit;
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), forceUnit;
   double ew = 1e02, gravity = 9.8e-04, viscosity = 1e-01, speed = atof(argv[8]);
   std::string outDir, energyFile, memoryFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
-  thrust::host_vector<double> pos(numParticles * nDim);
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setGeometryType(simControlStruct::geometryEnum::fixedSides3D);
@@ -99,12 +98,10 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
+  sp.initSoftParticleFlow(damping, readState);
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  pos = sp.getParticlePositions();
-  sp.initSoftParticleFlow(damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-  sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();

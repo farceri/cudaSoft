@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 240, cutDistance = 1, cutoff, maxDelta, sigma, damping, forceUnit, timeUnit;
+  double ec = 240, cutDistance, cutoff = 1, sigma, damping, forceUnit, timeUnit;
   double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]);
   double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
@@ -101,6 +100,7 @@ int main(int argc, char **argv) {
     sp.applyLEShear(strain);
   }
   // initialize simulation
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   if(initialStep == 0) {

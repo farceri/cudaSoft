@@ -23,15 +23,15 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = true, wca = false, gforce = false, alltoall = false;
+  bool read = false, readState = false, lj = true, wca = false, doublelj = false, gforce = false, alltoall = false, nve = true;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0;
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor, isf = 1;
-  double LJcut = 4, cutDistance = LJcut+0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double LJcut = 4, cutDistance = 0.5, cutoff = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.7;
-  double timeStep, timeUnit, sigma, cutoff, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
+  double ea = 1, eb = 1, eab = 0.25, timeStep, timeUnit, sigma, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
@@ -53,24 +53,22 @@ int main(int argc, char **argv) {
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     sigma = 2 * sp.getMeanParticleSigma();
     sp.setEnergyCostant(ec);
-    cutoff = 2 * cutDistance * sp.getMinParticleSigma();
     if(readState == true) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
     // initialize polydisperse packing
-    //sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
-    sp.setScaledMonoRandomParticles(phi0, lx);
+    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
+    //sp.setScaledMonoRandomParticles(phi0, lx);
     sp.scaleParticlePacking();
     //sp.scaleParticlesAndBoxSize();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.setEnergyCostant(ec);
-    cutoff = 2 * cutDistance * sp.getMinParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
+    cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     sp.setInitialPositions();
     cout << "Generate initial configurations with FIRE \n" << endl;
@@ -92,16 +90,16 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
+  } else if(doublelj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
   } else {
+    cutoff = 2;
     cout << "Setting Harmonic potential" << endl;
-    cutDistance = 0.5;
-    ec = 1;
   }
   if(gforce == true) {
     sp.setGravityType(simControlStruct::gravityEnum::on);
@@ -111,32 +109,40 @@ int main(int argc, char **argv) {
   currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
   previousPhi = currentPhi;
+  if(nve == true) {
+    sp.initSoftParticleNVE(Tinject, readState);
+  } else {
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
+  }
   // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
     timeUnit = sigma / sqrt(ec);
-    damping = sqrt(inertiaOverDamping) / sigma;
     timeStep = sp.setTimeStep(dt*timeUnit);
-    cout << "Time step: " << timeStep << ", damping: " << damping << endl;
+    if(nve == true) {
+      cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
+    } else {
+      damping = sqrt(inertiaOverDamping) / sigma;
+      cout << "Time step: " << timeStep << ", damping: " << damping << endl;
+    }
+    cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    //sp.initSoftParticleLangevin(Tinject, damping, readState);
-    sp.initSoftParticleNVE(Tinject, readState);
-    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-    sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     sp.setInitialPositions();
     waveQ = sp.getSoftWaveNumber();
     // equilibrate dynamics
     step = 0;
     while(step != maxStep) {
-      //sp.softParticleLangevinLoop();
-      sp.softParticleNVELoop();
+      if(nve == true) {
+        sp.softParticleNVELoop();
+      } else {
+        sp.softParticleLangevinLoop();
+      }
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
-        cout << "Langevin: current step: " << step;
+        cout << "Compression: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
-        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
-        cout << " K/N: " << sp.getParticleKineticEnergy() / numParticles;
+        cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
@@ -155,7 +161,7 @@ int main(int argc, char **argv) {
     currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,4) + "/";
     std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
-    ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
+    //ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     // check if target density is met
     if(currentPhi > phiTh) {
       cout << "\nTarget density met, current phi: " << currentPhi << endl;

@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long iteration = 0, maxIteration = 1e04, printFreq = maxIteration;
   long numParticles = 8192, nDim = 2, minStep = 20, numStep = 0, repetition = 0;
   double FIREStep = 1e-04, newFIREStep, phi, pressure, cutoff, maxDelta, strain, strainStep = atof(argv[3]);
-  double cutDistance = 1, polydispersity = 0.20, ec = 1, sigma, maxStrain = atof(argv[2]);
+  double cutDistance, cutoff = 2, polydispersity = 0.20, ec = 1, sigma, maxStrain = atof(argv[2]);
   double forceCheck, lastEnergyCheck, energyCheck, forceTollerance = 1e-12, energyTollerance = 1e-05;
   std::string inDir = argv[1], outDir, currentDir, dirSample = "shear5/", energyFile;
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
@@ -50,9 +50,10 @@ int main(int argc, char **argv) {
   phi = sp.getParticlePhi();
   sigma = sp.getMeanParticleSigma();
   FIREStep = FIREStep * sigma;
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   strain = strainStep;
   sp.setGeometryType(simControlStruct::geometryEnum::leesEdwards);
+  cutDistance = sp.setDisplacementCutoff(cutoff);
+  sp.calcParticleNeighborList(cutDistance);
   sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
   sp.setParticleMassFIRE();
   while (strain < (maxStrain + strainStep)) {
@@ -86,11 +87,6 @@ int main(int argc, char **argv) {
           repetition = 0;
         }
         lastEnergyCheck = energyCheck;
-      }
-      maxDelta = sp.getParticleMaxDisplacement();
-      if(3*maxDelta > cutoff) {
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
       }
       iteration += 1;
     }

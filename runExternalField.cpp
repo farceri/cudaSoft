@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step = 0, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), updateFreq = 1e02;
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = saveEnergyFreq, firstDecade = 0;
-  double cutDistance = 2., waveQ, damping = 1e03, timeUnit, timeStep = atof(argv[2]), cutoff, maxDelta;
+  double cutDistance, cutoff = 1, waveQ, damping = 1e03, timeUnit, timeStep = atof(argv[2]);
   double ec = 240, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
   double externalForce = atof(argv[8]), p0 = atof(argv[9]), pscale, beta = 1, taup = 1e-02;
@@ -57,7 +57,6 @@ int main(int argc, char **argv) {
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   sp.setEnergyCostant(ec);
-  cutoff = cutDistance * sp.getMinParticleSigma();
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -74,6 +73,7 @@ int main(int argc, char **argv) {
     cout << "Force Peclet number: " << 2. * sp.getMeanParticleSigma() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
   }
   // initialize simulation
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   if(whichDynamics == "active-langevin/") {
@@ -126,11 +126,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
       }
-    }
-    maxDelta = sp.getParticleMaxDisplacement();
-    if(3*maxDelta > cutoff) {
-      sp.calcParticleNeighborList(cutDistance);
-      sp.resetLastPositions();
     }
     step += 1;
   }

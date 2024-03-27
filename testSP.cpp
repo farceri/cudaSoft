@@ -25,9 +25,9 @@ int main(int argc, char **argv) {
   bool readState = true, readAndSaveSameDir = false, testNVE = true, testNVT = false, update = true;
   long numParticles = atol(argv[5]), nDim = 2;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10);
-  long saveEnergyFreq = int(checkPointFreq / 10), updateCount = 0, updateFreq = 100, totUpdate = 0;
-  double ec = 240, cutDistance = 1, sigma, timeStep = atof(argv[2]), Tinject = atof(argv[3]);
-  double Dr = 2e-04, driving = 8.5e-02, iod = 10, damping, timeUnit, forceUnit, cutoff, maxDelta;
+  long saveEnergyFreq = int(checkPointFreq / 10), updateCount = 0, totUpdate = 0;
+  double ec = 240, cutDistance, cutoff = 1, sigma, timeStep = atof(argv[2]), Tinject = atof(argv[3]);
+  double Dr = 2e-04, driving = 8.5e-02, iod = 10, damping, timeUnit, forceUnit;
   std::string energyFile, outDir, inDir = argv[1], currentDir;
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -38,8 +38,9 @@ int main(int argc, char **argv) {
   }
   // initialization
   sp.setEnergyCostant(ec);
-  sigma = sp.getMeanParticleSigma();
+  sigma = 2 * sp.getMeanParticleSigma();
   // initialize simulation
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   outDir = inDir;
@@ -74,7 +75,6 @@ int main(int argc, char **argv) {
   }
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
-  cutoff = cutDistance * sp.getMinParticleSigma();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -103,22 +103,6 @@ int main(int argc, char **argv) {
           cout << "No updates in this simulation block" << endl;
         }
         updateCount = 0;
-      }
-    }
-    if(update == true) {
-      maxDelta = sp.getParticleMaxDisplacement();
-      if(3*maxDelta > cutoff) {
-        totUpdate += 1;
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
-        updateCount += 1;
-      }
-    } else {
-      if(step % updateFreq == 0) {
-        maxDelta = sp.getParticleMaxDisplacement();
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
-        updateCount += 1;
       }
     }
     step += 1;

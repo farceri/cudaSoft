@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2, updateCount = 0;//, updateFreq = 10;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveFreq = 1;
   long linFreq = int(checkPointFreq / 10), initialStep = atof(argv[5]), firstDecade = 0, multiple = 1;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut+0.5, maxDelta, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]);
+  double ec = 1, Tinject = atof(argv[3]), LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
+  double cutDistance, cutoff = 1, damping, inertiaOverDamping = atof(argv[6]), strain=atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
@@ -78,7 +78,6 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   sp.setLJcutoff(LJcut);
   damping = sqrt(inertiaOverDamping) / sigma;
@@ -93,6 +92,7 @@ int main(int argc, char **argv) {
     sp.applyLEShear(strain);
   }
   // initialize simulation
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   if(initialStep == 0) {

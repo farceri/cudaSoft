@@ -231,7 +231,7 @@ public:
 
   double getParticleMaxDisplacement();
 
-  void setDisplacementCutoff(double cutoff_, double cutDistance_);
+  double setDisplacementCutoff(double cutoff_);
 
   void resetUpdateCount();
 

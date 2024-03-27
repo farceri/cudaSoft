@@ -27,8 +27,8 @@ int main(int argc, char **argv) {
   long step, maxStep = 1e04, printFreq = int(maxStep / 10);
   long numParticles = atol(argv[5]), nDim = 2, minStep = 20, numStep = 0, repetition = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
-  double phi, pressure, cutoff, maxDelta, strain, Tinject = atof(argv[6]), strainStep = atof(argv[4]);
-  double ec = 1, cutDistance = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[3]);
+  double phi, pressure, maxDelta, strain, Tinject = atof(argv[6]), strainStep = atof(argv[4]);
+  double ec = 1, cutDistance, cutoff = 1, polydispersity = 0.20, sigma, maxStrain = atof(argv[3]);
   std::string inDir = argv[1], outDir, currentDir, dirSample = "shear-NVT/", energyFile;
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -52,7 +52,8 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   sp.setEnergyCostant(ec);
   sp.setLJcutoff(LJcut);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
+  cutDistance = sp.setDisplacementCutoff(cutoff);
+  sp.calcParticleNeighborList(cutDistance);
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
@@ -75,11 +76,6 @@ int main(int argc, char **argv) {
         cout << "shear NVT: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature() << endl;
-      }
-      maxDelta = sp.getParticleMaxDisplacement();
-      if(3*maxDelta > cutoff) {
-        sp.calcParticleNeighborList(cutDistance);
-        sp.resetLastPositions();
       }
       step += 1;
     }

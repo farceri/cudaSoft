@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
-  double ec = 1, cutDistance = 1, sigma, cutoff, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
+  double ec = 1, cutDistance, cutoff = 1, sigma,  waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -51,21 +51,17 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
   } else if(adh == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::adhesive);
     cout << "Setting Adhesive potential" << endl;
-    cutDistance = l2+0.5;
     sp.setAdhesionParams(l1, l2);
   } else {
     cout << "Setting Harmonic potential" << endl;
-    cutDistance = 0.5;
-    ec = 240;
+    cutoff = 1;
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
@@ -123,10 +119,9 @@ int main(int argc, char **argv) {
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     sp.initSoftParticleLangevin(Tinject, damping, readState);
+    cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
-    cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-    sp.setDisplacementCutoff(cutoff, cutDistance);
     sp.resetUpdateCount();
     step = 0;
     waveQ = sp.getSoftWaveNumber();

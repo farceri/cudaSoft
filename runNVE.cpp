@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutDistance = LJcut+0.5, cutoff, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, LJcut = 4, cutoff = 1, cutDistance, waveQ, timeStep = atof(argv[2]);
   double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics + "/T" + argv[3] + "/";
@@ -41,19 +41,16 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
   } else if(doublelj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    cutDistance = LJcut+0.5;
     sp.setDoubleLJconstants(LJcut, ea, eab, eb);
   } else {
-    cout << "Setting Harmonic potential - params: " << argv[2] << " " << argv[3] << " " << argv[4] << " " << argv[5] << " " << argv[6] << endl;
-    cutDistance = 0.5;
+    cutoff = 2;
+    cout << "Setting Harmonic potential" << endl;
   }
   ioSPFile ioSP(&sp);
   // set input and output
@@ -101,11 +98,10 @@ int main(int argc, char **argv) {
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
   // initialize simulation
+  sp.initSoftParticleNVE(Tinject, readState);
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleNVE(Tinject, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-  sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();

@@ -62,7 +62,9 @@ __constant__ long d_partMaxNeighbors;
 
 inline __device__ double pbcDistance(const double x1, const double x2, const long dim) {
 	double delta = x1 - x2, size = d_boxSizePtr[dim];
-	return delta - size * round(delta / size); //round for distance, floor for position
+	//if (2*delta < -size) return delta + size;
+	//if (2*delta > size) return delta - size;
+	return delta - size * rint(delta / size); //round for distance, floor for position
 }
 
 //for leesEdwards need to handle first two dimensions together
@@ -105,10 +107,10 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 		break;
 		case simControlStruct::geometryEnum::leesEdwards:
 		deltay = thisVec[1] - otherVec[1];
-		shifty = round(deltay / d_boxSizePtr[1]) * d_boxSizePtr[1];
+		shifty = rint(deltay / d_boxSizePtr[1]) * d_boxSizePtr[1];
 		deltax = thisVec[0] - otherVec[0];
 		deltax -= shifty * d_LEshift;
-		deltax -= round(deltax / d_boxSizePtr[0]) * d_boxSizePtr[0];
+		deltax -= rint(deltax / d_boxSizePtr[0]) * d_boxSizePtr[0];
 		deltay -= shifty;
 		distanceSq = deltax * deltax + deltay * deltay;
 		break;
@@ -1116,8 +1118,8 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
-				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance); // the cutoff needs to be (1 + cutDistance) * minParticleRad
-				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum); // the cutoff needs to be cutDistance * minParticleRad
+				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < (cutDistance - 1));
+				isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum);
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
@@ -1206,6 +1208,16 @@ __global__ void kernelCalcContactVectorList(const double* pPos, const long* cont
 }
 
 //******************************** observables *******************************//
+__global__ void kernelCalcParticleVelSquared(const double* pVel, double* velSq) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		velSq[particleId] = 0;
+		for (long dim = 0; dim < d_nDim; dim++) {
+			velSq[particleId] += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+		}
+	}
+}
+
 __global__ void kernelCalcParticleDisplacement(const double* pPos, const double* pPreviousPos, double* pDisp) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {

@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave, linSave, perturb = false;
   long numParticles = atol(argv[7]), nDim = 2, maxIndex = atol(argv[9]);
   long maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10), saveEnergyFreq = int(checkPointFreq / 10);
-  long linFreq = 1e03, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;//, updateFreq = 10;
-  double ec = 1, Tinject = atof(argv[3]), cutoff, LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
-  double cutDistance = LJcut+0.5, maxDelta, waveQ, damping, inertiaOverDamping = atof(argv[6]), externalForce = atof(argv[8]);
+  long linFreq = 1e03, initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  double ec = 1, Tinject = atof(argv[3]), LJcut = 5.5, sigma, timeUnit, timeStep = atof(argv[2]);
+  double cutDistance, cutoff = 1, waveQ, damping, inertiaOverDamping = atof(argv[6]), externalForce = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "-EF" + argv[9] + "/";
   // initialize sp object
@@ -82,7 +82,6 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
   sigma = sp.getMeanParticleSigma();
   externalForce *= inertiaOverDamping / sigma;
   sp.setLJcutoff(LJcut);
@@ -95,13 +94,14 @@ int main(int argc, char **argv) {
   cout << "External force: " << externalForce << " applied to " << maxIndex << " particles" << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   // initialize simulation
-  sp.calcParticleNeighborList(cutDistance);
-  sp.calcParticleForceEnergyLJ();
   if(perturb == true) {
     sp.initSoftParticleLangevinPerturb(Tinject, damping, externalForce, maxIndex, readState);
   } else {
     sp.initSoftParticleLangevin(Tinject, damping, readState);
   }
+  cutDistance = sp.setDisplacementCutoff(cutoff);
+  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleForceEnergy();
   // run integrator
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
@@ -156,16 +156,6 @@ int main(int argc, char **argv) {
         ioSP.saveParticleState(currentDir);
       }
     }
-    maxDelta = sp.getParticleMaxDisplacement();
-    if(3*maxDelta > cutoff) {
-      sp.calcParticleNeighborList(cutDistance);
-      sp.resetLastPositions();
-      updateCount += 1;
-    }
-    //if(step % updateFreq == 0) {
-    //  sp.calcParticleNeighborList(cutDistance);
-    //  updateCount += 1;
-    //}
     step += 1;
   }
   // instrument code to measure end time

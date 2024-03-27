@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = 2;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, cutDistance, LJcut = 4, cutoff, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
+  double ec = 1, cutDistance, cutoff = 1, LJcut = 4, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
   double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]), strainx;
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample = "extend";
@@ -51,16 +51,13 @@ int main(int argc, char **argv) {
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
-    cutDistance = LJcut+0.5;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-    cutDistance = 1;
   } else {
     cout << "Setting Harmonic potential" << endl;
-    cutDistance = 0.5;
-    ec = 240;
+    cutoff = 2;
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[10] + "/";//+ "-" + argv[11]
@@ -121,11 +118,10 @@ int main(int argc, char **argv) {
     cout << "restarting configuration - energy.dat will be overridden" << endl;
   }
   // initialize simulation
+  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  cutoff = (1 + cutDistance) * sp.getMinParticleSigma();
-  sp.setDisplacementCutoff(cutoff, cutDistance);
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
   sp.setInitialPositions();
