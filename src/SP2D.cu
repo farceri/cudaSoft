@@ -664,26 +664,26 @@ double SP2D::getParticleMSD() {
 double SP2D::setDisplacementCutoff(double cutoff_) {
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
-    cutDistance = 1;
+    cutDistance = 0;
     break;
     case simControlStruct::potentialEnum::lennardJones:
-    cutDistance = LJcutoff;
+    cutDistance = LJcutoff - 1;
     break;
     case simControlStruct::potentialEnum::WCA:
-    cutDistance = WCAcut;
+    cutDistance = WCAcut - 1;
     break;
     case simControlStruct::potentialEnum::Mie:
-    cutDistance = LJcutoff;
+    cutDistance = LJcutoff - 1;
     break;
     case simControlStruct::potentialEnum::adhesive:
-    cutDistance = l2;
+    cutDistance = l2 - 1;
     break;
     case simControlStruct::potentialEnum::doubleLJ:
-    cutDistance = LJcutoff;
+    cutDistance = LJcutoff - 1;
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * 2 * getMaxParticleSigma();
+  cutoff = cutoff_ * getMinParticleSigma();
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }
@@ -697,8 +697,7 @@ double SP2D::getParticleMaxDisplacement() {
 }
 
 void SP2D::checkParticleMaxDisplacement() {
-  double maxDelta;
-  maxDelta = getParticleMaxDisplacement();
+  double maxDelta = getParticleMaxDisplacement();
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
@@ -936,7 +935,7 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   LJecut = 4 * ec * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
+  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " energy shift: " << LJecut << endl;
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_) {

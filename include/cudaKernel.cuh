@@ -412,11 +412,11 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
 	ratio = radSum / distance;
-	ratio6 = pow(ratio, 6.);
-	ratio12 = ratio6 * ratio6;// pow(ratio, 12.);
+	ratio12 = pow(ratio, 12);
+	ratio6 = pow(ratio, 6);
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut + forceShift * (distance - d_LJcutoff * radSum));
 	} else {
 		epot = 0.;

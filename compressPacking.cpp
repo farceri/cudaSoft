@@ -23,16 +23,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = false, wca = false, doublelj = true, gforce = false, alltoall = false, nve = true;
+  bool read = false, readState = false, lj = true, wca = false, doublelj = false, gforce = false, alltoall = false, nve = true;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
-  long printFreq = int(maxStep / 10), updateCount = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor, isf = 1;
-  double LJcut = 4, cutDistance, cutoff = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double LJcut = 4, cutDistance, cutoff = 0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.7;
   double ea = 1, eb = 1, eab = 0.25, timeStep, timeUnit, sigma, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
-  std::string currentDir, outDir = argv[1], inDir;
+  std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
@@ -58,8 +58,8 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
-    //sp.setScaledMonoRandomParticles(phi0, lx);
+    //sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
+    sp.setScaledMonoRandomParticles(phi0, lx);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.setEnergyCostant(ec);
@@ -97,7 +97,6 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb);
   } else {
-    cutoff = 2;
     cout << "Setting Harmonic potential" << endl;
   }
   if(gforce == true) {
@@ -115,6 +114,10 @@ int main(int argc, char **argv) {
   }
   // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
+    currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,4) + "/";
+    std::experimental::filesystem::create_directory(currentDir);
+    energyFile = currentDir + "energy.dat";
+    ioSP.openEnergyFile(energyFile);
     timeUnit = sigma / sqrt(ec);
     timeStep = sp.setTimeStep(dt*timeUnit);
     if(nve == true) {
@@ -137,10 +140,13 @@ int main(int argc, char **argv) {
       } else {
         sp.softParticleLangevinLoop();
       }
+      if(step % saveEnergyFreq == 0) {
+        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      }
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
         cout << "Compression: current step: " << step;
-        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " E/N: " << sp.getParticleEnergy();
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
@@ -157,9 +163,8 @@ int main(int argc, char **argv) {
     cout << " P: " << sp.getParticlePressure();
     cout << " phi: " << sp.getParticlePhi() << endl;
     // save minimized configuration
-    currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,4) + "/";
-    std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
+    ioSP.closeEnergyFile();
     //ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     // check if target density is met
     if(currentPhi > phiTh) {

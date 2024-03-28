@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false, lj = true, wca = false, doublelj = false;
+  bool readState = false, saveFinal = true, logSave, linSave = false, lj = true, wca = false, doublelj = false, alltoall = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -36,21 +36,6 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "/T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setEnergyCostant(ec);
-  //sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
-  if(lj == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cout << "Setting Lennard-Jones potential" << endl;
-    sp.setLJcutoff(LJcut);
-  } else if(wca == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    cout << "Setting WCA potential" << endl;
-  } else if(doublelj == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
-  } else {
-    cout << "Setting Harmonic potential" << endl;
-  }
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -91,6 +76,24 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
+  sp.setEnergyCostant(ec);
+  //sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
+  if(lj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+    cout << "Setting Lennard-Jones potential" << endl;
+    sp.setLJcutoff(LJcut);
+  } else if(wca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+    cout << "Setting WCA potential" << endl;
+  } else if(doublelj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  } else {
+    cout << "Setting Harmonic potential" << endl;
+  }
+  if(alltoall == true) {
+    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
+  }
   sigma = 2 * sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
