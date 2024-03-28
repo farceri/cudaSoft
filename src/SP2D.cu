@@ -682,9 +682,9 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     cutDistance = LJcutoff;
     break;
   }
-  cutDistance += cutoff_;
-  cutoff = cutoff_ * 2 * getMeanParticleSigma();
-  cout << "DPM2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
+  cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
+  cutoff = cutoff_ * 2 * getMaxParticleSigma();
+  cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }
 
@@ -699,7 +699,7 @@ double SP2D::getParticleMaxDisplacement() {
 void SP2D::checkParticleMaxDisplacement() {
   double maxDelta;
   maxDelta = getParticleMaxDisplacement();
-  if(2 * maxDelta > cutoff) {
+  if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     updateCount += 1;
@@ -1241,13 +1241,11 @@ double SP2D::getParticlePotentialEnergy() {
 double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  return thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+  return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
 
 double SP2D::getParticleEnergy() {
-  double etot = getParticlePotentialEnergy();
-  etot = etot + getParticleKineticEnergy();
-  return etot;
+  return (getParticlePotentialEnergy() + getParticleKineticEnergy());
 }
 
 double SP2D::getParticleTemperature() {

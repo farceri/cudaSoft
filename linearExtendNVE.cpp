@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = false, biaxial = true, centered = false;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false, doublelj = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
@@ -48,9 +48,16 @@ int main(int argc, char **argv) {
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  cout << "Setting double Lennard-Jones potential" << endl;
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  if(doublelj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    cout << "Setting double Lennard-Jones potential" << endl;
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+  } else {
+    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+    cout << "Setting Lennard-Jones potential" << endl;
+    sp.setLJcutoff(LJcut);
+    sp.setEnergyCostant(ec);
+  }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   //outDir = inDir + dirSample + "/";
@@ -71,7 +78,6 @@ int main(int argc, char **argv) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
   ioSP.saveParticlePacking(outDir);
-  sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
@@ -120,14 +126,14 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
         cout << "Extend Langevin: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        cout << " F: " << sp.getParticleWallForce(range);
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {

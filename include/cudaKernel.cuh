@@ -64,16 +64,16 @@ inline __device__ double pbcDistance(const double x1, const double x2, const lon
 	double delta = x1 - x2, size = d_boxSizePtr[dim];
 	//if (2*delta < -size) return delta + size;
 	//if (2*delta > size) return delta - size;
-	return delta - size * rint(delta / size); //round for distance, floor for position
+	return delta - size * round(delta / size); //round for distance, floor for position
 }
 
 //for leesEdwards need to handle first two dimensions together
 inline __device__ double pbcDistanceLE(const double x1, const double y1, const double x2, const double y2) {
 	double deltax = (x1 - x2);
-	double rounded = rint(deltax); //need to store for lees-edwards BC
+	double rounded = round(deltax); //need to store for lees-edwards BC
 	deltax -= rounded;
 	double deltay = (y1 - y2);
-	deltay = deltay - rounded*d_LEshift - rint(deltay - rounded*d_LEshift);
+	deltay = deltay - rounded*d_LEshift - round(deltay - rounded*d_LEshift);
 	return deltay;
 }
 
@@ -107,10 +107,10 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 		break;
 		case simControlStruct::geometryEnum::leesEdwards:
 		deltay = thisVec[1] - otherVec[1];
-		shifty = rint(deltay / d_boxSizePtr[1]) * d_boxSizePtr[1];
+		shifty = round(deltay / d_boxSizePtr[1]) * d_boxSizePtr[1];
 		deltax = thisVec[0] - otherVec[0];
 		deltax -= shifty * d_LEshift;
-		deltax -= rint(deltax / d_boxSizePtr[0]) * d_boxSizePtr[0];
+		deltax -= round(deltax / d_boxSizePtr[0]) * d_boxSizePtr[0];
 		deltay -= shifty;
 		distanceSq = deltax * deltax + deltay * deltay;
 		break;
@@ -1118,8 +1118,8 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
-				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < (cutDistance - 1));
-				isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum);
+				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
+				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance);
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
