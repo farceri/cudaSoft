@@ -142,7 +142,6 @@ void SoftParticleLangevin2::updateVelocity(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleVel);
-  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
 void SoftParticleLangevin2::updatePosition(double timeStep) {
@@ -385,7 +384,55 @@ void SoftParticleNVE::integrate() {
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
-  //conserveMomentum();
+}
+
+//************************ soft particle Nose Hoover **************************//
+void SoftParticleNoseHoover::integrate() {
+  updateVelocity(0.5 * sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleForceEnergy();
+  updateThermalVel();
+}
+
+void SoftParticleNoseHoover::updateVelocity(double timeStep) {
+  // update nose hoover damping
+  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - sp_->nDim * (sp_->numParticles + 1) * config.Tinject / 2);
+  double s_gamma(gamma);
+  long s_nDim(sp_->nDim);
+  double s_dt(timeStep);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+
+  auto noseHooverUpdateParticleVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma);
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, noseHooverUpdateParticleVel);
+}
+
+void SoftParticleNoseHoover::updateThermalVel() {
+  // update nose hoover damping
+  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - sp_->nDim * (sp_->numParticles + 1) * config.Tinject / 2);
+  double s_gamma(gamma);
+  long s_nDim(sp_->nDim);
+  double s_dt(sp_->dt);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+
+  auto noseHooverSecondUpdateParticleVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] = (pVel[pId * s_nDim + dim] + 0.5 * s_dt * pForce[pId * s_nDim + dim]) / (1 + 0.5 * s_dt * s_gamma);
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, noseHooverSecondUpdateParticleVel);
 }
 
 //********************** soft particle active langevin ***********************//

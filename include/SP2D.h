@@ -388,10 +388,15 @@ public:
 
   void softParticleFlowLoop();
 
-  // NVE integrators
+  // NVE integrator
   void initSoftParticleNVE(double Temp, bool readState);
 
   void softParticleNVELoop();
+
+  // Nose-Hoover integrator
+  void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);
+
+  void softParticleNoseHooverLoop();
 
   // Active integrators
   void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);

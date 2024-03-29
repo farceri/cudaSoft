@@ -1578,6 +1578,22 @@ void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
 }
 
+//************************* Nose-Hoover integrator ***************************//
+void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState) {
+  this->sim_ = new SoftParticleNoseHoover(this, SimConfig(Temp, 0, 0));
+  this->sim_->gamma = gamma;
+  this->sim_->mass = mass;
+  resetLastPositions();
+  if(readState == false) {
+    this->sim_->injectKineticEnergy();
+  }
+  cout << "SP2D::initSoftParticleNoseHoover:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+}
+
+void SP2D::softParticleNoseHooverLoop() {
+  this->sim_->integrate();
+}
+
 //**************************** Active integrators ****************************//
 void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
   this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving));

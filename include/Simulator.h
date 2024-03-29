@@ -149,6 +149,18 @@ public:
   virtual void integrate();
 };
 
+// Soft particle Nose-Hoover integrator child of SoftParticleLangevin
+class SoftParticleNoseHoover: public SoftParticleLangevin
+{
+public:
+  SoftParticleNoseHoover() = default;
+  SoftParticleNoseHoover(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+
+  virtual void updateVelocity(double timeStep);
+  virtual void updateThermalVel();
+  virtual void integrate();
+};
+
 // Soft particle Active Langevin integrator child of softParticleLangevin2
 class SoftParticleActiveLangevin: public SoftParticleLangevin2
 {
