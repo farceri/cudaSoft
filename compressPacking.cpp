@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = true, wca = false, doublelj = false, gforce = false, alltoall = false, nve = true;
+  bool read = false, readState = false, lj = false, wca = false, doublelj = false, gforce = false, alltoall = false, nve = true;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
       if(step % printFreq == 0) {
         isf = sp.getParticleISF(waveQ);
         cout << "Compression: current step: " << step;
-        cout << " E/N: " << sp.getParticleEnergy();
+        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();

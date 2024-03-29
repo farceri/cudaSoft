@@ -385,7 +385,7 @@ void SoftParticleNVE::integrate() {
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
-  conserveMomentum();
+  //conserveMomentum();
 }
 
 //********************** soft particle active langevin ***********************//
