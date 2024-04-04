@@ -240,6 +240,18 @@ public:
     outputFile.close();
   }
 
+  void save2DIndexFile(string fileName, thrust::host_vector<long> data, long numCols) {
+    this->openOutputFile(fileName);
+    long numRows = int(data.size()/numCols);
+    for (long row = 0; row < numRows; row++) {
+      for(long col = 0; col < numCols; col++) {
+        outputFile << data[row * numCols + col] << "\t";
+      }
+      outputFile << endl;
+    }
+    outputFile.close();
+  }
+
   thrust::host_vector<double> readBoxSize(string dirName, long nDim_) {
     thrust::host_vector<double> boxSize_(nDim_);
     boxSize_ = read1DFile(dirName + "boxSize.dat", nDim_);
@@ -344,9 +356,9 @@ public:
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
-    //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
     //sp_->calcParticleContacts(0.);
-    //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+    //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
   void saveParticleActivePacking(string dirName) {
@@ -368,9 +380,9 @@ public:
   save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
   save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
   save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
-  //save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+  //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   //sp_->calcParticleContacts(0.);
-  //save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
+  //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
 }
 
   void savePBCParticlePacking(string dirName) {
@@ -435,7 +447,7 @@ public:
   }
 
   void saveParticleNeighbors(string dirName) {
-    save2DFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   }
 
   void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {

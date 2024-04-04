@@ -26,14 +26,14 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = false, saveFinal = true, logSave, linSave = false, lj = true, wca = false, doublelj = false, alltoall = false;
-  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
+  bool readState = false, saveFinal = true, logSave, linSave = false, lj = false, wca = false, doublelj = true, alltoall = false;
+  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]);
+  double ec = 1, LJcut = 4, cutoff = 2, cutDistance, waveQ, timeStep = atof(argv[2]);
   double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
-  dirSample = whichDynamics + "/T" + argv[3] + "/";
+  dirSample = whichDynamics;
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
     cout << "Setting WCA potential" << endl;
   } else if(doublelj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
     cout << "Setting Harmonic potential" << endl;
   }
@@ -114,6 +114,8 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   // run integrator
+  ioSP.saveParticlePacking(outDir);
+  ioSP.saveParticleNeighbors(currentDir);
   while(step != maxStep) {
     sp.softParticleNVELoop();
     if(step % saveEnergyFreq == 0) {

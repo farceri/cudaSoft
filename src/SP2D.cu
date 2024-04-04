@@ -696,7 +696,7 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
-void SP2D::checkParticleMaxDisplacement() {
+void SP2D::checkParticleMaxDisplacement2() {
   double maxDelta = getParticleMaxDisplacement();
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
@@ -706,7 +706,7 @@ void SP2D::checkParticleMaxDisplacement() {
   }
 }
 
-void SP2D::checkParticleMaxDisplacement2() {
+void SP2D::checkParticleMaxDisplacement() {
   double maxDelta1, maxDelta2;
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
@@ -716,16 +716,12 @@ void SP2D::checkParticleMaxDisplacement2() {
   thrust::host_vector<double> sorted_Disp = d_particleDisp;
   maxDelta1 = sorted_Disp[0];
   maxDelta2 = sorted_Disp[1];
-  if(3 * maxDelta1 > cutoff) {
+  double maxSum = maxDelta1 + maxDelta2;
+  if(maxSum > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta1: " << maxDelta1 << " cutoff: " << cutoff << endl;
-  } else if(3 * maxDelta2 > cutoff) {
-    calcParticleNeighborList(cutDistance);
-    resetLastPositions();
-    updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2: " << maxDelta2 << " cutoff: " << cutoff << endl;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " cutoff: " << cutoff << endl;
   }
 }
 
@@ -938,7 +934,7 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " energy shift: " << LJecut << endl;
 }
 
-void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_) {
+void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   eAA = eAA_;
@@ -949,7 +945,9 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_eBB, &eBB, sizeof(eBB));
   LJecut = 4 * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << endl;
+  num1 = num1_;
+  cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
+  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " num1: " << num1 << endl;
 }
 
 void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {

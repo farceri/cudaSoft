@@ -70,6 +70,7 @@ public:
   double LJcutoff, LJecut;
   // double Lennard-Jones constants
   double eAA, eAB, eBB;
+  long num1;
   // Mie constants
   double nPower, mPower;
   double mieConstant, Miecut;
@@ -271,7 +272,7 @@ public:
 
   void setLJcutoff(double LJcutoff_);
 
-  void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_);
+  void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_);
 
   void setMieParams(double LJcutoff_, double nPower_, double mPower_);
 

@@ -145,7 +145,8 @@ class SoftParticleNVE: public SoftParticleLangevin
 public:
   SoftParticleNVE() = default;
   SoftParticleNVE(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
-
+  
+  virtual void injectKineticEnergy();
   virtual void integrate();
 };
 

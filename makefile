@@ -57,13 +57,13 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-EXE = compressPacking
+#EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature
 
 # run dynamics
-#EXE = runNVE
+EXE = runNVE
 #EXE = runNPT
 #EXE = runLangevin
 #EXE = runActiveLJ

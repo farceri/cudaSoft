@@ -39,6 +39,7 @@ __constant__ double d_LJecut;
 __constant__ double d_eAA;
 __constant__ double d_eAB;
 __constant__ double d_eBB;
+__constant__ double d_num1;
 // Mie constants
 __constant__ double d_nPower;
 __constant__ double d_mPower;
@@ -278,8 +279,8 @@ inline __device__ double calcMieForceShift(const double radSum) {
 	return d_mieConstant * d_ec * (d_nPower / nRatio - d_mPower / mRatio) / (d_LJcutoff * radSum);
 }
 
-inline __device__ double calcGradMultiple(const double* thisPos, const double* otherPos, const double radSum) {
-	double distance, overlap, ratio, ratio12, ratio6, ration, ratiom, forceShift;
+inline __device__ double calcGradMultiple(const long particleId, const long otherId, const double* thisPos, const double* otherPos, const double radSum) {
+	double distance, overlap, ratio, ratio12, ratio6, ration, ratiom, forceShift, epsilon;
 	distance = calcDistance(thisPos, otherPos);
 	switch (d_simControl.potentialType) {
 		case simControlStruct::potentialEnum::harmonic:
@@ -333,12 +334,25 @@ inline __device__ double calcGradMultiple(const double* thisPos, const double* o
 		}
 		break;
 		case simControlStruct::potentialEnum::doubleLJ:
+		if(particleId < d_num1) {
+			if(otherId < d_num1) {
+				epsilon = d_eAA;
+			} else {
+				epsilon = d_eAB;
+			}
+		} else {
+			if(otherId >= d_num1) {
+				epsilon = d_eAB;
+			} else {
+				epsilon = d_eBB;
+			}
+		}
 		ratio = radSum / distance;
 		ratio12 = pow(ratio, 12);
 		ratio6 = pow(ratio, 6);
 		if (distance <= (d_LJcutoff * radSum)) {
 			forceShift = calcLJForceShift(radSum);
-			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+			return 4 * epsilon * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
 		} else {
 			return 0;
 		}
@@ -505,14 +519,14 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
   	double distance, ratio, ratio12, ratio6, forceShift, gradMultiple = 0, epot = 0;
 	double delta[MAXDIM], epsilon = 0;
 	// set energy scale based on particle indices
-	if(particleId < d_numParticles) {
-		if(otherId < d_numParticles) {
+	if(particleId < d_num1) {
+		if(otherId < d_num1) {
 			epsilon = d_eAA;
 		} else {
 			epsilon = d_eAB;
 		}
 	} else {
-		if(otherId < d_numParticles) {
+		if(otherId < d_num1) {
 			epsilon = d_eAB;
 		} else {
 			epsilon = d_eBB;
@@ -939,9 +953,10 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 		pStress[2] += pVel[particleId * d_nDim + 1] * pVel[particleId * d_nDim];
 		// stress between neighbor particles
 		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
 			if(extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
 				radSum = thisRad + otherRad;
-				gradMultiple = calcGradMultiple(thisPos, otherPos, radSum);
+				gradMultiple = calcGradMultiple(particleId, otherId, thisPos, otherPos, radSum);
 				if(gradMultiple > 0) {
 					distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 					for (long dim = 0; dim < d_nDim; dim++) {

@@ -386,6 +386,26 @@ void SoftParticleNVE::integrate() {
   updateVelocity(0.5 * sp_->dt);
 }
 
+void SoftParticleNVE::injectKineticEnergy() {
+  long s_nDim(sp_->nDim);
+  double currentTemp = sp_->getParticleTemperature();
+  double scale = sqrt(config.Tinject / currentTemp);
+  //cout << "Simulator::SoftParticleNVE: current temperature: " << currentTemp << " scale: " << scale;
+  auto r = thrust::counting_iterator<long>(0);
+  double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+
+  auto rescaleVelocities = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, rescaleVelocities);
+  kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+  //cout << " new temperature: " << sp_->getParticleTemperature() << endl;
+}
+
 //************************ soft particle Nose Hoover **************************//
 void SoftParticleNoseHoover::integrate() {
   updateVelocity(0.5 * sp_->dt);
