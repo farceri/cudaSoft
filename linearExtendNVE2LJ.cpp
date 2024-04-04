@@ -23,9 +23,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = false, biaxial = true, centered = false;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false, doublelj = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
+  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
@@ -48,10 +48,9 @@ int main(int argc, char **argv) {
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  sp.setEnergyCostant(ec);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-  cout << "Setting Lennard-Jones potential" << endl;
-  sp.setLJcutoff(LJcut);
+  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+  cout << "Setting double Lennard-Jones potential" << endl;
+  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   //outDir = inDir + dirSample + "/";

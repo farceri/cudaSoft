@@ -26,15 +26,18 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false, lj = true, wca = false, alltoall = false;
-  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
+  bool readState = true, saveFinal = true, logSave, linSave = false;
+  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutoff = 2, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
+  double LJcut = 4, cutoff = 2, cutDistance, waveQ, timeStep = atof(argv[2]);
+  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics;
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -75,20 +78,6 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setEnergyCostant(ec);
-  if(lj == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cout << "Setting Lennard-Jones potential" << endl;
-    sp.setLJcutoff(LJcut);
-  } else if(wca == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    cout << "Setting WCA potential" << endl;
-  } else {
-    cout << "Setting Harmonic potential" << endl;
-  }
-  if(alltoall == true) {
-    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
-  }
   sigma = 2 * sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
