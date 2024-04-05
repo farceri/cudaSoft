@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor;
-  double mass = 1, LJcut = 4, cutDistance, cutoff = 1, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double mass = 1, LJcut = 4, cutDistance, cutoff = 0.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.7;
   double timeStep, timeUnit, sigma, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir, energyFile;
