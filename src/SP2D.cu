@@ -696,7 +696,7 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
-void SP2D::checkParticleMaxDisplacement2() {
+void SP2D::checkParticleMaxDisplacement() {
   double maxDelta = getParticleMaxDisplacement();
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
@@ -706,7 +706,7 @@ void SP2D::checkParticleMaxDisplacement2() {
   }
 }
 
-void SP2D::checkParticleMaxDisplacement() {
+void SP2D::checkParticleMaxDisplacement2() {
   double maxDelta1, maxDelta2;
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
@@ -792,8 +792,7 @@ void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
 
 void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx) {
   thrust::host_vector<double> boxSize(nDim);
-  double r1, r2, randNum, mean, sigma, scale;
-  mean = 0.;
+  double r1, r2, randNum, mean = 0, sigma, scale;
   sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
   // generate polydisperse particle size
   for (long particleId = 0; particleId < numParticles; particleId++) {
@@ -834,9 +833,7 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx) {
   thrust::host_vector<double> boxSize(nDim);
   double scale;
   // generate polydisperse particle size
-  for (long particleId = 0; particleId < numParticles; particleId++) {
-    d_particleRad[particleId] = 0.5;
-  }
+  thrust::fill(d_particleRad.begin(), d_particleRad.end(), 0.5);
   boxSize[0] = lx;
   for (long dim = 1; dim < nDim; dim++) {
     boxSize[dim] = 1;
@@ -1237,6 +1234,7 @@ double SP2D::getParticlePotentialEnergy() {
 
 double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
+  thrust::fill(velSquared.begin(), velSquared.end(), double(0));
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
@@ -1572,7 +1570,10 @@ void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   cout << "SP2D::initSoftParticleNVE:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleNVELoop() {
+void SP2D::softParticleNVELoop(bool scaleVel) {
+  if(scaleVel == true) {
+    this->sim_->injectKineticEnergy();
+  }
   this->sim_->integrate();
 }
 

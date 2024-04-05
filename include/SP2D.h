@@ -392,7 +392,7 @@ public:
   // NVE integrator
   void initSoftParticleNVE(double Temp, bool readState);
 
-  void softParticleNVELoop();
+  void softParticleNVELoop(bool scaleVel);
 
   // Nose-Hoover integrator
   void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);
