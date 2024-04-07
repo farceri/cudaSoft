@@ -164,7 +164,7 @@ public:
   void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
 
   void applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_);
-  
+
   void setDimBlock(long dimBlock_);
   long getDimBlock();
 
@@ -392,7 +392,12 @@ public:
   // NVE integrator
   void initSoftParticleNVE(double Temp, bool readState);
 
-  void softParticleNVELoop(bool scaleVel);
+  void softParticleNVELoop();
+
+  // NVE integrator with velocity rescale
+//  void initSoftParticleNVERescale(double Temp, bool readState);
+
+//  void softParticleNVERescaleLoop();
 
   // Nose-Hoover integrator
   void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);

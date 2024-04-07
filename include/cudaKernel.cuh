@@ -712,7 +712,7 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
   	if (particleId < d_numParticles) {
 		double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
 		double thisPos[MAXDIM], otherPos[MAXDIM];
-		double thisHeight, otherHeight;//thisDistance, otherDistance, 
+		double thisHeight, otherHeight;//thisDistance, otherDistance,
 		// zero out the force and get particle positions
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
@@ -1134,7 +1134,7 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
 				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
-				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance);
+				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum);
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);

@@ -57,7 +57,7 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-EXE = compressPacking
+#EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -69,7 +69,7 @@ EXE = compressPacking
 #EXE = runLangevin
 #EXE = runActiveLJ
 #EXE = runActiveWCA
-#EXE = runLangevinLJ
+EXE = runLangevinLJ
 #EXE = runLangevin2LJ
 #EXE = runExternalField
 

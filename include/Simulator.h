@@ -145,10 +145,20 @@ class SoftParticleNVE: public SoftParticleLangevin
 public:
   SoftParticleNVE() = default;
   SoftParticleNVE(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
-  
-  virtual void injectKineticEnergy();
+
   virtual void integrate();
 };
+
+// Soft particle NVE integrator child of SoftParticleLangevin
+//class SoftParticleNVERescale: public SoftParticleLangevin
+//{
+//public:
+//  SoftParticleNVERescale() = default;
+//  SoftParticleNVERescale(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+
+//  virtual void injectKineticEnergy();
+//  virtual void integrate();
+//};
 
 // Soft particle Nose-Hoover integrator child of SoftParticleLangevin
 class SoftParticleNoseHoover: public SoftParticleLangevin

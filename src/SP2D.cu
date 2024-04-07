@@ -696,7 +696,7 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
-void SP2D::checkParticleMaxDisplacement() {
+void SP2D::checkParticleMaxDisplacement2() {
   double maxDelta = getParticleMaxDisplacement();
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
@@ -706,7 +706,7 @@ void SP2D::checkParticleMaxDisplacement() {
   }
 }
 
-void SP2D::checkParticleMaxDisplacement2() {
+void SP2D::checkParticleMaxDisplacement() {
   double maxDelta1, maxDelta2;
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
@@ -1234,7 +1234,6 @@ double SP2D::getParticlePotentialEnergy() {
 
 double SP2D::getParticleKineticEnergy() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
-  thrust::fill(velSquared.begin(), velSquared.end(), double(0));
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
@@ -1559,7 +1558,6 @@ void SP2D::softParticleFlowLoop() {
   this->sim_->integrate();
 }
 
-
 //***************************** NVE integrator *******************************//
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0));
@@ -1570,12 +1568,24 @@ void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   cout << "SP2D::initSoftParticleNVE:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleNVELoop(bool scaleVel) {
-  if(scaleVel == true) {
-    this->sim_->injectKineticEnergy();
-  }
+void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
 }
+
+//***************************** NVE integrator *******************************//
+//void SP2D::initSoftParticleNVERescale(double Temp, bool readState) {
+//  this->sim_ = new SoftParticleNVERescale(this, SimConfig(Temp, 0, 0));
+//  resetLastPositions();
+//  if(readState == false) {
+//    this->sim_->injectKineticEnergy();
+//  }
+//  cout << "SP2D::initSoftParticleNVERescale:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+//}
+
+//void SP2D::softParticleNVERescaleLoop() {
+//  this->sim_->injectKineticEnergy();
+//  this->sim_->integrate();
+//}
 
 //************************* Nose-Hoover integrator ***************************//
 void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState) {
