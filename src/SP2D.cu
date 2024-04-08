@@ -683,7 +683,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * getMinParticleSigma();
+  cutoff = cutoff_ * getMeanParticleSigma();
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }
@@ -721,7 +721,7 @@ void SP2D::checkParticleMaxDisplacement() {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " cutoff: " << cutoff << endl;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " " << maxDelta1 << " " << maxDelta2 << " cutoff: " << cutoff << endl;
   }
 }
 
@@ -872,7 +872,7 @@ void SP2D::scaleParticles(double scale) {
 }
 
 void SP2D::scaleParticlePacking() {
-  double sigma = 2 * getMeanParticleSigma();
+  double sigma = getMeanParticleSigma();
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
   thrust::host_vector<double> boxSize_(nDim);
