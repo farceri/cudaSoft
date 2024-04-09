@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
+  double ec = 1, cutDistance, cutoff = 1, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -119,12 +119,12 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
-        cout << "Extend Langevin: current step: " << step;
+        cout << "Extend NVE2LJ: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
