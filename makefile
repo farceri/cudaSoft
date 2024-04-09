@@ -66,7 +66,6 @@ EXE = compressPacking
 #EXE = runNVE
 #EXE = runNVE2LJ
 #EXE = runNPT
-#EXE = runLangevin
 #EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runLangevinLJ

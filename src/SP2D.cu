@@ -872,7 +872,7 @@ void SP2D::scaleParticles(double scale) {
 }
 
 void SP2D::scaleParticlePacking() {
-  double sigma = getMeanParticleSigma();
+  double sigma = 2 * getMeanParticleSigma();
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
   thrust::host_vector<double> boxSize_(nDim);

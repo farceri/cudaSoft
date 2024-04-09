@@ -23,14 +23,14 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = false, wca = false;
-  bool gforce = false, alltoall = false, nve = true;
+  bool read = false, readState = false, lj = true, wca = false;
+  bool gforce = false, alltoall = false, nve = false;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor;
-  double mass = 1, LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
+  double mass = 1, LJcut = 4, cutDistance, cutoff = 2, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.7;
   double timeStep, timeUnit, sigma, cutDistance, cutoff = 1, maxDelta, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir, energyFile;
@@ -39,11 +39,11 @@ int main(int argc, char **argv) {
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(alltoall == true) {
-    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
-  }
   if(gforce == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+  }
+  if(alltoall == true) {
+    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
   }
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
@@ -105,6 +105,14 @@ int main(int argc, char **argv) {
   currentPhi = sp.getParticlePhi();
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
   previousPhi = currentPhi;
+  timeUnit = sigma / sqrt(ec);
+  timeStep = sp.setTimeStep(dt*timeUnit);
+  if(nve == true) {
+    cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
+  } else {
+    damping = sqrt(inertiaOverDamping) / sigma;
+    cout << "Time step: " << timeStep << ", damping: " << damping << endl;
+  }
   if(nve == true) {
     sp.initSoftParticleNVE(Tinject, readState);
   } else {
@@ -116,14 +124,6 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
-    timeUnit = sigma / sqrt(ec);
-    timeStep = sp.setTimeStep(dt*timeUnit);
-    if(nve == true) {
-      cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
-    } else {
-      damping = sqrt(inertiaOverDamping) / sigma;
-      cout << "Time step: " << timeStep << ", damping: " << damping << endl;
-    }
     cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighborList(cutDistance);
     sp.calcParticleForceEnergy();
@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
       }
       if(step % printFreq == 0) {
         cout << "Compression: current step: " << step;
-        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
