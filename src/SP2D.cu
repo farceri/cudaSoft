@@ -868,13 +868,11 @@ void SP2D::pressureScaleParticles(double pscale) {
 }
 
 void SP2D::scaleParticles(double scale) {
-  cout << "SP2D::scaleParticles: scale " << scale << endl;
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(scale), d_particleRad.begin(), thrust::multiplies<double>());
 }
 
 void SP2D::scaleParticlePacking() {
   double sigma = 2 * getMeanParticleSigma();
-  cout << "SP2D::scaleParticlePacking: sigma " << sigma << endl;
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
   thrust::host_vector<double> boxSize_(nDim);
