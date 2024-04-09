@@ -664,22 +664,22 @@ double SP2D::getParticleMSD() {
 double SP2D::setDisplacementCutoff(double cutoff_) {
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
-    cutDistance = 0;
+    cutDistance = 1;
     break;
     case simControlStruct::potentialEnum::lennardJones:
-    cutDistance = LJcutoff - 1;
+    cutDistance = LJcutoff;
     break;
     case simControlStruct::potentialEnum::WCA:
-    cutDistance = WCAcut - 1;
+    cutDistance = WCAcut;
     break;
     case simControlStruct::potentialEnum::Mie:
-    cutDistance = LJcutoff - 1;
+    cutDistance = LJcutoff;
     break;
     case simControlStruct::potentialEnum::adhesive:
-    cutDistance = l2 - 1;
+    cutDistance = l2;
     break;
     case simControlStruct::potentialEnum::doubleLJ:
-    cutDistance = LJcutoff - 1;
+    cutDistance = LJcutoff;
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
@@ -1573,19 +1573,15 @@ void SP2D::softParticleNVELoop() {
 }
 
 //***************************** NVE integrator *******************************//
-//void SP2D::initSoftParticleNVERescale(double Temp, bool readState) {
-//  this->sim_ = new SoftParticleNVERescale(this, SimConfig(Temp, 0, 0));
-//  resetLastPositions();
-//  if(readState == false) {
-//    this->sim_->injectKineticEnergy();
-//  }
-//  cout << "SP2D::initSoftParticleNVERescale:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-//}
+void SP2D::initSoftParticleNVERescale(double Temp) {
+  this->sim_ = new SoftParticleNVERescale(this, SimConfig(Temp, 0, 0));
+  resetLastPositions();
+  cout << "SP2D::initSoftParticleNVERescale:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+}
 
-//void SP2D::softParticleNVERescaleLoop() {
-//  this->sim_->injectKineticEnergy();
-//  this->sim_->integrate();
-//}
+void SP2D::softParticleNVERescaleLoop() {
+  this->sim_->integrate();
+}
 
 //************************* Nose-Hoover integrator ***************************//
 void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState) {

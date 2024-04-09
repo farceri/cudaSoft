@@ -1133,8 +1133,8 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
-				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
-				//isNeighbor = (calcDistance(thisPos, otherPos) < cutDistance * radSum);
+				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
+				isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);

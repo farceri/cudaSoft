@@ -395,9 +395,9 @@ public:
   void softParticleNVELoop();
 
   // NVE integrator with velocity rescale
-//  void initSoftParticleNVERescale(double Temp, bool readState);
+  void initSoftParticleNVERescale(double Temp);
 
-//  void softParticleNVERescaleLoop();
+  void softParticleNVERescaleLoop();
 
   // Nose-Hoover integrator
   void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);

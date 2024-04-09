@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel = false;;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutoff = 0.2, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
+  double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics;
   // initialize sp object
@@ -95,7 +95,11 @@ int main(int argc, char **argv) {
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
   // initialize simulation
-  sp.initSoftParticleNVE(Tinject, readState);
+  if(scaleVel == true) {
+    sp.initSoftParticleNVERescale(Tinject);
+  } else {
+    sp.initSoftParticleNVE(Tinject, readState);
+  }
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
@@ -112,7 +116,11 @@ int main(int argc, char **argv) {
   ioSP.saveParticlePacking(outDir);
   ioSP.saveParticleNeighbors(currentDir);
   while(step != maxStep) {
-    sp.softParticleNVELoop();
+    if(scaleVel == true) {
+      sp.softParticleNVERescaleLoop();
+    } else {
+      sp.softParticleNVELoop();
+    }
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
