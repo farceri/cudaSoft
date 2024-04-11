@@ -86,9 +86,13 @@ public:
   }
 
   void saveParticleSimpleEnergy(long step, double timeStep, long numParticles) {
+    double ekin = sp_->getParticlePotentialEnergy();
+    double epot = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << endl;
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
   void saveParticleEnergy(long step, double timeStep, double waveNumber, long numParticles) {

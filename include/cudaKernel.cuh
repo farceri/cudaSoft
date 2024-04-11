@@ -272,6 +272,11 @@ inline __device__ double calcLJForceShift(const double radSum) {
 	return 24 * d_ec * (2 / ratio6 - 1) / (d_LJcutoff * radSum * ratio6);
 }
 
+inline __device__ double calcDoubleLJForceShift(const double epsilon, const double radSum) {
+	double ratio6 = pow(d_LJcutoff, 6);
+	return 24 * epsilon * (2 / ratio6 - 1) / (d_LJcutoff * radSum * ratio6);
+}
+
 inline __device__ double calcMieForceShift(const double radSum) {
 	double nRatio, mRatio;
 	nRatio = pow(d_LJcutoff, d_nPower);
@@ -293,11 +298,11 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		break;
 		case simControlStruct::potentialEnum::lennardJones:
 		ratio = radSum / distance;
-		ratio12 = pow(ratio, 12);
 		ratio6 = pow(ratio, 6);
+		ratio12 = ratio6 * ratio6;
 		if (distance <= (d_LJcutoff * radSum)) {
 			forceShift = calcLJForceShift(radSum);
-			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+			return 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		} else {
 			return 0;
 		}
@@ -315,10 +320,10 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		break;
 		case simControlStruct::potentialEnum::WCA:
 		ratio = radSum / distance;
-		ratio12 = pow(ratio, 12);
 		ratio6 = pow(ratio, 6);
+		ratio12 = ratio6 * ratio6;
 		if (distance <= (WCAcut * radSum)) {
-			return 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+			return 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		} else {
 			return 0;
 		}
@@ -348,11 +353,11 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 			}
 		}
 		ratio = radSum / distance;
-		ratio12 = pow(ratio, 12);
 		ratio6 = pow(ratio, 6);
+		ratio12 = ratio6 * ratio6;
 		if (distance <= (d_LJcutoff * radSum)) {
-			forceShift = calcLJForceShift(radSum);
-			return 4 * epsilon * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+			forceShift = calcDoubleLJForceShift(epsilon, radSum);
+			return 24 * epsilon * (2 * ratio12 -  ratio6) / distance - forceShift;
 		} else {
 			return 0;
 		}
@@ -402,10 +407,10 @@ inline __device__ double calcWallWCAInteraction(const double* thisPos, const dou
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, wallPos, delta);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (WCAcut * radSum)) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
 	} else {
 		epot = 0.;
@@ -426,12 +431,12 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
-		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut + forceShift * (distance - d_LJcutoff * radSum));
+		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut + forceShift * (distance - d_LJcutoff * radSum)) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -449,11 +454,11 @@ inline __device__ double calcWCAInteraction(const double* thisPos, const double*
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (WCAcut * radSum)) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
-		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
+		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -478,8 +483,7 @@ inline __device__ double calcMieInteraction(const double* thisPos, const double*
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcMieForceShift(radSum);
 		gradMultiple =  d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
-		epot = 0.5 * d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut);
-		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
+		epot = 0.5 * (d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut) + forceShift * (distance - d_LJcutoff * radSum)) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -536,13 +540,12 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (d_LJcutoff * radSum)) {
-		forceShift = calcLJForceShift(radSum);
-		gradMultiple = 4 * epsilon * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
-		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut);
-		epot += 0.5 * forceShift * (distance - d_LJcutoff * radSum);
+		forceShift = calcDoubleLJForceShift(epsilon, radSum);
+		gradMultiple = 24 * epsilon * (2 * ratio12 - ratio6) / distance - forceShift;
+		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut + forceShift * (distance - d_LJcutoff * radSum)) * 0.5;
 	} else {
 		epot = 0.;
 	}
@@ -656,11 +659,11 @@ inline __device__ double calcLJYforce(const double* thisPos, const double* other
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	//printf("distance %lf \n", distance);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance - forceShift;
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 	}
 	if (gradMultiple != 0) {
 		return gradMultiple * delta[1] / distance;
@@ -674,10 +677,10 @@ inline __device__ double calcWCAYforce(const double* thisPos, const double* othe
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	if (distance <= (WCAcut * radSum)) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance;
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 	}
 	if (gradMultiple != 0) {
 		return gradMultiple * delta[1] / distance;
@@ -691,11 +694,11 @@ inline __device__ double calcWCAAdhesiveYforce(const double* thisPos, const doub
 	double delta[MAXDIM];
 	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	ratio = radSum / distance;
-	ratio12 = pow(ratio, 12);
 	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
 	overlap = 1 - distance / radSum;
 	if (distance < WCAcut * radSum) {
-		gradMultiple = 4 * d_ec * (12 * ratio12 - 6 * ratio6) / distance + d_ec * overlap / radSum;
+		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance + d_ec * overlap / radSum;
 	} else if (distance >= WCAcut * radSum && distance < (WCAcut + d_l2) * radSum) {
 		gradMultiple = - d_ec * ((WCAcut - 1) / d_l2) * (overlap + WCAcut + d_l2) / radSum;
 	}

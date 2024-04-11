@@ -26,11 +26,11 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false, scaleVel = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false, scaleVel = true;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double LJcut = 4, cutoff = 1, cutDistance, waveQ, timeStep = atof(argv[2]);
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]);
   double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics + "/";//+ "T" + argv[3] + 
@@ -82,7 +82,11 @@ int main(int argc, char **argv) {
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
-  cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
+  if(readState == false) {
+    cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
+  } else {
+    cout << "Reading state - time step: " << timeStep << endl;
+  }
   // initialize simulation
   if(scaleVel == true) {
     sp.initSoftParticleNVERescale(Tinject);
@@ -103,7 +107,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   ioSP.saveParticlePacking(outDir);
-  ioSP.saveParticleNeighbors(currentDir);
+  ioSP.saveParticleNeighbors(outDir);
   while(step != maxStep) {
     if(scaleVel == true) {
       sp.softParticleNVERescaleLoop();
@@ -126,7 +130,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(currentDir);
+          ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -142,7 +146,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -150,7 +154,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
@@ -163,7 +167,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(currentDir);
+    ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

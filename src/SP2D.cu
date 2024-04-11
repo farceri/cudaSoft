@@ -683,7 +683,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * getMeanParticleSigma();
+  cutoff = cutoff_; //* 2 * getMinParticleSigma();
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }
@@ -696,8 +696,9 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
-void SP2D::checkParticleMaxDisplacement2() {
-  double maxDelta = getParticleMaxDisplacement();
+void SP2D::checkParticleMaxDisplacement() {
+  double maxDelta, sigma = 2 * getMinParticleSigma();
+  maxDelta = getParticleMaxDisplacement()/ sigma;
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
@@ -706,7 +707,7 @@ void SP2D::checkParticleMaxDisplacement2() {
   }
 }
 
-void SP2D::checkParticleMaxDisplacement() {
+void SP2D::checkParticleMaxDisplacement2() {
   double maxDelta1, maxDelta2;
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
@@ -714,8 +715,9 @@ void SP2D::checkParticleMaxDisplacement() {
   kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
   thrust::sort(d_particleDisp.begin(), d_particleDisp.end(), thrust::greater<double>());
   thrust::host_vector<double> sorted_Disp = d_particleDisp;
-  maxDelta1 = sorted_Disp[0];
-  maxDelta2 = sorted_Disp[1];
+  double sigma = 2 * getMinParticleSigma();
+  maxDelta1 = sorted_Disp[0] / sigma;
+  maxDelta2 = sorted_Disp[1] / sigma;
   double maxSum = maxDelta1 + maxDelta2;
   if(maxSum > cutoff) {
     calcParticleNeighborList(cutDistance);

@@ -384,6 +384,7 @@ void SoftParticleNVE::integrate() {
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
+  //conserveMomentum();
 }
 
 //**************** soft particle nve with velocity rescaling *****************//
@@ -394,6 +395,7 @@ void SoftParticleNVERescale::integrate() {
   sp_->checkParticleMaxDisplacement();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
+  //conserveMomentum();
 }
 
 void SoftParticleNVERescale::injectKineticEnergy() {
