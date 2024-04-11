@@ -415,6 +415,41 @@ void SoftParticleNVERescale::injectKineticEnergy() {
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
+//**************** soft particle nve with velocity rescaling *****************//
+void SoftParticleNVEDoubleRescale::integrate() {
+  injectKineticEnergy();
+  updateVelocity(0.5 * sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->checkParticleMaxDisplacement();
+  sp_->calcParticleForceEnergy();
+  updateVelocity(0.5 * sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleNVEDoubleRescale::injectKineticEnergy() {
+  std::tuple<double, double> Temps = sp_->getParticleT1T2();
+  double scale1 = sqrt(config.Tinject / get<0>(Temps));
+  double scale2 = sqrt(config.driving / get<1>(Temps));
+  long s_nDim(sp_->nDim);
+  long s_num1(sp_->num1);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+
+  auto doubleScaleParticleVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      if(pId < s_num1) {
+        pVel[pId * s_nDim + dim] *= scale1;
+      } else {
+        pVel[pId * s_nDim + dim] *= scale2;
+      }
+    }
+  };
+
+  thrust::for_each(r, r + sp_->num1, doubleScaleParticleVel);
+  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+}
+
 //************************ soft particle Nose Hoover **************************//
 void SoftParticleNoseHoover::integrate() {
   updateVelocity(0.5 * sp_->dt);

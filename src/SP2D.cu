@@ -20,6 +20,7 @@
 #include <thrust/sort.h>
 #include <thrust/fill.h>
 #include <thrust/copy.h>
+#include <thrust/gather.h>
 #include <thrust/transform.h>
 #include <thrust/transform_reduce.h>
 #include <thrust/inner_product.h>
@@ -63,6 +64,7 @@ SP2D::SP2D(long nParticles, long dim) {
   flowViscosity = 1;
   cutDistance = 1;
   updateCount = 0;
+  shift = false;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -702,6 +704,9 @@ void SP2D::checkParticleMaxDisplacement() {
   if(3 * maxDelta > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
+    if(shift == true) {
+      removeCOMDrift();
+    }
     updateCount += 1;
     //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta1: " << maxDelta1 << " cutoff: " << cutoff << endl;
   }
@@ -722,6 +727,9 @@ void SP2D::checkParticleMaxDisplacement2() {
   if(maxSum > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
+    if(shift == true) {
+      removeCOMDrift();
+    }
     updateCount += 1;
     //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " " << maxDelta1 << " " << maxDelta2 << " cutoff: " << cutoff << endl;
   }
@@ -1246,7 +1254,31 @@ double SP2D::getParticleEnergy() {
 
 double SP2D::getParticleTemperature() {
   double ekin = getParticleKineticEnergy();
-  return 2 * ekin / (numParticles * nDim);
+  return ekin / numParticles;
+}
+
+std::tuple<double, double> SP2D::getParticleT1T2() {
+  thrust::device_vector<double> velSquared(d_particleVel.size());
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
+  thrust::device_vector<double> velSq1(num1);
+  thrust::device_vector<double> velSq2(numParticles-num1);
+  thrust::copy(velSquared.begin(), velSquared.begin() + num1, velSq1.begin());
+  thrust::copy(velSquared.end() - (numParticles-num1), velSquared.end(), velSq2.begin());
+  double T1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / num1;
+  double T2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (numParticles - num1);
+  return std::make_tuple(T1, T2);
+}
+
+std::tuple<double, double> SP2D::getParticleKineticEnergy12() {
+  thrust::device_vector<double> velSquared(d_particleVel.size());
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
+  thrust::device_vector<double> velSq1(num1);
+  thrust::device_vector<double> velSq2(numParticles-num1);
+  thrust::copy(velSquared.begin(), velSquared.begin() + num1, velSq1.begin());
+  thrust::copy(velSquared.end() - (numParticles-num1), velSquared.end(), velSq2.begin());
+  double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / num1;
+  double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (numParticles - num1);
+  return std::make_tuple(ekin1, ekin2);
 }
 
 double SP2D::getMassiveTemperature(long firstIndex, double mass) {
@@ -1256,8 +1288,31 @@ double SP2D::getMassiveTemperature(long firstIndex, double mass) {
   return mass * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
 }
 
-double SP2D::getParticleDrift() {
-  return thrust::reduce(d_particlePos.begin(), d_particlePos.end(), double(0), thrust::plus<double>()) / (numParticles * nDim);
+void SP2D::removeCOMDrift() {
+  // center of mass on x
+  thrust::device_vector<double> particlePos_x(d_particlePos.size() / 2);
+  thrust::device_vector<long> idx(d_particlePos.size() / 2);
+  thrust::sequence(idx.begin(), idx.end(), 0, 2);
+  thrust::gather(idx.begin(), idx.end(), d_particlePos.begin(), particlePos_x.begin());
+  double com_x = thrust::reduce(particlePos_x.begin(), particlePos_x.end(), double(0), thrust::plus<double>()) / numParticles;
+  // center of mass on y
+  thrust::device_vector<double> particlePos_y(d_particlePos.size() / 2);
+  thrust::device_vector<long> idy(d_particlePos.size() / 2);
+  thrust::sequence(idy.begin(), idy.end(), 1, 2);
+  thrust::gather(idy.begin(), idy.end(), d_particlePos.begin(), particlePos_y.begin());
+  double com_y = thrust::reduce(particlePos_y.begin(), particlePos_y.end(), double(0), thrust::plus<double>()) / numParticles;
+
+  // subtract center of mass position
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double* boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+  auto removeCenterOfMass = [=] __device__ (long pId) {
+		pPos[pId * s_nDim] -= (com_x - boxSize[0] * 0.5);
+    pPos[pId * s_nDim + 1] -= (com_y - boxSize[1] * 0.5);
+  };
+  thrust::for_each(r, r + numParticles, removeCenterOfMass);
 }
 
 //************************* contacts and neighbors ***************************//
@@ -1564,6 +1619,7 @@ void SP2D::softParticleFlowLoop() {
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
+  shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
@@ -1574,14 +1630,28 @@ void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
 }
 
-//***************************** NVE integrator *******************************//
+//******************* NVE integrator with velocity rescale *******************//
 void SP2D::initSoftParticleNVERescale(double Temp) {
   this->sim_ = new SoftParticleNVERescale(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
+  shift = true;
   cout << "SP2D::initSoftParticleNVERescale:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
 void SP2D::softParticleNVERescaleLoop() {
+  this->sim_->integrate();
+}
+
+//*************** NVE integrator with double velocity rescale ****************//
+void SP2D::initSoftParticleNVEDoubleRescale(double Temp1, double Temp2) {
+  this->sim_ = new SoftParticleNVEDoubleRescale(this, SimConfig(Temp1, 0, Temp2));
+  resetLastPositions();
+  shift = true;
+  std::tuple<double, double> Temps = getParticleT1T2();
+  cout << "SP2D::initSoftParticleNVEDoubleRescale:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << endl;
+}
+
+void SP2D::softParticleNVEDoubleRescaleLoop() {
   this->sim_->integrate();
 }
 
@@ -1591,6 +1661,7 @@ void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bo
   this->sim_->gamma = gamma;
   this->sim_->mass = mass;
   resetLastPositions();
+  //shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }

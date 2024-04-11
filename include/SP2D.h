@@ -9,6 +9,7 @@
 
 #include "defs.h"
 #include <vector>
+#include <tuple>
 #include <string>
 #include <memory>
 #include <iomanip>
@@ -18,6 +19,7 @@
 using namespace std;
 using std::vector;
 using std::string;
+using std::tuple;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
@@ -84,6 +86,7 @@ public:
   // neighbor update variables
   double cutoff, cutDistance;
   long updateCount;
+  bool shift;
 
   // dynamical particle variables
   thrust::device_vector<double> d_particlePos;
@@ -334,9 +337,13 @@ public:
 
   double getParticleTemperature();
 
+  std::tuple<double, double> getParticleT1T2();
+
+  std::tuple<double, double> getParticleKineticEnergy12();
+
   double getMassiveTemperature(long firstIndex, double mass);
 
-  double getParticleDrift();
+  void removeCOMDrift();
 
   // contacts and neighbors
   thrust::host_vector<long> getParticleNeighbors();
@@ -389,15 +396,18 @@ public:
 
   void softParticleFlowLoop();
 
-  // NVE integrator
+  // NVE integrators
   void initSoftParticleNVE(double Temp, bool readState);
 
   void softParticleNVELoop();
 
-  // NVE integrator with velocity rescale
   void initSoftParticleNVERescale(double Temp);
 
   void softParticleNVERescaleLoop();
+
+  void initSoftParticleNVEDoubleRescale(double Temp1, double Temp2);
+
+  void softParticleNVEDoubleRescaleLoop();
 
   // Nose-Hoover integrator
   void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);

@@ -149,12 +149,23 @@ public:
   virtual void integrate();
 };
 
-// Soft particle NVE integrator child of SoftParticleLangevin
+// Soft particle NVE integrator with velocity rescale child of SoftParticleLangevin
 class SoftParticleNVERescale: public SoftParticleLangevin
 {
 public:
   SoftParticleNVERescale() = default;
   SoftParticleNVERescale(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+
+  virtual void injectKineticEnergy();
+  virtual void integrate();
+};
+
+// Soft particle NVE integrator with double velocity rescale child of SoftParticleLangevin
+class SoftParticleNVEDoubleRescale: public SoftParticleLangevin
+{
+public:
+  SoftParticleNVEDoubleRescale() = default;
+  SoftParticleNVEDoubleRescale(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
 
   virtual void injectKineticEnergy();
   virtual void integrate();

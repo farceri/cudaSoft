@@ -119,8 +119,8 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-        //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {

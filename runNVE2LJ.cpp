@@ -9,6 +9,7 @@
 #include "include/Simulator.h"
 #include "include/defs.h"
 #include <vector>
+#include <tuple>
 #include <string>
 #include <iostream>
 #include <iomanip>
@@ -26,13 +27,14 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, scaleVel = true;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false, scaleVel = false, doubleScaleVel = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]);
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), sigma, timeUnit;
+  double LJcut = 4, cutoff = 1, cutDistance, waveQ, timeStep = atof(argv[2]);
+  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
+  std::tuple<double, double> Temps;
   dirSample = whichDynamics + "/";//+ "T" + argv[3] + 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -49,6 +51,7 @@ int main(int argc, char **argv) {
         outDir = outDir + "dynamics-log/";
       } else {
         outDir = outDir + "dynamics/";
+        //outDir = outDir + "T1-" + argv[3] + "-T2-" + argv[8] + "/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -82,7 +85,9 @@ int main(int argc, char **argv) {
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
-  if(readState == false) {
+  if(doubleScaleVel == true) {
+    cout << "T1: " << Tinject << " T2: " << Tinject2 << " time step: " << timeStep << endl;
+  } else if(readState == false) {
     cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
   } else {
     cout << "Reading state - time step: " << timeStep << endl;
@@ -90,6 +95,8 @@ int main(int argc, char **argv) {
   // initialize simulation
   if(scaleVel == true) {
     sp.initSoftParticleNVERescale(Tinject);
+  } else if(doubleScaleVel == true) {
+    sp.initSoftParticleNVEDoubleRescale(Tinject, Tinject2);
   } else {
     sp.initSoftParticleNVE(Tinject, readState);
   }
@@ -111,15 +118,26 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     if(scaleVel == true) {
       sp.softParticleNVERescaleLoop();
+    } else if(doubleScaleVel == true) {
+      sp.softParticleNVEDoubleRescaleLoop();
     } else {
       sp.softParticleNVELoop();
     }
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      if(doubleScaleVel == true) {
+        ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles);
+      } else {
+        ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      }
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
-        cout << " T: " << sp.getParticleTemperature();
+        if(doubleScaleVel == true) {
+          Temps = sp.getParticleT1T2();
+          cout << " T1: " << get<0>(Temps) << " T2: " << get<1>(Temps);
+        } else {
+          cout << " T: " << sp.getParticleTemperature();
+        }
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
