@@ -23,7 +23,7 @@ using std::tuple;
 
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
-  enum class interactionEnum {neighbor, allToAll} interactionType;
+  enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ} potentialType;
   enum class boxEnum {harmonic, WCA} boxType;
   enum class gravityEnum {on, off} gravityType;
@@ -84,7 +84,7 @@ public:
   double flowSpeed, flowDecay;
   double flowViscosity, flowHeight;
   // neighbor update variables
-  double cutoff, cutDistance;
+  double cutoff, cutDistance, rcut;
   long updateCount;
   bool shift;
 
@@ -141,8 +141,8 @@ public:
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
 
-  void setInteractionType(simControlStruct::interactionEnum interactionType_);
-	simControlStruct::interactionEnum getInteractionType();
+  void setNeighborType(simControlStruct::neighborEnum neighborType_);
+	simControlStruct::neighborEnum getNeighborType();
 
   void setPotentialType(simControlStruct::potentialEnum potentialType_);
 	simControlStruct::potentialEnum getPotentialType();
@@ -233,13 +233,17 @@ public:
 
   double getParticleMSD();
 
-  double getParticleMaxDisplacement();
-
   double setDisplacementCutoff(double cutoff_);
 
   void resetUpdateCount();
 
   long getUpdateCount();
+
+  void checkParticleNeighbors();
+
+  double getParticleMaxDisplacement();
+
+  int checkParticleDisplacement();
 
   void checkParticleMaxDisplacement();
 
@@ -292,6 +296,12 @@ public:
   void calcFlowVelocity();
 
   // particle functions
+  void calcParticleInteraction();
+  
+  void checkParticleWallInteraction();
+
+  void checkGravity();
+
   void calcParticleForceEnergy();
 
   //void calcParticleBoundaryForceEnergy();
@@ -336,6 +346,8 @@ public:
   double getParticleEnergy();
 
   double getParticleTemperature();
+
+  void adjustKineticEnergy(double prevEtot);
 
   std::tuple<double, double> getParticleT1T2();
 

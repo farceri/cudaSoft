@@ -462,7 +462,9 @@ public:
   }
 
   void saveParticleNeighbors(string dirName) {
-    save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    if(sp_->simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+      save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+    }
   }
 
   void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {

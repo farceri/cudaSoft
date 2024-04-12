@@ -24,36 +24,38 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, lj = true, wca = false;
-  bool gforce = false, alltoall = false, nve = false;
+  bool gforce = false, fixedbc = false, alltoall = false, nve = true;
   long numParticles = atol(argv[5]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
-  double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 6e-02, scaleFactor;
+  double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double mass = 1, LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
-  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.7;
-  double cutDistance, cutoff = 2, timeStep, timeUnit, sigma, lx = atof(argv[4]), gravity = 9.8e-04;
+  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.8;
+  double cutDistance, cutoff = 1.5, timeStep, timeUnit, sigma, lx = atof(argv[4]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setEnergyCostant(ec);
   if(gforce == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+  } else if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
   if(alltoall == true) {
-    sp.setInteractionType(simControlStruct::interactionEnum::allToAll);
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
   if(read == true) {
     inDir = argv[6];
-    inDir = outDir + inDir;
+    inDir = outDir + inDir + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     sigma = 2 * sp.getMeanParticleSigma();
-    sp.setEnergyCostant(ec);
     if(readState == true) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
@@ -63,7 +65,6 @@ int main(int argc, char **argv) {
     //sp.setScaledMonoRandomParticles(phi0, lx);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
-    sp.setEnergyCostant(ec);
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
     cutDistance = sp.setDisplacementCutoff(cutoff);
@@ -132,8 +133,18 @@ int main(int argc, char **argv) {
     waveQ = sp.getSoftWaveNumber();
     // equilibrate dynamics
     step = 0;
+    // remove energy injected by compression
+    if(nve == true && searchStep != 0) {
+      cout << "Energy after compression - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustKineticEnergy(prevEnergy);
+      cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    }
     while(step != maxStep) {
-      sp.softParticleLangevinLoop();
+      if(nve == true) {
+        sp.softParticleNVELoop();
+      } else {
+        sp.softParticleLangevinLoop();
+      }
       if(step % saveEnergyFreq == 0) {
         ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
@@ -142,19 +153,22 @@ int main(int argc, char **argv) {
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
-        updateCount = sp.getUpdateCount();
-        if(step != 0 && updateCount > 0) {
-          cout << " number of updates: " << updateCount << " frequency " << printFreq / updateCount << endl;
+        if(sp.simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+          updateCount = sp.getUpdateCount();
+          if(step != 0 && updateCount > 0) {
+            cout << " number of updates: " << updateCount << " frequency " << printFreq / updateCount << endl;
+          } else {
+            cout << " no updates" << endl;
+          }
+          sp.resetUpdateCount();
         } else {
-          cout << " no updates" << endl;
+          cout << endl;
         }
-        sp.resetUpdateCount();
       }
       step += 1;
     }
-    cout << "Final step - T: " << sp.getParticleTemperature();
-    cout << " P: " << sp.getParticlePressure();
-    cout << " phi: " << sp.getParticlePhi() << endl;
+    prevEnergy = sp.getParticleEnergy();
+    cout << "Energy before compression - E/N: " << prevEnergy / numParticles << endl;
     // save minimized configuration
     ioSP.saveParticlePacking(currentDir);
     ioSP.saveParticleNeighbors(currentDir);

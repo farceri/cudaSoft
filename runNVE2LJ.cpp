@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -38,6 +38,8 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "/";//+ "T" + argv[3] + 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  //sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
   sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
@@ -50,7 +52,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        outDir = outDir + "dynamics1/";
         //outDir = outDir + "T1-" + argv[3] + "-T2-" + argv[8] + "/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {

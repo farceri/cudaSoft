@@ -160,7 +160,7 @@ void FIRE::minimizerParticleLoop() {
 	// Move the system forward, based on the previous velocities and forces
 	updateParticlePositionAndVelocity();
 	// Calculate the new set of forces at the new step
-  	sp_->checkParticleMaxDisplacement();
+  	sp_->checkParticleNeighbors();
 	sp_->calcParticleForceEnergy();
 	// update the velocity based on the current forces
 	updateParticleVelocity();

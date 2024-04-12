@@ -45,7 +45,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNDim(nDim);
   setNumParticles(numParticles);
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
-	simControl.interactionType = simControlStruct::interactionEnum::neighbor;
+	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
 	simControl.boxType = simControlStruct::boxEnum::harmonic;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
@@ -196,21 +196,21 @@ simControlStruct::geometryEnum SP2D::getGeometryType() {
 	return simControl.geometryType;
 }
 
-void SP2D::setInteractionType(simControlStruct::interactionEnum interactionType_) {
-	simControl.interactionType = interactionType_;
-  if(simControl.interactionType == simControlStruct::interactionEnum::neighbor) {
-    cout << "SP2D: setInteractionType: interactionType: neighbor" << endl;
-  } else if(simControl.interactionType == simControlStruct::interactionEnum::allToAll) {
-    cout << "SP2D: setInteractionType: interactionType: allToAll" << endl;
+void SP2D::setNeighborType(simControlStruct::neighborEnum neighborType_) {
+	simControl.neighborType = neighborType_;
+  if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+    cout << "SP2D: setneighborType: neighborType: neighbor" << endl;
+  } else if(simControl.neighborType == simControlStruct::neighborEnum::allToAll) {
+    cout << "SP2D: setneighborType: neighborType: allToAll" << endl;
   } else {
-    cout << "SP2D: setInteractionType: please specify valid interactionType: neighbor or allToAll" << endl;
+    cout << "SP2D: setneighborType: please specify valid neighborType: neighbor or allToAll" << endl;
   }
 	syncSimControlToDevice();
 }
 
-simControlStruct::interactionEnum SP2D::getInteractionType() {
+simControlStruct::neighborEnum SP2D::getNeighborType() {
 	syncSimControlFromDevice();
-	return simControl.interactionType;
+	return simControl.neighborType;
 }
 
 void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
@@ -664,30 +664,45 @@ double SP2D::getParticleMSD() {
 }
 
 double SP2D::setDisplacementCutoff(double cutoff_) {
+  double sigma = 2 * getMeanParticleSigma();
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
     cutDistance = 1;
     break;
     case simControlStruct::potentialEnum::lennardJones:
-    cutDistance = LJcutoff;
+    cutDistance = 1 + LJcutoff;
     break;
     case simControlStruct::potentialEnum::WCA:
-    cutDistance = WCAcut;
+    cutDistance = 1 + WCAcut;
     break;
     case simControlStruct::potentialEnum::Mie:
-    cutDistance = LJcutoff;
+    cutDistance = 1 + LJcutoff;
     break;
     case simControlStruct::potentialEnum::adhesive:
-    cutDistance = l2;
+    cutDistance = 1 + l2;
     break;
     case simControlStruct::potentialEnum::doubleLJ:
-    cutDistance = LJcutoff;
+    cutDistance = 1 + LJcutoff;
+    break;
+    default:
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_; //* 2 * getMinParticleSigma();
+  cutoff = cutoff_;
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
+}
+
+void SP2D::checkParticleNeighbors() {
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    checkParticleMaxDisplacement();
+    break;
+    case simControlStruct::neighborEnum::allToAll:
+    break;
+    default:
+    break;
+  }
 }
 
 double SP2D::getParticleMaxDisplacement() {
@@ -698,17 +713,37 @@ double SP2D::getParticleMaxDisplacement() {
   return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
 }
 
+int SP2D::checkParticleDisplacement() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+  thrust::device_vector<int> recalcFlag(d_particleRad.size());
+  thrust::fill(recalcFlag.begin(), recalcFlag.end(), int(0));
+  int *flag = thrust::raw_pointer_cast(&recalcFlag[0]);
+  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, flag, cutoff);
+  return thrust::reduce(recalcFlag.begin(), recalcFlag.end(), int(0), thrust::plus<int>());
+}
+
+void SP2D::resetUpdateCount() {
+  updateCount = double(0);
+  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
+}
+
+long SP2D::getUpdateCount() {
+  return updateCount;
+}
+
 void SP2D::checkParticleMaxDisplacement() {
-  double maxDelta, sigma = 2 * getMinParticleSigma();
-  maxDelta = getParticleMaxDisplacement()/ sigma;
-  if(3 * maxDelta > cutoff) {
+  //double maxDelta = getParticleMaxDisplacement();
+  //if(3 * maxDelta > cutoff) {
+  int flag = checkParticleDisplacement();
+  if(flag != 0) { 
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     if(shift == true) {
       removeCOMDrift();
     }
     updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta1: " << maxDelta1 << " cutoff: " << cutoff << endl;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta: " << maxDelta << " cutoff: " << cutoff << endl;
   }
 }
 
@@ -720,11 +755,10 @@ void SP2D::checkParticleMaxDisplacement2() {
   kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
   thrust::sort(d_particleDisp.begin(), d_particleDisp.end(), thrust::greater<double>());
   thrust::host_vector<double> sorted_Disp = d_particleDisp;
-  double sigma = 2 * getMinParticleSigma();
-  maxDelta1 = sorted_Disp[0] / sigma;
-  maxDelta2 = sorted_Disp[1] / sigma;
+  maxDelta1 = sorted_Disp[0];
+  maxDelta2 = sorted_Disp[1];
   double maxSum = maxDelta1 + maxDelta2;
-  if(maxSum > cutoff) {
+  if(3 * maxSum > cutoff) {
     calcParticleNeighborList(cutDistance);
     resetLastPositions();
     if(shift == true) {
@@ -735,13 +769,32 @@ void SP2D::checkParticleMaxDisplacement2() {
   }
 }
 
-void SP2D::resetUpdateCount() {
-  updateCount = double(0);
-  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
-}
+// this function is called after particledisplacement has been computed
+void SP2D::removeCOMDrift() {
+  // compute drift on x
+  thrust::device_vector<double> particleDisp_x(d_particleDisp.size() / 2);
+  thrust::device_vector<long> idx(d_particleDisp.size() / 2);
+  thrust::sequence(idx.begin(), idx.end(), 0, 2);
+  thrust::gather(idx.begin(), idx.end(), d_particleDisp.begin(), particleDisp_x.begin());
+  double drift_x = thrust::reduce(particleDisp_x.begin(), particleDisp_x.end(), double(0), thrust::plus<double>()) / numParticles;
+  // compute drift on y
+  thrust::device_vector<double> particleDisp_y(d_particleDisp.size() / 2);
+  thrust::device_vector<long> idy(d_particleDisp.size() / 2);
+  thrust::sequence(idy.begin(), idy.end(), 1, 2);
+  thrust::gather(idy.begin(), idy.end(), d_particleDisp.begin(), particleDisp_y.begin());
+  double drift_y = thrust::reduce(particleDisp_y.begin(), particleDisp_y.end(), double(0), thrust::plus<double>()) / numParticles;
 
-long SP2D::getUpdateCount() {
-  return updateCount;
+  // subtract drift from current positions
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double* boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+  auto removeDrift = [=] __device__ (long pId) {
+		pPos[pId * s_nDim] -= drift_x;
+    pPos[pId * s_nDim + 1] -= drift_y;
+  };
+  thrust::for_each(r, r + numParticles, removeDrift);
 }
 
 double SP2D::getSoftWaveNumber() {
@@ -1021,30 +1074,32 @@ void SP2D::calcFlowVelocity() {
   kernelCalcFlowVelocity<<<dimGrid, dimBlock>>>(pPos, sHeight, flowVel);
 }
 
-/*void SP2D::calcParticleForceEnergy() {
+void SP2D::calcParticleInteraction() {
 	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   // compute particle interaction
-  kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-}*/
-
-void SP2D::calcParticleForceEnergy() {
-	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
-	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
-  // compute particle interaction
-  switch (simControl.interactionType) {
-    case simControlStruct::interactionEnum::neighbor:
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
     kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
-    case simControlStruct::interactionEnum::allToAll:
+    case simControlStruct::neighborEnum::allToAll:
     kernelCalcAllToAllParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
+    default:
+    break;
   }
+}
+
+void SP2D::checkParticleWallInteraction() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   switch (simControl.geometryType) {
+    case simControlStruct::geometryEnum::normal:
+    break;
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
 		break;
@@ -1054,12 +1109,30 @@ void SP2D::calcParticleForceEnergy() {
     case simControlStruct::geometryEnum::fixedSides3D:
     kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
+    default:
+    break;
 	}
+}
+
+void SP2D::checkGravity() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   switch (simControl.gravityType) {
     case simControlStruct::gravityEnum::on:
     kernelAddParticleGravity<<<dimGrid, dimBlock>>>(pPos, pForce, pEnergy);
     break;
+    case simControlStruct::gravityEnum::off:
+    break;
+    default:
+    break;
   }
+}
+
+void SP2D::calcParticleForceEnergy() {
+  calcParticleInteraction();
+  checkParticleWallInteraction();
+  checkGravity();
 }
 
  void SP2D::makeExternalParticleForce(double externalForce) {
@@ -1215,11 +1288,15 @@ double SP2D::getParticleWallPressure() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *wallStress = thrust::raw_pointer_cast(&d_stress[0]);
   switch (simControl.geometryType) {
+    case simControlStruct::geometryEnum::normal:
+    break;
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
 		break;
 		case simControlStruct::geometryEnum::fixedSides2D:
     kernelCalcParticleSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    break;
+    default:
     break;
 	}
 	return (d_stress[0] + d_stress[3]) / (nDim * volume);
@@ -1257,6 +1334,31 @@ double SP2D::getParticleTemperature() {
   return ekin / numParticles;
 }
 
+void SP2D::adjustKineticEnergy(double prevEtot) {
+  double scale, ekin = getParticleKineticEnergy();
+  double deltaEtot = getParticlePotentialEnergy() + ekin;
+  deltaEtot -= prevEtot;
+  if(ekin > deltaEtot) {
+    scale = sqrt((ekin - deltaEtot) / ekin);
+    //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
+    long s_nDim(nDim);
+    auto r = thrust::counting_iterator<long>(0);
+    double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+    auto adjustParticleVel = [=] __device__ (long pId) {
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pVel[pId * s_nDim + dim] *= scale;
+      }
+    };
+
+    cout << "SP2D::adjustKineticEnergy:: scale: " << scale << endl;
+    thrust::for_each(r, r + numParticles, adjustParticleVel);
+  } else {
+    cout << "SP2D::adjustKineticEnergy:: kinetic energy is less then change in total energy - no adjustment is made" << endl;
+  }
+}
+
 std::tuple<double, double> SP2D::getParticleT1T2() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
@@ -1286,33 +1388,6 @@ double SP2D::getMassiveTemperature(long firstIndex, double mass) {
   thrust::device_vector<double> velSquared(firstIndex * nDim);
   thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, velSquared.begin(), square());
   return mass * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
-}
-
-void SP2D::removeCOMDrift() {
-  // center of mass on x
-  thrust::device_vector<double> particlePos_x(d_particlePos.size() / 2);
-  thrust::device_vector<long> idx(d_particlePos.size() / 2);
-  thrust::sequence(idx.begin(), idx.end(), 0, 2);
-  thrust::gather(idx.begin(), idx.end(), d_particlePos.begin(), particlePos_x.begin());
-  double com_x = thrust::reduce(particlePos_x.begin(), particlePos_x.end(), double(0), thrust::plus<double>()) / numParticles;
-  // center of mass on y
-  thrust::device_vector<double> particlePos_y(d_particlePos.size() / 2);
-  thrust::device_vector<long> idy(d_particlePos.size() / 2);
-  thrust::sequence(idy.begin(), idy.end(), 1, 2);
-  thrust::gather(idy.begin(), idy.end(), d_particlePos.begin(), particlePos_y.begin());
-  double com_y = thrust::reduce(particlePos_y.begin(), particlePos_y.end(), double(0), thrust::plus<double>()) / numParticles;
-
-  // subtract center of mass position
-  long s_nDim(nDim);
-  auto r = thrust::counting_iterator<long>(0);
-	double* pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-	double* boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
-
-  auto removeCenterOfMass = [=] __device__ (long pId) {
-		pPos[pId * s_nDim] -= (com_x - boxSize[0] * 0.5);
-    pPos[pId * s_nDim + 1] -= (com_y - boxSize[1] * 0.5);
-  };
-  thrust::for_each(r, r + numParticles, removeCenterOfMass);
 }
 
 //************************* contacts and neighbors ***************************//
@@ -1661,7 +1736,7 @@ void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bo
   this->sim_->gamma = gamma;
   this->sim_->mass = mass;
   resetLastPositions();
-  //shift = true;
+  shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
