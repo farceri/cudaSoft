@@ -63,7 +63,7 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-EXE = runNVE
+#EXE = runNVE
 #EXE = runNVE2LJ
 #EXE = runNPT
 #EXE = runActiveLJ
@@ -73,7 +73,7 @@ EXE = runNVE
 
 # mechanics
 #EXE = linearShearFIRE
-#EXE = linearExtendNVE
+EXE = linearExtendNVE
 #EXE = linearExtendNVE2LJ
 #EXE = simpleNVE
 #EXE = shearLangevin

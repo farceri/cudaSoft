@@ -135,8 +135,11 @@ int main(int argc, char **argv) {
     step = 0;
     // remove energy injected by compression
     if(nve == true && searchStep != 0) {
+      sp.calcParticleNeighborList(cutDistance);
+      sp.calcParticleForceEnergy();
       cout << "Energy after compression - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       sp.adjustKineticEnergy(prevEnergy);
+      sp.calcParticleForceEnergy();
       cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     }
     while(step != maxStep) {

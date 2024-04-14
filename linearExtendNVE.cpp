@@ -23,11 +23,11 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = false, biaxial = true, centered = false, rescaleVel = false;
+  bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
+  double ec = 1, cutDistance, cutoff = 2, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -116,9 +116,12 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
+    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
     cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     sp.adjustKineticEnergy(prevEnergy);
+    sp.calcParticleForceEnergy();
     cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     sp.resetUpdateCount();
     step = 0;

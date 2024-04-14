@@ -1221,8 +1221,8 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				radSum = thisRad + otherRad;
-				//isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);
-				isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
+				isNeighbor = (-calcOverlap(thisPos, otherPos, radSum) < cutDistance);// cutDistance should be greater than radSum
+				//isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
 					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
@@ -1328,11 +1328,11 @@ __global__ void kernelCalcParticleDisplacement(const double* pPos, const double*
 	}
 }
 
-__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pPreviousPos, const double* pRad, int* flag, double cutoff) {
+__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pPreviousPos, int* flag, double cutoff) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double displacement = calcDistance(&pPos[particleId*d_nDim], &pPreviousPos[particleId*d_nDim]);
-		if(3 * displacement > (cutoff * 2 * pRad[particleId])) {
+		if(2 * displacement > cutoff) {
 			flag[particleId] = 1;
 		}
 	}
