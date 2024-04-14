@@ -1328,11 +1328,11 @@ __global__ void kernelCalcParticleDisplacement(const double* pPos, const double*
 	}
 }
 
-__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pPreviousPos, int* flag, double cutoff) {
+__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pPreviousPos, const double* pRad, int* flag, double cutoff) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double displacement = calcDistance(&pPos[particleId*d_nDim], &pPreviousPos[particleId*d_nDim]);
-		if(3 * displacement > cutoff) {
+		if(3 * displacement > (cutoff * 2 * pRad[particleId])) {
 			flag[particleId] = 1;
 		}
 	}

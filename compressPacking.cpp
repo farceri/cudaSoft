@@ -23,16 +23,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = true, wca = false;
+  bool read = true, readState = true, lj = true, wca = false;
   bool gforce = false, fixedbc = false, alltoall = false, nve = true;
-  long numParticles = atol(argv[5]), nDim = 2;
+  long numParticles = atol(argv[4]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
+  long maxStep = 5e04, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double mass = 1, LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.8;
-  double cutDistance, cutoff = 1.5, timeStep, timeUnit, sigma, lx = atof(argv[4]), gravity = 9.8e-04;
+  double cutDistance, cutoff = 1.5, timeStep, timeUnit, sigma, lx = atof(argv[5]), ly = atof(argv[6]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
   std::experimental::filesystem::create_directory(outDir);
   // read initial configuration
   if(read == true) {
-    inDir = argv[6];
+    inDir = argv[7];
     inDir = outDir + inDir + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     sigma = 2 * sp.getMeanParticleSigma();
@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx);
-    //sp.setScaledMonoRandomParticles(phi0, lx);
+    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly);
+    //sp.setScaledMonoRandomParticles(phi0, lx, ly);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
@@ -165,6 +165,8 @@ int main(int argc, char **argv) {
           cout << endl;
         }
       }
+      //sp.calcParticleNeighborList(cutDistance);
+      //sp.checkParticleNeighbors();
       step += 1;
     }
     prevEnergy = sp.getParticleEnergy();

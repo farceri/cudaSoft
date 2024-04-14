@@ -664,7 +664,6 @@ double SP2D::getParticleMSD() {
 }
 
 double SP2D::setDisplacementCutoff(double cutoff_) {
-  double sigma = 2 * getMeanParticleSigma();
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
     cutDistance = 1;
@@ -693,82 +692,6 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
   return cutDistance;
 }
 
-void SP2D::checkParticleNeighbors() {
-  switch (simControl.neighborType) {
-    case simControlStruct::neighborEnum::neighbor:
-    checkParticleMaxDisplacement();
-    break;
-    case simControlStruct::neighborEnum::allToAll:
-    break;
-    default:
-    break;
-  }
-}
-
-double SP2D::getParticleMaxDisplacement() {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
-  double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
-  kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
-  return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
-}
-
-int SP2D::checkParticleDisplacement() {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
-  thrust::device_vector<int> recalcFlag(d_particleRad.size());
-  thrust::fill(recalcFlag.begin(), recalcFlag.end(), int(0));
-  int *flag = thrust::raw_pointer_cast(&recalcFlag[0]);
-  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, flag, cutoff);
-  return thrust::reduce(recalcFlag.begin(), recalcFlag.end(), int(0), thrust::plus<int>());
-}
-
-void SP2D::resetUpdateCount() {
-  updateCount = double(0);
-  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
-}
-
-long SP2D::getUpdateCount() {
-  return updateCount;
-}
-
-void SP2D::checkParticleMaxDisplacement() {
-  //double maxDelta = getParticleMaxDisplacement();
-  //if(3 * maxDelta > cutoff) {
-  int flag = checkParticleDisplacement();
-  if(flag != 0) { 
-    calcParticleNeighborList(cutDistance);
-    resetLastPositions();
-    if(shift == true) {
-      removeCOMDrift();
-    }
-    updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta: " << maxDelta << " cutoff: " << cutoff << endl;
-  }
-}
-
-void SP2D::checkParticleMaxDisplacement2() {
-  double maxDelta1, maxDelta2;
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
-  double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
-  kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
-  thrust::sort(d_particleDisp.begin(), d_particleDisp.end(), thrust::greater<double>());
-  thrust::host_vector<double> sorted_Disp = d_particleDisp;
-  maxDelta1 = sorted_Disp[0];
-  maxDelta2 = sorted_Disp[1];
-  double maxSum = maxDelta1 + maxDelta2;
-  if(3 * maxSum > cutoff) {
-    calcParticleNeighborList(cutDistance);
-    resetLastPositions();
-    if(shift == true) {
-      removeCOMDrift();
-    }
-    updateCount += 1;
-    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " " << maxDelta1 << " " << maxDelta2 << " cutoff: " << cutoff << endl;
-  }
-}
-
 // this function is called after particledisplacement has been computed
 void SP2D::removeCOMDrift() {
   // compute drift on x
@@ -795,6 +718,92 @@ void SP2D::removeCOMDrift() {
     pPos[pId * s_nDim + 1] -= drift_y;
   };
   thrust::for_each(r, r + numParticles, removeDrift);
+}
+
+double SP2D::getParticleMaxDisplacement() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+  double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
+  kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
+  return thrust::reduce(d_particleDisp.begin(), d_particleDisp.end(), double(-1), thrust::maximum<double>());
+}
+
+void SP2D::checkParticleDisplacement() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+  thrust::device_vector<int> recalcFlag(d_particleRad.size());
+  thrust::fill(recalcFlag.begin(), recalcFlag.end(), int(0));
+  int *flag = thrust::raw_pointer_cast(&recalcFlag[0]);
+  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pRad, flag, cutoff);
+  int sumFlag = thrust::reduce(recalcFlag.begin(), recalcFlag.end(), int(0), thrust::plus<int>());
+  if(sumFlag != 0) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    if(shift == true) {
+      removeCOMDrift();
+    }
+    updateCount += 1;
+  }
+}
+
+void SP2D::resetUpdateCount() {
+  updateCount = double(0);
+  //cout << "SP2D::resetUpdateCount - updatCount " << updateCount << endl;
+}
+
+long SP2D::getUpdateCount() {
+  return updateCount;
+}
+
+void SP2D::checkParticleMaxDisplacement() {
+  double sigma = 2 * getMinParticleSigma();
+  double maxDelta = getParticleMaxDisplacement() / sigma;
+  if(3 * maxDelta > cutoff) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    if(shift == true) {
+      removeCOMDrift();
+    }
+    updateCount += 1;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta: " << maxDelta << " cutoff: " << cutoff << endl;
+  }
+}
+
+void SP2D::checkParticleMaxDisplacement2() {
+  double sigma = 2 * getMinParticleSigma();
+  double maxDelta1, maxDelta2;
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
+  double *pDisp = thrust::raw_pointer_cast(&d_particleDisp[0]);
+  kernelCalcParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, pDisp);
+  thrust::sort(d_particleDisp.begin(), d_particleDisp.end(), thrust::greater<double>());
+  thrust::host_vector<double> sorted_Disp = d_particleDisp;
+  maxDelta1 = sorted_Disp[0] / sigma;
+  maxDelta2 = sorted_Disp[1] / sigma;
+  double maxSum = maxDelta1 + maxDelta2;
+  if(3 * maxSum > cutoff) {
+    calcParticleNeighborList(cutDistance);
+    resetLastPositions();
+    if(shift == true) {
+      removeCOMDrift();
+    }
+    updateCount += 1;
+    //cout << "SP2D::checkParticleMaxDisplacement - updated neighbors, maxDelta2 + maxDelta1: " << maxSum << " " << maxDelta1 << " " << maxDelta2 << " cutoff: " << cutoff << endl;
+  }
+}
+
+void SP2D::checkParticleNeighbors() {
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    checkParticleDisplacement();
+    //checkParticleMaxDisplacement();
+    break;
+    case simControlStruct::neighborEnum::allToAll:
+    break;
+    default:
+    break;
+  }
 }
 
 double SP2D::getSoftWaveNumber() {
@@ -835,7 +844,7 @@ void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
   } else if(nDim == 3) {
     scale = cbrt(getParticlePhi() / phi0);
   } else {
-    cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
+    cout << "SP2D::setPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
   for (long dim = 0; dim < nDim; dim++) {
     boxSize[dim] = boxLength;
@@ -853,7 +862,7 @@ void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
   setLengthScaleToOne();
 }
 
-void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx) {
+void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean = 0, sigma, scale;
   sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
@@ -865,9 +874,7 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
     d_particleRad[particleId] = 0.5 * exp(mean + randNum * sigma);
   }
   boxSize[0] = lx;
-  for (long dim = 1; dim < nDim; dim++) {
-    boxSize[dim] = 1;
-  }
+  boxSize[1] = ly;
   setBoxSize(boxSize);
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
@@ -877,9 +884,7 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
   boxSize[0] = lx * scale;
-  for (long dim = 1; dim < nDim; dim++) {
-    boxSize[dim] = scale;
-  }
+  boxSize[1] = ly * scale;
   setBoxSize(boxSize);
   // extract random positions
   for (long particleId = 0; particleId < numParticles; particleId++) {
@@ -892,15 +897,13 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
   setLengthScaleToOne();
 }
 
-void SP2D::setScaledMonoRandomParticles(double phi0, double lx) {
+void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
   thrust::host_vector<double> boxSize(nDim);
   double scale;
   // generate polydisperse particle size
   thrust::fill(d_particleRad.begin(), d_particleRad.end(), 0.5);
   boxSize[0] = lx;
-  for (long dim = 1; dim < nDim; dim++) {
-    boxSize[dim] = 1;
-  }
+  boxSize[1] = ly;
   setBoxSize(boxSize);
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
@@ -910,9 +913,7 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx) {
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
   boxSize[0] = lx * scale;
-  for (long dim = 1; dim < nDim; dim++) {
-    boxSize[dim] = scale;
-  }
+  boxSize[1] = ly * scale;
   setBoxSize(boxSize);
   // extract random positions
   for (long particleId = 0; particleId < numParticles; particleId++) {

@@ -243,7 +243,7 @@ public:
 
   double getParticleMaxDisplacement();
 
-  int checkParticleDisplacement();
+  void checkParticleDisplacement();
 
   void checkParticleMaxDisplacement();
 
@@ -256,9 +256,9 @@ public:
   // initialization functions
   void setPolyRandomParticles(double phi0, double polyDispersity);
 
-  void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx);
+  void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly);
 
-  void setScaledMonoRandomParticles(double phi0, double lx);
+  void setScaledMonoRandomParticles(double phi0, double lx, double ly);
 
   void pressureScaleParticles(double pscale);
 

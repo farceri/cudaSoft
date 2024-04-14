@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
       }
     }
     //sp.calcParticleNeighborList(cutDistance);
-    sp.checkParticleNeighbors();
+    //sp.checkParticleNeighbors();
     if(logSave == true) {
       if(step > (multiple * checkPointFreq)) {
         saveFreq = 1;
