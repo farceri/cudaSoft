@@ -26,11 +26,11 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false, lj = false, wca = true, alltoall = false, fixedbc = false;
+  bool readState = true, saveFinal = true, logSave, linSave = false, lj = true, wca = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutoff = 0.1, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
+  double ec = 1, LJcut = 4, cutoff = 2, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit, size;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics;// + "T" + argv[3] + "/";
   // initialize sp object
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
   } else {
     sp.initSoftParticleNVE(Tinject, readState);
   }
-  cutDistance = sp.setDisplacementCutoff(cutoff);
+  cutDistance = sp.setDisplacementCutoff(cutoff, sigma);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
       }
     }
     //sp.calcParticleNeighborList(cutDistance);
-    sp.checkParticleNeighbors();
+    //sp.checkParticleNeighbors();
     if(logSave == true) {
       if(step > (multiple * checkPointFreq)) {
         saveFreq = 1;

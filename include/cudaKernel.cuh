@@ -35,6 +35,7 @@ __constant__ double d_l2;
 // Lennard-Jones constants
 __constant__ double d_LJcutoff;
 __constant__ double d_LJecut;
+__constant__ double d_LJfshift;
 // Double Lennard-Jones
 __constant__ double d_eAA;
 __constant__ double d_eAB;
@@ -354,7 +355,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
 		if (distance < (d_LJcutoff * radSum)) {
-			forceShift = calcLJForceShift(radSum);
+			forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
 			return 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		} else {
 			return 0;
@@ -409,7 +410,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
 		if (distance < (d_LJcutoff * radSum)) {
-			forceShift = calcDoubleLJForceShift(epsilon, radSum);
+			forceShift = epsilon * d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 			return 24 * epsilon * (2 * ratio12 -  ratio6) / distance - forceShift;
 		} else {
 			return 0;
@@ -489,7 +490,7 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
 	if (distance < (d_LJcutoff * radSum)) {
-		forceShift = calcLJForceShift(radSum);
+		forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 	} else {
@@ -598,7 +599,7 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
 	if (distance < (d_LJcutoff * radSum)) {
-		forceShift = calcDoubleLJForceShift(epsilon, radSum);
+		forceShift = epsilon * d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 		gradMultiple = 24 * epsilon * (2 * ratio12 - ratio6) / distance - forceShift;
 		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 	} else {
@@ -723,7 +724,7 @@ inline __device__ double calcLJYforce(const double* thisPos, const double* other
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
 	if (distance < (d_LJcutoff * radSum)) {
-		forceShift = calcLJForceShift(radSum);
+		forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 	}
 	if (gradMultiple != 0) {

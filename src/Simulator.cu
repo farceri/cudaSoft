@@ -381,7 +381,7 @@ void SoftParticleFlow::updatePosition(double timeStep) {
 void SoftParticleNVE::integrate() {
   updateVelocity(0.5 * sp_->dt);
   updatePosition(sp_->dt);
-  //sp_->checkParticleNeighbors();
+  sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
   //conserveMomentum();

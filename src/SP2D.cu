@@ -663,7 +663,7 @@ double SP2D::getParticleMSD() {
   return thrust::reduce(d_particleDelta.begin(), d_particleDelta.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
-double SP2D::setDisplacementCutoff(double cutoff_) {
+double SP2D::setDisplacementCutoff(double cutoff_, double size_) {
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
     cutDistance = 1;
@@ -687,7 +687,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * 2 * getMeanParticleSigma();
+  cutoff = cutoff_ * size_;
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }
@@ -990,7 +990,10 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   LJecut = 4 * ec * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " energy shift: " << LJecut << endl;
+  double ratio6 = pow(LJcutoff, 6);
+	LJfshift = 24 * ec * (2 / ratio6 - 1) / (LJcutoff * ratio6);
+  cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
+  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
@@ -1004,9 +1007,13 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_eBB, &eBB, sizeof(eBB));
   LJecut = 4 * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
+  double ratio6 = pow(LJcutoff, 6);
+	LJfshift = 24 * (2 / ratio6 - 1) / (LJcutoff * ratio6);
+  cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
-  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " num1: " << num1 << endl;
+  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB;
+  cout << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " LJfshift: " << LJfshift << " num1: " << num1 << endl;
 }
 
 void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {

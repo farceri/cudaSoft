@@ -69,7 +69,7 @@ public:
   // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
-  double LJcutoff, LJecut;
+  double LJcutoff, LJecut, LJfshift;
   // double Lennard-Jones constants
   double eAA, eAB, eBB;
   long num1;
@@ -233,7 +233,7 @@ public:
 
   double getParticleMSD();
 
-  double setDisplacementCutoff(double cutoff_);
+  double setDisplacementCutoff(double cutoff_, double size_);
 
   void resetUpdateCount();
 

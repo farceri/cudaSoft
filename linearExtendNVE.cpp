@@ -146,10 +146,6 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
-          //timeDir = currentDir + "/t" + std::to_string(step) + "/";
-          //std::experimental::filesystem::create_directory(timeDir);
-          //ioSP.saveParticlePacking(timeDir);
-          //ioSP.saveParticleNeighbors(timeDir);
         }
       }
       step += 1;
