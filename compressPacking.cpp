@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double mass = 1, LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]);
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.8;
-  double cutDistance, cutoff = 1.5, timeStep, timeUnit, sigma, lx = atof(argv[5]), ly = atof(argv[6]), gravity = 9.8e-04;
+  double cutDistance, cutoff = 0.2, timeStep, timeUnit, sigma, lx = atof(argv[5]), ly = atof(argv[6]), gravity = 9.8e-04;
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
         }
       }
       //sp.calcParticleNeighborList(cutDistance);
-      //sp.checkParticleNeighbors();
+      sp.checkParticleNeighbors();
       step += 1;
     }
     prevEnergy = sp.getParticleEnergy();

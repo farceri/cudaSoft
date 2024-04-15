@@ -678,7 +678,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     cutDistance = LJcutoff;
     break;
     case simControlStruct::potentialEnum::adhesive:
-    cutDistance = l2;
+    cutDistance = 1 + l2;
     break;
     case simControlStruct::potentialEnum::doubleLJ:
     cutDistance = LJcutoff;
@@ -687,7 +687,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * getMinParticleSigma();
+  cutoff = cutoff_ * 2 * getMeanParticleSigma();
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }

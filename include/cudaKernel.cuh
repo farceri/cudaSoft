@@ -353,7 +353,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio = radSum / distance;
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
-		if (distance <= (d_LJcutoff * radSum)) {
+		if (distance < (d_LJcutoff * radSum)) {
 			forceShift = calcLJForceShift(radSum);
 			return 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		} else {
@@ -364,7 +364,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio = radSum / distance;
 		ration = pow(ratio, d_nPower);
 		ratiom = pow(ratio, d_mPower);
-		if (distance <= (d_LJcutoff * radSum)) {
+		if (distance < (d_LJcutoff * radSum)) {
 			forceShift = calcMieForceShift(radSum);
 			return d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
 		} else {
@@ -375,7 +375,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio = radSum / distance;
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
-		if (distance <= (WCAcut * radSum)) {
+		if (distance < (WCAcut * radSum)) {
 			return 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		} else {
 			return 0;
@@ -408,7 +408,7 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		ratio = radSum / distance;
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
-		if (distance <= (d_LJcutoff * radSum)) {
+		if (distance < (d_LJcutoff * radSum)) {
 			forceShift = calcDoubleLJForceShift(epsilon, radSum);
 			return 24 * epsilon * (2 * ratio12 -  ratio6) / distance - forceShift;
 		} else {
@@ -464,7 +464,7 @@ inline __device__ double calcWallWCAInteraction(const double* thisPos, const dou
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (WCAcut * radSum)) {
+	if (distance < (WCAcut * radSum)) {
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
 	} else {
@@ -488,10 +488,10 @@ inline __device__ double calcLJInteraction(const double* thisPos, const double* 
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (d_LJcutoff * radSum)) {
+	if (distance < (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
-		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut + forceShift * (distance - d_LJcutoff * radSum));
+		epot = 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 	} else {
 		epot = 0.;
 	}
@@ -511,7 +511,7 @@ inline __device__ double calcWCAInteraction(const double* thisPos, const double*
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (WCAcut * radSum)) {
+	if (distance < (WCAcut * radSum)) {
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		epot = 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
 	} else {
@@ -535,10 +535,10 @@ inline __device__ double calcMieInteraction(const double* thisPos, const double*
 	ratio = radSum / distance;
 	ration = pow(ratio, d_nPower);
 	ratiom = pow(ratio, d_mPower);
-	if (distance <= (d_LJcutoff * radSum)) {
+	if (distance < (d_LJcutoff * radSum)) {
 		forceShift = calcMieForceShift(radSum);
 		gradMultiple =  d_mieConstant * d_ec * (d_nPower * ration - d_mPower * ratiom) / distance - forceShift;
-		epot = 0.5 * (d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut) + forceShift * (distance - d_LJcutoff * radSum));
+		epot = 0.5 * (d_mieConstant * d_ec * ((ration - ratiom) - d_Miecut) - abs(forceShift) * (distance - d_LJcutoff * radSum));
 	} else {
 		epot = 0.;
 	}
@@ -597,10 +597,10 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (d_LJcutoff * radSum)) {
+	if (distance < (d_LJcutoff * radSum)) {
 		forceShift = calcDoubleLJForceShift(epsilon, radSum);
 		gradMultiple = 24 * epsilon * (2 * ratio12 - ratio6) / distance - forceShift;
-		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut + forceShift * (distance - d_LJcutoff * radSum));
+		epot = 0.5 * (4 * epsilon * (ratio12 - ratio6) - epsilon * d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 	} else {
 		epot = 0.;
 	}
@@ -722,7 +722,7 @@ inline __device__ double calcLJYforce(const double* thisPos, const double* other
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (d_LJcutoff * radSum)) {
+	if (distance < (d_LJcutoff * radSum)) {
 		forceShift = calcLJForceShift(radSum);
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 	}
@@ -740,7 +740,7 @@ inline __device__ double calcWCAYforce(const double* thisPos, const double* othe
 	ratio = radSum / distance;
 	ratio6 = pow(ratio, 6);
 	ratio12 = ratio6 * ratio6;
-	if (distance <= (WCAcut * radSum)) {
+	if (distance < (WCAcut * radSum)) {
 		gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 	}
 	if (gradMultiple != 0) {
@@ -1321,17 +1321,17 @@ __global__ void kernelCalcParticleVelSquared(const double* pVel, double* velSq) 
 	}
 }
 
-__global__ void kernelCalcParticleDisplacement(const double* pPos, const double* pPreviousPos, double* pDisp) {
+__global__ void kernelCalcParticleDisplacement(const double* pPos, const double* pLastPos, double* pDisp) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		pDisp[particleId] = calcDistance(&pPos[particleId*d_nDim], &pPreviousPos[particleId*d_nDim]);
+		pDisp[particleId] = calcDistance(&pPos[particleId*d_nDim], &pLastPos[particleId*d_nDim]);
 	}
 }
 
-__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pPreviousPos, int* flag, double cutoff) {
+__global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pLastPos, int* flag, double cutoff) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double displacement = calcDistance(&pPos[particleId*d_nDim], &pPreviousPos[particleId*d_nDim]);
+		double displacement = calcDistance(&pPos[particleId*d_nDim], &pLastPos[particleId*d_nDim]);
 		if(2 * displacement > cutoff) {
 			flag[particleId] = 1;
 		}
