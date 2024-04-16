@@ -233,7 +233,7 @@ public:
 
   double getParticleMSD();
 
-  double setDisplacementCutoff(double cutoff_, double size_);
+  double setDisplacementCutoff(double cutoff_);
 
   void resetUpdateCount();
 

@@ -73,6 +73,10 @@ SP2D::SP2D(long nParticles, long dim) {
   // particle variables
   initParticleVariables(numParticles);
   initParticleDeltaVariables(numParticles);
+  // initialize contacts and neighbors
+  //initContacts(numParticles);
+  initParticleNeighbors(numParticles);
+  syncParticleNeighborsToDevice();
   if(cudaGetLastError()) cout << "SP2D():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
@@ -131,8 +135,8 @@ void SP2D::initContacts(long numParticles_) {
 }
 
 void SP2D::initParticleNeighbors(long numParticles_) {
-  partNeighborListSize = 2;
-  partMaxNeighbors = 2;
+  partNeighborListSize = 0;
+  partMaxNeighbors = 0;
   d_partNeighborList.resize(numParticles_);
   d_partMaxNeighborList.resize(numParticles_);
   thrust::fill(d_partNeighborList.begin(), d_partNeighborList.end(), -1L);
@@ -176,11 +180,6 @@ simControlStruct::geometryEnum SP2D::getGeometryType() {
 void SP2D::setNeighborType(simControlStruct::neighborEnum neighborType_) {
 	simControl.neighborType = neighborType_;
   if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
-    // initialize contacts and neighbors
-    //initContacts(numParticles);
-    initParticleNeighbors(numParticles);
-    cout << "neighbors initialized" << endl;
-    syncParticleNeighborsToDevice();
     cout << "SP2D: setNeighborType: neighborType: neighbor" << endl;
   } else if(simControl.neighborType == simControlStruct::neighborEnum::allToAll) {
     cout << "SP2D: setNeighborType: neighborType: allToAll" << endl;
@@ -648,7 +647,7 @@ double SP2D::getParticleMSD() {
   return thrust::reduce(d_particleDelta.begin(), d_particleDelta.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
-double SP2D::setDisplacementCutoff(double cutoff_, double size_) {
+double SP2D::setDisplacementCutoff(double cutoff_) {
   switch (simControl.potentialType) {
     case simControlStruct::potentialEnum::harmonic:
     cutDistance = 1;
@@ -672,7 +671,7 @@ double SP2D::setDisplacementCutoff(double cutoff_, double size_) {
     break;
   }
   cutDistance += cutoff_; // adimensional because it is used for the overlap (gap) between two particles
-  cutoff = cutoff_ * size_;
+  cutoff = cutoff_ * 2 * getMeanParticleSigma();
   cout << "SP2D::setDisplacementCutoff - cutDistance: " << cutDistance << " cutoff: " << cutoff << endl;
   return cutDistance;
 }

@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(currentDir);
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
-    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
     cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;

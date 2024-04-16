@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   cout << "initial velocity on particle 1: " << vel1 << " time step: " << timeStep << endl;
   // initialize simulation
   if(sp.getNeighborType() == simControlStruct::neighborEnum::neighbor) {
-    cutDistance = sp.setDisplacementCutoff(cutoff, sigma0);
+    cutDistance = sp.setDisplacementCutoff(cutoff);
     sp.calcParticleNeighbors(cutDistance);
   }
   sp.calcParticleForceEnergy();
