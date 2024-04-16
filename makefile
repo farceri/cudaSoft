@@ -54,11 +54,11 @@ INC_DIR = include
 # Target executable name:
 
 #EXE = testSP
-EXE = testInteraction
+#EXE = testInteraction
 
 # make packings
 #EXE = jamPacking
-#EXE = compressPacking
+EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature

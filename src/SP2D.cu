@@ -8,6 +8,7 @@
 #include "../include/cudaKernel.cuh"
 #include "../include/Simulator.h"
 #include "../include/FIRE.h"
+#include "../include/cached_allocator.cuh"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -72,34 +73,10 @@ SP2D::SP2D(long nParticles, long dim) {
   // particle variables
   initParticleVariables(numParticles);
   initParticleDeltaVariables(numParticles);
-  // initialize contacts and neighbors
-  initContacts(numParticles);
-  initParticleNeighbors(numParticles);
-  syncParticleNeighborsToDevice();
+  if(cudaGetLastError()) cout << "SP2D():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
-SP2D::~SP2D() {
-	// clear all vectors and pointers
-	d_boxSize.clear();
-  d_stress.clear();
-  d_particleRad.clear();
-  d_particlePos.clear();
-  d_particleVel.clear();
-  d_particleForce.clear();
-  d_particleEnergy.clear();
-  d_particleAngle.clear();
-  // delta variables
-  d_particleInitPos.clear();
-  d_particleLastPos.clear();
-  d_particleDelta.clear();
-  d_particleDisp.clear();
-  // contacts and neighbors
-  d_contactList.clear();
-  d_numContacts.clear();
-  d_contactVectorList.clear();
-  d_partNeighborList.clear();
-  d_partMaxNeighborList.clear();
-}
+SP2D::~SP2D() {}
 
 double SP2D::checkGPUMemory() {
   int device;
@@ -154,8 +131,8 @@ void SP2D::initContacts(long numParticles_) {
 }
 
 void SP2D::initParticleNeighbors(long numParticles_) {
-  partNeighborListSize = 0;
-  partMaxNeighbors = 0;
+  partNeighborListSize = 2;
+  partMaxNeighbors = 2;
   d_partNeighborList.resize(numParticles_);
   d_partMaxNeighborList.resize(numParticles_);
   thrust::fill(d_partNeighborList.begin(), d_partNeighborList.end(), -1L);
@@ -199,11 +176,16 @@ simControlStruct::geometryEnum SP2D::getGeometryType() {
 void SP2D::setNeighborType(simControlStruct::neighborEnum neighborType_) {
 	simControl.neighborType = neighborType_;
   if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
-    cout << "SP2D: setneighborType: neighborType: neighbor" << endl;
+    // initialize contacts and neighbors
+    //initContacts(numParticles);
+    initParticleNeighbors(numParticles);
+    cout << "neighbors initialized" << endl;
+    syncParticleNeighborsToDevice();
+    cout << "SP2D: setNeighborType: neighborType: neighbor" << endl;
   } else if(simControl.neighborType == simControlStruct::neighborEnum::allToAll) {
-    cout << "SP2D: setneighborType: neighborType: allToAll" << endl;
+    cout << "SP2D: setNeighborType: neighborType: allToAll" << endl;
   } else {
-    cout << "SP2D: setneighborType: please specify valid neighborType: neighbor or allToAll" << endl;
+    cout << "SP2D: setNeighborType: please specify valid neighborType: neighbor or allToAll" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -571,11 +553,13 @@ thrust::host_vector<double> SP2D::getPBCParticlePositions() {
 }
 
 void SP2D::resetLastPositions() {
-  d_particleLastPos = getParticlePositions();
+  cudaDeviceSynchronize();
+  d_particleLastPos = d_particlePos;
 }
 
 void SP2D::setInitialPositions() {
-  d_particleInitPos = getParticlePositions();
+  cudaDeviceSynchronize();
+  d_particleInitPos = d_particlePos;
 }
 
 thrust::host_vector<double> SP2D::getLastPositions() {
@@ -585,6 +569,7 @@ thrust::host_vector<double> SP2D::getLastPositions() {
 }
 
 void SP2D::resetLastVelocities() {
+  cudaDeviceSynchronize();
   d_particleLastVel = d_particleVel;
 }
 
@@ -1085,7 +1070,7 @@ void SP2D::calcParticleInteraction() {
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
-  // compute particle interaction
+  //cout << "dimGrid, dimBlock: " << dimGrid << ", " << dimBlock << endl;
   switch (simControl.neighborType) {
     case simControlStruct::neighborEnum::neighbor:
     kernelCalcParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
@@ -1098,14 +1083,12 @@ void SP2D::calcParticleInteraction() {
   }
 }
 
-void SP2D::checkParticleWallInteraction() {
+void SP2D::addParticleWallInteraction() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
   switch (simControl.geometryType) {
-    case simControlStruct::geometryEnum::normal:
-    break;
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
 		break;
@@ -1120,28 +1103,28 @@ void SP2D::checkParticleWallInteraction() {
 	}
 }
 
-void SP2D::checkGravity() {
+void SP2D::addParticleGravity() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+  kernelAddParticleGravity<<<dimGrid, dimBlock>>>(pPos, pForce, pEnergy);
+}
+
+void SP2D::calcParticleForceEnergy() {
+  calcParticleInteraction();
+  if(simControl.geometryType != simControlStruct::geometryEnum::normal) {
+    addParticleWallInteraction();
+  }
   switch (simControl.gravityType) {
     case simControlStruct::gravityEnum::on:
-    kernelAddParticleGravity<<<dimGrid, dimBlock>>>(pPos, pForce, pEnergy);
-    break;
-    case simControlStruct::gravityEnum::off:
+    addParticleGravity();
     break;
     default:
     break;
   }
 }
 
-void SP2D::calcParticleForceEnergy() {
-  calcParticleInteraction();
-  checkParticleWallInteraction();
-  checkGravity();
-}
-
-void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double vel1) {
+void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
   int pId;
   thrust::host_vector<double> boxSize(nDim);
   // set particle radii
@@ -1154,22 +1137,14 @@ void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, do
   for (pId = 0; pId < numParticles; pId++) {
     d_particlePos[pId * nDim] = lx * 0.5;
   }
-  d_particlePos[0 * nDim + 1] = ly * 0.25;
-  d_particlePos[1 * nDim + 1] = ly * 0.55;
+  d_particlePos[0 * nDim + 1] = ly * y0;
+  d_particlePos[1 * nDim + 1] = ly * y1;
   // assign velocity
   d_particleVel[1 * nDim + 1] = vel1;
   setLengthScaleToOne();
 }
 
-void SP2D::testInteraction(double timeStep) {
-  //int pId, dim;
-  // move particle A at constant velocity while keeping particle B fixed
-  //for (pId = 0; pId = numParticles; pId++) {
-  //  for (dim = 0; dim < nDim; dim++) {
-  //    d_particleVel[pId * nDim + dim] += 0.5 * timeStep * d_particleForce[pId * nDim + dim];
-  //    d_particlePos[pId * nDim + dim] += timeStep * d_particleVel[pId * nDim + dim];
-  //  }
-  //}
+void SP2D::firstUpdate(double timeStep) {
   int s_nDim(nDim);
   double s_dt(timeStep);
   auto r = thrust::counting_iterator<long>(0);
@@ -1186,25 +1161,47 @@ void SP2D::testInteraction(double timeStep) {
   };
 
   thrust::for_each(r, r + numParticles, firstUpdate);
+}
 
-  checkParticleNeighbors();
-  calcParticleForceEnergy();
+void SP2D::secondUpdate(double timeStep) {
+  int s_nDim(nDim);
+  double s_dt(timeStep);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	const double* pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 
-  auto s = thrust::counting_iterator<long>(0);
-
-  auto secondUpdate = [=] __device__ (long pId) {
+  auto firstUpdate = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
       pVel[pId * s_nDim + dim] += 0.5 * s_dt * pForce[pId * s_nDim + dim];
     }
   };
-  thrust::for_each(s, s + numParticles, secondUpdate);
 
-  //for (pId = 0; pId = numParticles; pId++) {
-  //  for (dim = 0; dim < nDim; dim++) {
-  //    d_particleVel[pId * nDim + dim] += 0.5 * timeStep * d_particleForce[pId * nDim + dim];
-  //  }
-  //}
+  thrust::for_each(r, r + numParticles, firstUpdate);
+}
+
+void SP2D::testInteraction(double timeStep) {
+  firstUpdate(timeStep);
+  checkParticleNeighbors();
+  calcParticleForceEnergy();
+  secondUpdate(timeStep);
+}
+
+void SP2D::printTwoParticles() {
+  cudaDeviceSynchronize();
+  if(cudaGetLastError) cout << "SP2D::printTwoParticles:: cudaGetLastError(): " << cudaGetLastError() << endl;
+  thrust::host_vector<double> particleForce(d_particleForce.size(), 0.0);
+  thrust::host_vector<double> particleVel(d_particleForce.size(), 0.0);
+  thrust::host_vector<double> particlePos(d_particleForce.size(), 0.0);
+  particleForce = d_particleForce;
+  particleVel = d_particleVel;
+  particlePos = d_particlePos;
+  cout << "particle 0: fx: " << particleForce[0] << " fy: " << particleForce[1] << endl;
+  cout << "particle 0: vx: " << particleVel[0] << " vy: " << particleVel[1] << endl;
+  cout << "particle 0: x: " << particlePos[0] << " y: " << particlePos[1] << endl;
+  cout << "particle 1: fx: " << particleForce[2] << " fy: " << particleForce[3] << endl;
+  cout << "particle 1: vx: " << particleVel[2] << " vy: " << particleVel[3] << endl;
+  cout << "particle 1: x: " << particlePos[2] << " y: " << particlePos[3] << endl;
 }
 
  void SP2D::makeExternalParticleForce(double externalForce) {
@@ -1473,7 +1470,6 @@ void SP2D::calcParticleNeighbors(double cutDistance) {
   switch (simControl.neighborType) {
     case simControlStruct::neighborEnum::neighbor:
     calcParticleNeighborList(cutDistance);
-    //checkParticleMaxDisplacement();
     break;
     case simControlStruct::neighborEnum::allToAll:
     break;
@@ -1491,6 +1487,7 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
 
   kernelCalcParticleNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, cutDistance);
   // compute maximum number of neighbors per particle
+  if(cudaGetLastError()) cout << "SP2D::calcParticleNeighborList():: cudaGetLastError(): " << cudaGetLastError() << endl;
   partMaxNeighbors = thrust::reduce(d_partMaxNeighborList.begin(), d_partMaxNeighborList.end(), -1L, thrust::maximum<long>());
   syncParticleNeighborsToDevice();
   //cout << "SP2D::calcParticleNeighborList: maxNeighbors: " << partMaxNeighbors << endl;
@@ -1509,6 +1506,7 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
 }
 
 void SP2D::syncParticleNeighborsToDevice() {
+  cudaDeviceSynchronize();
 	//Copy the pointers and information about neighbors to the gpu
 	cudaMemcpyToSymbol(d_partNeighborListSize, &partNeighborListSize, sizeof(partNeighborListSize));
 	cudaMemcpyToSymbol(d_partMaxNeighbors, &partMaxNeighbors, sizeof(partMaxNeighbors));
@@ -1518,6 +1516,7 @@ void SP2D::syncParticleNeighborsToDevice() {
 
 	long* partNeighborList = thrust::raw_pointer_cast(&d_partNeighborList[0]);
 	cudaMemcpyToSymbol(d_partNeighborListPtr, &partNeighborList, sizeof(partNeighborList));
+  if(cudaGetLastError()) cout << "SP2D::syncParticleNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
 void SP2D::calcParticleBoxNeighborList(double cutDistance) {

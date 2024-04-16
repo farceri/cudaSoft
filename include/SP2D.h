@@ -298,15 +298,21 @@ public:
   // particle functions
   void calcParticleInteraction();
 
-  void checkParticleWallInteraction();
+  void addParticleWallInteraction();
 
-  void checkGravity();
+  void addParticleGravity();
 
   void calcParticleForceEnergy();
 
-  void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double vel1);
+  void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
+
+  void firstUpdate(double timeStep);
+
+  void secondUpdate(double timeStep);
 
   void testInteraction(double timeStep);
+
+  void printTwoParticles();
 
   //void calcParticleBoundaryForceEnergy();
 

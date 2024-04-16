@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
     cutDistance = sp.setDisplacementCutoff(cutoff, sigma);
-    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     sp.resetUpdateCount();
     sp.setInitialPositions();
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     energyFile = currentDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
     cutDistance = sp.setDisplacementCutoff(cutoff, size);
-    sp.calcParticleNeighborList(cutDistance);
+    sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     sp.resetUpdateCount();
     sp.setInitialPositions();
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
     step = 0;
     // remove energy injected by compression
     if(nve == true && searchStep != 0) {
-      sp.calcParticleNeighborList(cutDistance);
+      sp.calcParticleNeighbors(cutDistance);
       sp.calcParticleForceEnergy();
       cout << "Energy after compression - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       sp.adjustKineticEnergy(prevEnergy);

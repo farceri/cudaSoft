@@ -266,16 +266,16 @@ inline __device__ void getParticlePos(const long pId, const double* pPos, double
 }
 
 inline __device__ bool extractOtherParticle(const long particleId, const long otherId, const double* pPos, const double* pRad, double* otherPos, double& otherRad) {
-	if ((particleId != otherId) && (otherId != -1)) {
+	if (particleId != otherId) {
 		getParticlePos(otherId, pPos, otherPos);
-		otherRad = pRad[particleId];
+		otherRad = pRad[otherId];
     	return true;
   	}
   	return false;
 }
 
 inline __device__ bool extractOtherParticlePos(const long particleId, const long otherId, const double* pPos, double* otherPos) {
-	if ((particleId != otherId) && (otherId != -1)) {
+	if (particleId != otherId) {
 		getParticlePos(otherId, pPos, otherPos);
     	return true;
   	}
@@ -433,12 +433,13 @@ inline __device__ double calcContactInteraction(const double* thisPos, const dou
 	if (overlap > 0) {
 		gradMultiple = d_ec * overlap / radSum;
 		#pragma unroll (MAXDIM)
-	  for (long dim = 0; dim < d_nDim; dim++) {
-	    currentForce[dim] += gradMultiple * delta[dim] / distance;
-	  }
-	  return (0.5 * d_ec * overlap * overlap) * 0.5;
+		for (long dim = 0; dim < d_nDim; dim++) {
+			currentForce[dim] += gradMultiple * delta[dim] / distance;
+		}
+	  	return (0.5 * d_ec * overlap * overlap) * 0.5;
 	}
 	return 0.;
+	__syncthreads();
 }
 
 inline __device__ double calcWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce) {
@@ -450,10 +451,10 @@ inline __device__ double calcWallContactInteraction(const double* thisPos, const
 	if (overlap > 0) {
 		gradMultiple = d_ew * overlap / radSum;
 		#pragma unroll (MAXDIM)
-	  for (long dim = 0; dim < d_nDim; dim++) {
-	    currentForce[dim] += gradMultiple * delta[dim] / distance;
-	  }
-	  return (0.5 * d_ew * overlap * overlap);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			currentForce[dim] += gradMultiple * delta[dim] / distance;
+		}
+		return (0.5 * d_ew * overlap * overlap);
 	}
 	return 0.;
 }
@@ -661,6 +662,7 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
+		//printf("particleId %ld\n", particleId);
     	double thisRad, otherRad, radSum;
 		double thisPos[MAXDIM], otherPos[MAXDIM];
 		// zero out the force and get particle positions
@@ -672,9 +674,9 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
 		pEnergy[particleId] = 0;
 		// interaction between vertices of neighbor particles
 		for (long otherId = 0; otherId < d_numParticles; otherId++) {
-			//printf("numParticles: %ld otherId %ld particleId %ld\n", d_numParticles, otherId, particleId);
 			if (extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				radSum = thisRad + otherRad;
+				//printf("numParticles: %ld otherId %ld particleId %ld radSum %lf\n", d_numParticles, otherId, particleId, radSum);
 				switch (d_simControl.potentialType) {
 					case simControlStruct::potentialEnum::harmonic:
 					pEnergy[particleId] += calcContactInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
@@ -690,10 +692,12 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
 					break;
 					case simControlStruct::potentialEnum::doubleLJ:
 					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
+					printf("particleId %ld otherId %ld energy %lf \n", particleId, otherId, pEnergy[particleId]);
 					break;
 					default:
 					break;
 				}
+				//if(pEnergy[particleId] != 0) printf("particleId %ld otherId %ld pForce[particleId] %e %e\n", particleId, otherId, pForce[particleId * d_nDim], pForce[particleId * d_nDim + 1]);
 				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
 			}
 		}
@@ -1226,7 +1230,7 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
 				//isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
 				if (addedNeighbor < d_partNeighborListSize) {
 					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
-					//if(isNeighbor == true && particleId == 116) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
+					if(isNeighbor == true) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
 				}
 				addedNeighbor += isNeighbor;
 			}

@@ -21,12 +21,12 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-  bool read = true, readState = true, saveFinal = true, linSave = true;
+  bool read = false, readState = false, saveFinal = false, linSave = true;
   bool lj = true, wca = false, alltoall = true, fixedbc = false;
   long step = 0, numParticles = 2, nDim = 2, maxStep = atof(argv[3]), updateCount = 0;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  double ec = 1, LJcut = 4, cutoff = 2, cutDistance, timeStep = atof(argv[2]), sigma, timeUnit, size;
-  double sigma0 = 1, sigma1 = 1, lx = 10, ly = 10, vel1 = -0.2;
+  double ec = 1, LJcut = 4, cutoff = 0.2, cutDistance, timeStep = atof(argv[2]), sigma, timeUnit, size;
+  double sigma0 = 1, sigma1 = 1, lx = 10, ly = 10, vel1 = -0.1, y0 = 0.2, y1 = 0.7;
   std::string outDir, energyFile, inDir = argv[1], currentDir, dirSample;
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if (read == true) {//keep running the same dynamics
+    cout << "Read packing" << endl;
     inDir = inDir + dirSample;
     outDir = inDir;
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
@@ -60,26 +61,29 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {//start a new dyanmics
+    cout << "Initialize new packing" << endl;
+    sp.setTwoParticleTestPacking(sigma0, sigma1, lx, ly, y0, y1, vel1);
+    sp.printTwoParticles();
     if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
       std::experimental::filesystem::create_directory(inDir + dirSample);
     }
     outDir = inDir + dirSample;
   }
   std::experimental::filesystem::create_directory(outDir);
-  sp.setTwoParticleTestPacking(sigma0, sigma1, lx, ly, vel1);
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
   timeUnit = sigma0;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
+  cout << "Units - time: " << timeUnit << " space: " << sigma0 << endl;
   cout << "initial velocity on particle 1: " << vel1 << " time step: " << timeStep << endl;
   // initialize simulation
-  cutDistance = sp.setDisplacementCutoff(cutoff, sigma0);
-  sp.calcParticleNeighbors(cutDistance);
+  if(sp.getNeighborType() == simControlStruct::neighborEnum::neighbor) {
+    cutDistance = sp.setDisplacementCutoff(cutoff, sigma0);
+    sp.calcParticleNeighbors(cutDistance);
+  }
   sp.calcParticleForceEnergy();
-  cout << " Initial energy: " << sp.getParticleEnergy() << endl;
   sp.resetUpdateCount();
   sp.setInitialPositions();
   // record simulation time
