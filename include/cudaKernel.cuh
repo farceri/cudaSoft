@@ -618,7 +618,7 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 __global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-		long otherId; 
+		long otherId;
     	double thisRad, otherRad, radSum;
 		double thisPos[MAXDIM], otherPos[MAXDIM];
 		// zero out the force and get particle positions

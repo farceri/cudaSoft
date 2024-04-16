@@ -297,12 +297,16 @@ public:
 
   // particle functions
   void calcParticleInteraction();
-  
+
   void checkParticleWallInteraction();
 
   void checkGravity();
 
   void calcParticleForceEnergy();
+
+  void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double vel1);
+
+  void testInteraction(double timeStep);
 
   //void calcParticleBoundaryForceEnergy();
 
@@ -359,6 +363,8 @@ public:
 
   // contacts and neighbors
   thrust::host_vector<long> getParticleNeighbors();
+
+  void calcParticleNeighbors(double cutDistance);
 
   void calcParticleNeighborList(double cutDistance);
 

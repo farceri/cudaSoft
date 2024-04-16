@@ -1141,6 +1141,72 @@ void SP2D::calcParticleForceEnergy() {
   checkGravity();
 }
 
+void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double vel1) {
+  int pId;
+  thrust::host_vector<double> boxSize(nDim);
+  // set particle radii
+  d_particleRad[0] = 0.5 * sigma0;
+  d_particleRad[1] = 0.5 * sigma1;
+  boxSize[0] = lx;
+  boxSize[1] = ly;
+  setBoxSize(boxSize);
+  // assign positions
+  for (pId = 0; pId < numParticles; pId++) {
+    d_particlePos[pId * nDim] = lx * 0.5;
+  }
+  d_particlePos[0 * nDim + 1] = ly * 0.25;
+  d_particlePos[1 * nDim + 1] = ly * 0.55;
+  // assign velocity
+  d_particleVel[1 * nDim + 1] = vel1;
+  setLengthScaleToOne();
+}
+
+void SP2D::testInteraction(double timeStep) {
+  //int pId, dim;
+  // move particle A at constant velocity while keeping particle B fixed
+  //for (pId = 0; pId = numParticles; pId++) {
+  //  for (dim = 0; dim < nDim; dim++) {
+  //    d_particleVel[pId * nDim + dim] += 0.5 * timeStep * d_particleForce[pId * nDim + dim];
+  //    d_particlePos[pId * nDim + dim] += timeStep * d_particleVel[pId * nDim + dim];
+  //  }
+  //}
+  int s_nDim(nDim);
+  double s_dt(timeStep);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	const double* pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+
+  auto firstUpdate = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] += 0.5 * s_dt * pForce[pId * s_nDim + dim];
+      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, firstUpdate);
+
+  checkParticleNeighbors();
+  calcParticleForceEnergy();
+
+  auto s = thrust::counting_iterator<long>(0);
+
+  auto secondUpdate = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] += 0.5 * s_dt * pForce[pId * s_nDim + dim];
+    }
+  };
+  thrust::for_each(s, s + numParticles, secondUpdate);
+
+  //for (pId = 0; pId = numParticles; pId++) {
+  //  for (dim = 0; dim < nDim; dim++) {
+  //    d_particleVel[pId * nDim + dim] += 0.5 * timeStep * d_particleForce[pId * nDim + dim];
+  //  }
+  //}
+}
+
  void SP2D::makeExternalParticleForce(double externalForce) {
    // extract +-1 random forces
    d_particleDelta.resize(numParticles);
@@ -1401,6 +1467,19 @@ thrust::host_vector<long> SP2D::getParticleNeighbors() {
   thrust::host_vector<long> partNeighborListFromDevice;
   partNeighborListFromDevice = d_partNeighborList;
   return partNeighborListFromDevice;
+}
+
+void SP2D::calcParticleNeighbors(double cutDistance) {
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    calcParticleNeighborList(cutDistance);
+    //checkParticleMaxDisplacement();
+    break;
+    case simControlStruct::neighborEnum::allToAll:
+    break;
+    default:
+    break;
+  }
 }
 
 void SP2D::calcParticleNeighborList(double cutDistance) {

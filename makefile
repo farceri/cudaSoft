@@ -54,6 +54,7 @@ INC_DIR = include
 # Target executable name:
 
 #EXE = testSP
+EXE = testInteraction
 
 # make packings
 #EXE = jamPacking
@@ -63,7 +64,7 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-EXE = runNVE
+#EXE = runNVE
 #EXE = runNVE2LJ
 #EXE = runNPT
 #EXE = runActiveLJ

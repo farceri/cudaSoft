@@ -448,6 +448,7 @@ public:
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+    save2DFile(dirName + "particleForce.dat", sp_->getParticleForces(), sp_->nDim);
   }
 
   void saveParticleActiveState(string dirName) {
