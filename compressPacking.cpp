@@ -24,10 +24,10 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, lj = true, wca = false;
-  bool gforce = false, fixedbc = false, alltoall = false, nve = true;
+  bool gforce = false, fixedbc = false, alltoall = false, nve = false;
   long numParticles = atol(argv[4]), nDim = 2;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e06, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0, num1;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double mass = 1, LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
     // equilibrate dynamics
     step = 0;
     // remove energy injected by compression
-    if(nve == true && searchStep != 0) {
+    if(searchStep != 0) {
       sp.calcParticleNeighbors(cutDistance);
       sp.calcParticleForceEnergy();
       cout << "Energy after compression - E/N: " << sp.getParticleEnergy() / numParticles << endl;

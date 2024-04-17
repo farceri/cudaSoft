@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
       dirSample = "compress";
     }
   } else if(biaxial == true) {
-    dirSample = "biaxial";
+    dirSample = "biaxial-extend";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
