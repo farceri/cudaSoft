@@ -23,25 +23,29 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel, doubleT = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, scaleVel = false, doubleScaleVel = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double LJcut = 4, cutoff = 1, cutDistance, waveQ, timeStep = atof(argv[2]);
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]), sigma, timeUnit;
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
+  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   std::tuple<double, double> Temps;
-  dirSample = whichDynamics + "/";//+ "T" + argv[3] + 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  //sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-  sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  }
   sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
   sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  if(alltoall == true) {
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  }
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -52,8 +56,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics1/";
-        //outDir = outDir + "T1-" + argv[3] + "-T2-" + argv[8] + "/";
+        outDir = outDir + "dynamics/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -65,6 +68,7 @@ int main(int argc, char **argv) {
     }
   } else {//start a new dyanmics
     if(readAndMakeNewDir == true) {
+      scaleVel = true;
       readState = true;
       outDir = inDir + "../../" + dirSample;
     } else {
@@ -87,23 +91,27 @@ int main(int argc, char **argv) {
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
-  if(doubleScaleVel == true) {
+  if(scaleVel == true) {
+    if(doubleT == true) {
     cout << "T1: " << Tinject << " T2: " << Tinject2 << " time step: " << timeStep << endl;
-  } else if(readState == false) {
+    } else {
     cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
+    }
   } else {
     cout << "Reading state - time step: " << timeStep << endl;
   }
   // initialize simulation
   if(scaleVel == true) {
-    sp.initSoftParticleNVERescale(Tinject);
-  } else if(doubleScaleVel == true) {
-    sp.initSoftParticleNVEDoubleRescale(Tinject, Tinject2);
+    if(doubleT == true) {
+      sp.initSoftParticleNVEDoubleRescale(Tinject, Tinject2);
+    } else {
+      sp.initSoftParticleNVERescale(Tinject);
+    }
   } else {
     sp.initSoftParticleNVE(Tinject, readState);
   }
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
   sp.setInitialPositions();
@@ -119,14 +127,16 @@ int main(int argc, char **argv) {
   ioSP.saveParticleNeighbors(outDir);
   while(step != maxStep) {
     if(scaleVel == true) {
-      sp.softParticleNVERescaleLoop();
-    } else if(doubleScaleVel == true) {
-      sp.softParticleNVEDoubleRescaleLoop();
+      if(doubleT == true) {
+        sp.softParticleNVEDoubleRescaleLoop();
+      } else {
+        sp.softParticleNVERescaleLoop();
+      }
     } else {
       sp.softParticleNVELoop();
     }
     if(step % saveEnergyFreq == 0) {
-      if(doubleScaleVel == true) {
+      if(doubleT == true) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles);
       } else {
         ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
@@ -134,7 +144,7 @@ int main(int argc, char **argv) {
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
-        if(doubleScaleVel == true) {
+        if(doubleT == true) {
           Temps = sp.getParticleT1T2();
           cout << " T1: " << get<0>(Temps) << " T2: " << get<1>(Temps);
         } else {
@@ -166,7 +176,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -174,7 +184,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
