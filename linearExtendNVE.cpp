@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
-  double ec = 1, cutDistance, cutoff = 2, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
+  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -76,7 +76,12 @@ int main(int argc, char **argv) {
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = 1 / damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
+  cout << "Time step: " << timeStep << " sigma: " << sigma;
+  if(readState == false) {
+    cout << " Tinject: " << Tinject << endl;
+  } else {
+    cout << endl;
+  }
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
@@ -85,19 +90,19 @@ int main(int argc, char **argv) {
   sp.calcParticleForceEnergy();
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
-  strainStepx = -strainStep / (1 + strainStep);
+  strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
     prevEnergy = sp.getParticleEnergy();
     cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
-      strainx = -strain / (1 + strain);
-      newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
+      strainx = -sign * strain / (1 + sign * strain);
+      newBoxSize[0] = (1 + strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
+        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, sign * strainStepx);
+        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
       }
     } else {
       newBoxSize = initBoxSize;
@@ -109,7 +114,7 @@ int main(int argc, char **argv) {
       }
     }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << strain << ", density: " << sp.getParticlePhi() << endl;
+    cout << "strain: " << sign * strain << ", density: " << sp.getParticlePhi() << endl;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
@@ -128,8 +133,8 @@ int main(int argc, char **argv) {
     sp.setInitialPositions();
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
