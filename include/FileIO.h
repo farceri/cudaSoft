@@ -113,7 +113,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
     energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << endl;
   }
@@ -125,7 +125,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleActiveWallForce(range, driving) << "\t";
     energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << endl;
   }
