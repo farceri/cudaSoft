@@ -72,8 +72,7 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  damping = sqrt(inertiaOverDamping) / sigma;
-  timeUnit = 1 / damping;
+  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
@@ -127,8 +126,8 @@ int main(int argc, char **argv) {
     sp.setInitialPositions();
     while(step != maxStep) {
       if(step % linFreq == 0) {
-        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
       sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
