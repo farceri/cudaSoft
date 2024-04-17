@@ -775,10 +775,45 @@ inline __device__ double calcWCAAdhesiveYforce(const double* thisPos, const doub
 	}
 }
 
+inline __device__ double calcDoubleLJYforce(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId) {
+  	double distance, ratio, ratio12, ratio6, forceShift, gradMultiple = 0;
+	double delta[MAXDIM], epsilon;
+	//distance = calcDistance(thisPos, otherPos);
+	distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	// set energy scale based on particle indices
+	if(particleId < d_num1) {
+		if(otherId < d_num1) {
+			epsilon = d_eAA;
+		} else {
+			epsilon = d_eAB;
+		}
+	} else {
+		if(otherId < d_num1) {
+			epsilon = d_eAB;
+		} else {
+			epsilon = d_eBB;
+		}
+	}
+	//printf("distance %lf \n", distance);
+	ratio = radSum / distance;
+	ratio6 = pow(ratio, 6);
+	ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		forceShift = epsilon * d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
+		gradMultiple = 24 * epsilon * (2 * ratio12 - ratio6) / distance - forceShift;
+	}
+	if (gradMultiple != 0) {
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0;
+	}
+}
+
 // particle-particle interaction across fictitious wall at half height in 2D
 __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
+		long otherId;
 		double thisRad, otherRad, radSum, midHeight = d_boxSizePtr[1]*0.5;
 		double thisPos[MAXDIM], otherPos[MAXDIM];
 		double thisHeight, otherHeight;//thisDistance, otherDistance,
@@ -815,6 +850,10 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 								break;
 								case simControlStruct::potentialEnum::adhesive:
 								wallForce[particleId] += calcWCAAdhesiveYforce(thisPos, otherPos, radSum);
+								break;
+								case simControlStruct::potentialEnum::doubleLJ:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								wallForce[particleId] += calcDoubleLJYforce(thisPos, otherPos, radSum, particleId, otherId);
 								break;
 								default:
 								break;

@@ -74,7 +74,12 @@ int main(int argc, char **argv) {
   sigma = 2 * sp.getMeanParticleSigma();
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
+  cout << "Time step: " << timeStep << " sigma: " << sigma;
+  if(readState == false) {
+    cout << " Tinject: " << Tinject << endl;
+  } else {
+    cout << endl;
+  }
   ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
