@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 2, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
+  double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 2;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighborList(cutDistance);
+  sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
   sp.setInitialPositions();
@@ -114,8 +114,8 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
-      ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
+      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin LJ: current step: " << step + initialStep;
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
         //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }

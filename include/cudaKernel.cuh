@@ -872,7 +872,7 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 __global__ void kernelAddParticleWallActiveForce(const double* pAngle, const double driving, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-		// zero out the force and get particle positions
+		// if the interaction of particleId has already been counted
 		if(wallCount[particleId] > 0) {
 			wallForce[particleId] += driving * sin(pAngle[particleId]);
 		}

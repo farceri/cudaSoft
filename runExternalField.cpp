@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   ioSP.save1DFile(outDir + "/externalField.dat", sp.getExternalParticleForce());
   while(step != maxStep) {
     if(constantPressure == true) {
-      pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleTotalPressure(driving) - p0);
+      pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleActivePressure(driving) - p0);
     }
     if(whichDynamics == "active-langevin/") {
       sp.softParticleActiveExtFieldLoop();
