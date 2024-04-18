@@ -306,6 +306,8 @@ public:
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 
+  void setThreeParticleTestPacking(double sigma01, double sigma2, double lx, double ly, double y01, double y2, double vel2);
+
   void firstUpdate(double timeStep);
 
   void secondUpdate(double timeStep);
@@ -313,6 +315,8 @@ public:
   void testInteraction(double timeStep);
 
   void printTwoParticles();
+
+  void printThreeParticles();
 
   //void calcParticleBoundaryForceEnergy();
 

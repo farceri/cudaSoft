@@ -65,9 +65,9 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-#EXE = runNVE2LJ
+EXE = runNVE2LJ
 #EXE = runNPT
-EXE = runLangevinLJ
+#EXE = runLangevinLJ
 #EXE = runActiveLJ
 #EXE = runActiveWCA
 #EXE = runExternalField

@@ -19,17 +19,19 @@
 #include <experimental/filesystem>
 
 using namespace std;
+using std::cout;
 
 int main(int argc, char **argv) {
-  bool read = false, readState = false, saveFinal = false, linSave = true;
-  bool lj = true, wca = false, alltoall = true, fixedbc = false;
-  long step = 0, numParticles = 2, nDim = 2, maxStep = atof(argv[3]), updateCount = 0;
+  bool read = true, readState = true, saveFinal = false, linSave = true;
+  bool doublelj = true, lj = false, wca = false, alltoall = true, fixedbc = false;
+  long step = 0, numParticles = atol(argv[4]), nDim = 2, maxStep = atof(argv[3]), updateCount = 0, num1 = 1;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   double ec = 1, LJcut = 4, cutoff = 0.2, cutDistance, timeStep = atof(argv[2]), sigma, timeUnit, size;
-  double sigma0 = 1, sigma1 = 1, lx = 10, ly = 10, vel1 = -0.1, y0 = 0.2, y1 = 0.7;
+  double sigma0 = 1, sigma1 = 3, lx = 10, ly = 10, vel1 = -0.1, y0 = 0.2, y1 = 0.7;
+  double ea = 1, eb = 1, eab = 1;
   std::string outDir, energyFile, inDir = argv[1], currentDir, dirSample;
   // initialize sp object
-	SP2D sp(numParticles, nDim);
+  SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
@@ -43,6 +45,11 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     dirSample = "wca/";
     cout << "Setting WCA potential" << endl;
+  } else if(doublelj == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    dirSample = "2lj/";
+    cout << "Setting double Lennard-Jones potential" << endl;
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
     cout << "Setting Harmonic potential" << endl;
     dirSample = "harmonic/";
@@ -62,8 +69,15 @@ int main(int argc, char **argv) {
     }
   } else {//start a new dyanmics
     cout << "Initialize new packing" << endl;
-    sp.setTwoParticleTestPacking(sigma0, sigma1, lx, ly, y0, y1, vel1);
-    sp.printTwoParticles();
+    if(numParticles == 3) {
+      sp.setThreeParticleTestPacking(sigma0, sigma1, lx, ly, y0, y1, vel1);
+      sp.printThreeParticles();
+    } else if(numParticles == 2) {
+      sp.setTwoParticleTestPacking(sigma0, sigma1, lx, ly, y0, y1, vel1);
+      sp.printTwoParticles();
+    } else {
+      cout << "testInteraction only works for 2 or 3 particles!" << endl;
+    }
     if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
       std::experimental::filesystem::create_directory(inDir + dirSample);
     }

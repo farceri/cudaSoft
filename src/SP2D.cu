@@ -1124,7 +1124,6 @@ void SP2D::calcParticleForceEnergy() {
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
-  int pId;
   thrust::host_vector<double> boxSize(nDim);
   // set particle radii
   d_particleRad[0] = 0.5 * sigma0;
@@ -1133,10 +1132,31 @@ void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, do
   boxSize[1] = ly;
   setBoxSize(boxSize);
   // assign positions
-  for (pId = 0; pId < numParticles; pId++) {
+  for (int pId = 0; pId < numParticles; pId++) {
     d_particlePos[pId * nDim] = lx * 0.5;
   }
   d_particlePos[0 * nDim + 1] = ly * y0;
+  d_particlePos[1 * nDim + 1] = ly * y1;
+  // assign velocity
+  d_particleVel[1 * nDim + 1] = vel1;
+  setLengthScaleToOne();
+}
+
+void SP2D::setThreeParticleTestPacking(double sigma02, double sigma1, double lx, double ly, double y02, double y1, double vel1) {
+  thrust::host_vector<double> boxSize(nDim);
+  // set particle radii
+  d_particleRad[0] = 0.5 * sigma02;
+  d_particleRad[1] = 0.5 * sigma1;
+  d_particleRad[2] = 0.5 * sigma02;
+  boxSize[0] = lx;
+  boxSize[1] = ly;
+  setBoxSize(boxSize);
+  // assign positions
+  d_particlePos[0 * nDim] = lx * 0.35;
+  d_particlePos[0 * nDim + 1] = ly * y02;
+  d_particlePos[2 * nDim] = lx * 0.65;
+  d_particlePos[2 * nDim + 1] = ly * y02;
+  d_particlePos[1 * nDim] = lx * 0.5;
   d_particlePos[1 * nDim + 1] = ly * y1;
   // assign velocity
   d_particleVel[1 * nDim + 1] = vel1;
@@ -1201,6 +1221,26 @@ void SP2D::printTwoParticles() {
   cout << "particle 1: fx: " << particleForce[2] << " fy: " << particleForce[3] << endl;
   cout << "particle 1: vx: " << particleVel[2] << " vy: " << particleVel[3] << endl;
   cout << "particle 1: x: " << particlePos[2] << " y: " << particlePos[3] << endl;
+}
+
+void SP2D::printThreeParticles() {
+  cudaDeviceSynchronize();
+  if(cudaGetLastError) cout << "SP2D::printThreeParticles:: cudaGetLastError(): " << cudaGetLastError() << endl;
+  thrust::host_vector<double> particleForce(d_particleForce.size(), 0.0);
+  thrust::host_vector<double> particleVel(d_particleForce.size(), 0.0);
+  thrust::host_vector<double> particlePos(d_particleForce.size(), 0.0);
+  particleForce = d_particleForce;
+  particleVel = d_particleVel;
+  particlePos = d_particlePos;
+  cout << "particle 0: fx: " << particleForce[0] << " fy: " << particleForce[1] << endl;
+  cout << "particle 0: vx: " << particleVel[0] << " vy: " << particleVel[1] << endl;
+  cout << "particle 0: x: " << particlePos[0] << " y: " << particlePos[1] << endl;
+  cout << "particle 1: fx: " << particleForce[2] << " fy: " << particleForce[3] << endl;
+  cout << "particle 1: vx: " << particleVel[2] << " vy: " << particleVel[3] << endl;
+  cout << "particle 1: x: " << particlePos[2] << " y: " << particlePos[3] << endl;
+  cout << "particle 2: fx: " << particleForce[4] << " fy: " << particleForce[5] << endl;
+  cout << "particle 2: vx: " << particleVel[4] << " vy: " << particleVel[5] << endl;
+  cout << "particle 2: x: " << particlePos[4] << " y: " << particlePos[5] << endl;
 }
 
  void SP2D::makeExternalParticleForce(double externalForce) {
