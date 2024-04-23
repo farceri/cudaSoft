@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   sp.setEnergyCostant(ec);
   sp.setLJcutoff(LJcut);
   if(fixedSides == true) {

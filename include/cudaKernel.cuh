@@ -779,14 +779,14 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 			auto thisHeight = thisPos[1];// - d_boxSizePtr[1] * floor(thisPos[1] / d_boxSizePtr[1]);
 			//thisDistance = thisPos[1] - midHeight;
 			//if(thisDistance < 0) {
-			if(thisHeight < (midHeight - thisRad) && thisHeight > (midHeight - range)) {
+			if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
 				// interaction between vertices of neighbor particles
 				for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 					if (extractParticleNeighbor(particleId, nListId, pPosPBC, pRad, otherPos, otherRad)) {
 						auto otherHeight = otherPos[1];// - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
 						//otherDistance = otherPos[1] - midHeight;
 						//if(otherDistance > 0) {
-						if(otherHeight > (midHeight + otherRad) && otherHeight < (midHeight + range)) {
+						if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
 							wallCount[particleId] += 1;
 							auto radSum = thisRad + otherRad;
 							switch (d_simControl.potentialType) {

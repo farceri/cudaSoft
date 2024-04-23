@@ -23,16 +23,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false, scaleVel, doubleT = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel = true, doubleT = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, alltoall = false, fixedbc = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
+  double ea = 2, eb = 2, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   std::tuple<double, double> Temps;
@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
