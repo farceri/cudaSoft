@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
   bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "extend";
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -38,12 +38,12 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
-      dirSample = "biaxial-comp";
+      dirSample = "nve-biaxial-comp";
     } else {
-      dirSample = "compress";
+      dirSample = "nve-comp";
     }
   } else if(biaxial == true) {
-    dirSample = "biaxial-extend";
+    dirSample = "nve-biaxial-ext";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
@@ -80,7 +80,6 @@ int main(int argc, char **argv) {
   } else {
     cout << endl;
   }
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);

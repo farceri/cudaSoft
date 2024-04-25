@@ -25,11 +25,11 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
+  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nvt-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -38,20 +38,19 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
-      dirSample = "nve-biaxial-comp";
+      dirSample = "nvt-biaxial-comp";
     } else {
-      dirSample = "nve-comp";
+      dirSample = "nvt-comp";
     }
   } else if(biaxial == true) {
-    dirSample = "nve-biaxial-ext";
+    dirSample = "nvt-biaxial-ext";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  sp.setEnergyCostant(ec);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-  cout << "Setting Lennard-Jones potential" << endl;
-  sp.setLJcutoff(LJcut);
+  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+  cout << "Setting double Lennard-Jones potential" << endl;
+  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   //outDir = inDir + dirSample + "/";
@@ -73,25 +72,19 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  damping = sqrt(inertiaOverDamping) / sigma;
+  timeUnit = 1 / damping;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Time step: " << timeStep << " sigma: " << sigma;
-  if(readState == false) {
-    cout << " Tinject: " << Tinject << endl;
-  } else {
-    cout << endl;
-  }
+  //timeStep = sp.setTimeStep(timeStep);
+  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
+  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
   range *= LJcut * sigma;
-  sp.initSoftParticleNVE(Tinject, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighbors(cutDistance);
-  sp.calcParticleForceEnergy();
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
-    prevEnergy = sp.getParticleEnergy();
-    cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -sign * strain / (1 + sign * strain);
@@ -121,11 +114,6 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
-    // adjust kinetic energy to preserve energy conservation
-    cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-    sp.adjustKineticEnergy(prevEnergy);
-    sp.calcParticleForceEnergy();
-    cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     sp.resetUpdateCount();
     step = 0;
     sp.setInitialPositions();
@@ -134,9 +122,9 @@ int main(int argc, char **argv) {
         ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
         //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
-      sp.softParticleNVELoop();
+      sp.softParticleLangevinLoop();
       if(step % checkPointFreq == 0) {
-        cout << "Extend NVE: current step: " << step;
+        cout << "Extend NVT2LJ: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
