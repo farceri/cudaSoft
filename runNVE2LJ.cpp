@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ea = 2, eb = 2, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
-  dirSample = whichDynamics + "e2/";//"T" + argv[3] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   std::tuple<double, double> Temps;
   // initialize sp object
 	SP2D sp(numParticles, nDim);
