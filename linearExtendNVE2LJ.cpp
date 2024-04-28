@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
+  bool readState = true, save = true, compress = true, biaxial = true, centered = false, adjustEkin = true, adjustTemp = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
@@ -83,14 +83,18 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighbors(cutDistance);
-  sp.calcParticleForceEnergy();
+  if(adjustEkin == true) {
+    sp.calcParticleNeighbors(cutDistance);
+    sp.calcParticleForceEnergy();
+  }
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
-    prevEnergy = sp.getParticleEnergy();
-    cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    if(adjustEkin == true) {
+      prevEnergy = sp.getParticleEnergy();
+      cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    }
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -sign * strain / (1 + sign * strain);
@@ -121,10 +125,12 @@ int main(int argc, char **argv) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
-    cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-    sp.adjustKineticEnergy(prevEnergy);
-    sp.calcParticleForceEnergy();
-    cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    if(adjustEkin == true) {
+      cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustKineticEnergy(prevEnergy);
+      sp.calcParticleForceEnergy();
+      cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    }
     sp.resetUpdateCount();
     step = 0;
     sp.setInitialPositions();
@@ -146,6 +152,9 @@ int main(int argc, char **argv) {
           cout << " no updates" << endl;
         }
         sp.resetUpdateCount();
+        if(adjustTemp == true) {
+          sp.adjustTemperature(Tinject);
+        }
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
         }

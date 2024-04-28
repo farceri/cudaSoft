@@ -1467,6 +1467,24 @@ void SP2D::adjustKineticEnergy(double prevEtot) {
   }
 }
 
+void SP2D::adjustTemperature(double targetTemp) {
+  double scale = sqrt(targetTemp / getParticleTemperature());
+  //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+  double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+  auto adjustParticleTemp = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+    for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
+    }
+  };
+
+  //cout << "SP2D::adjustTemperature:: scale: " << scale << endl;
+  thrust::for_each(r, r + numParticles, adjustParticleTemp);
+}
+
 std::tuple<double, double> SP2D::getParticleT1T2() {
   thrust::device_vector<double> velSquared(d_particleVel.size());
   thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());

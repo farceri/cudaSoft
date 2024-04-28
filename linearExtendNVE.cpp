@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
-  double ea = 1, eab = 0.25, eb = 1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
+  double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "1nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -38,12 +38,12 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
-      dirSample = "nve-biaxial-comp";
+      dirSample = "1nve-biaxial-comp";
     } else {
-      dirSample = "nve-comp";
+      dirSample = "1nve-comp";
     }
   } else if(biaxial == true) {
-    dirSample = "nve-biaxial-ext";
+    dirSample = "1nve-biaxial-ext";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
@@ -84,14 +84,14 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  sp.calcParticleNeighbors(cutDistance);
-  sp.calcParticleForceEnergy();
+  //sp.calcParticleNeighbors(cutDistance);
+  //sp.calcParticleForceEnergy();
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
-    prevEnergy = sp.getParticleEnergy();
-    cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    //prevEnergy = sp.getParticleEnergy();
+    //cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -sign * strain / (1 + sign * strain);
@@ -122,10 +122,10 @@ int main(int argc, char **argv) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
-    cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-    sp.adjustKineticEnergy(prevEnergy);
-    sp.calcParticleForceEnergy();
-    cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    //cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    //sp.adjustKineticEnergy(prevEnergy);
+    //sp.calcParticleForceEnergy();
+    //cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     sp.resetUpdateCount();
     step = 0;
     sp.setInitialPositions();

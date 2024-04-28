@@ -363,6 +363,8 @@ public:
 
   void adjustKineticEnergy(double prevEtot);
 
+  void adjustTemperature(double targetTemp);
+
   std::tuple<double, double> getParticleT1T2();
 
   std::tuple<double, double> getParticleKineticEnergy12();
