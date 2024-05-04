@@ -260,6 +260,8 @@ public:
 
   void setScaledMonoRandomParticles(double phi0, double lx, double ly);
 
+  void setScaledBiRandomParticles(double phi0, double lx, double ly);
+
   void pressureScaleParticles(double pscale);
 
   void scaleParticles(double scale);

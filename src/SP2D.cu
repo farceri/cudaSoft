@@ -908,6 +908,37 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
   setLengthScaleToOne();
 }
 
+void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly) {
+  thrust::host_vector<double> boxSize(nDim);
+  double scale;
+  long halfNum = int(numParticles / 2);
+  // generate polydisperse particle size
+  thrust::fill(d_particleRad.begin(), d_particleRad.begin() + halfNum, 0.5);
+  thrust::fill(d_particleRad.begin() + halfNum, d_particleRad.end(), 0.7);
+  boxSize[0] = lx;
+  boxSize[1] = ly;
+  setBoxSize(boxSize);
+  if(nDim == 2) {
+    scale = sqrt(getParticlePhi() / phi0);
+  } else if(nDim == 3) {
+    scale = cbrt(getParticlePhi() / phi0);
+  } else {
+    cout << "SP2D::setScaledBiRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
+  }
+  boxSize[0] = lx * scale;
+  boxSize[1] = ly * scale;
+  setBoxSize(boxSize);
+  // extract random positions
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    for(long dim = 0; dim < nDim; dim++) {
+      d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
+    }
+  }
+  // need to set this otherwise forces are zeros
+  //setParticleLengthScale();
+  setLengthScaleToOne();
+}
+
 void SP2D::pressureScaleParticles(double pscale) {
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(pscale), d_particlePos.begin(), thrust::multiplies<double>());
   thrust::transform(d_boxSize.begin(), d_boxSize.end(), thrust::make_constant_iterator(pscale), d_boxSize.begin(), thrust::multiplies<double>());

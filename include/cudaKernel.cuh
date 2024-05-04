@@ -403,19 +403,13 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		if (distance < (d_LJcutoff * radSum)) {
 			forceShift = d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 			gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
-			if(particleId < d_num1) {
-				if(otherId < d_num1) {
-					gradMultiple *= d_eAA;
-				} else {
-					gradMultiple *= d_eAB;
-				}
-			} else {
-				if(otherId >= d_num1) {
-					gradMultiple *= d_eAB;
-				} else {
-					gradMultiple *= d_eBB;
-				}
-			}
+			if(particleId < d_num1 && otherId < d_num1) {
+			gradMultiple *= d_eAA;
+		} else if(particleId >= d_num1 && otherId >= d_num1) {
+			gradMultiple *= d_eBB;
+		} else {
+			gradMultiple *= d_eAB;
+		}
 			return gradMultiple;
 		} else {
 			return 0;
@@ -575,22 +569,15 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 		auto gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
 		auto epot = 0.5 * (4 * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 		// set energy scale based on particle indices
-		if(particleId < d_num1) {
-			if(otherId < d_num1) {
-				gradMultiple *= d_eAA;
-				epot *= d_eAA;
-			} else {
-				gradMultiple *= d_eAB;
-				epot *= d_eAB;
-			}
+		if(particleId < d_num1 && otherId < d_num1) {
+			gradMultiple *= d_eAA;
+			epot *= d_eAA;
+		} else if(particleId >= d_num1 && otherId >= d_num1) {
+			gradMultiple *= d_eBB;
+			epot *= d_eBB;
 		} else {
-			if(otherId < d_num1) {
-				gradMultiple *= d_eAB;
-				epot *= d_eAB;
-			} else {
-				gradMultiple *= d_eBB;
-				epot *= d_eBB;
-			}
+			gradMultiple *= d_eAB;
+			epot *= d_eAB;
 		}
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
@@ -742,18 +729,12 @@ inline __device__ double calcDoubleLJYforce(const double* thisPos, const double*
 		auto forceShift = d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 		auto gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
 		// set energy scale based on particle indices
-		if(particleId < d_num1) {
-			if(otherId < d_num1) {
-				gradMultiple *= d_eAA;
-			} else {
-				gradMultiple *= d_eAB;
-			}
+		if(particleId < d_num1 && otherId < d_num1) {
+			gradMultiple *= d_eAA;
+		} else if(particleId >= d_num1 && otherId >= d_num1) {
+			gradMultiple *= d_eBB;
 		} else {
-			if(otherId < d_num1) {
-				gradMultiple *= d_eAB;
-			} else {
-				gradMultiple *= d_eBB;
-			}
+			gradMultiple *= d_eAB;
 		}
 		return gradMultiple * delta[1] / distance;
 	} else {
