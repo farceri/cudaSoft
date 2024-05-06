@@ -24,7 +24,7 @@ using std::tuple;
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
-  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ} potentialType;
+  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJWCA} potentialType;
   enum class boxEnum {harmonic, WCA} boxType;
   enum class gravityEnum {on, off} gravityType;
 };
@@ -442,6 +442,9 @@ public:
   void softParticleNVEDoubleRescaleLoop();
 
   // Nose-Hoover integrator
+  void getNoseHooverParams(double &mass, double &damping);
+  void setNoseHooverParams(double mass, double damping);
+
   void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);
 
   void softParticleNoseHooverLoop();

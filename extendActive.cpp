@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, lj = true, wca = false, compress = false, biaxial = true, centered = false;
   bool saveFinal = true, logSave = true, linSave = false, savePacking = false;
-  long numParticles = atol(argv[9]), nDim = 2;
+  long numParticles = atol(argv[9]), nDim = 2, direction = 0;
   long maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, cutDistance, cutoff = 1, LJcut = 4, sigma, damping, forceUnit, timeUnit, sign = 1, range, waveQ;
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = 1/(tp * timeUnit);
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
   if(initialStep == 0) {
     strainx = -strain / (1 + strain);
     boxSize = sp.getBoxSize();

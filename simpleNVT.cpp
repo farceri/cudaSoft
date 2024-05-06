@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
   damping /= timeUnit;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  ioSP.saveLangevinParams(outDir, sigma, damping);
   // initialize simulation
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);

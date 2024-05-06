@@ -473,14 +473,72 @@ public:
     }
   }
 
-  void saveParticleDynamicalParams(string dirName, double sigma, double damping, double Dr, double driving) {
+  void saveLangevinParams(string dirName, double sigma, double damping) {
     string fileParams = dirName + "dynParams.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
     saveParams << "sigma" << "\t" << sigma << endl;
     saveParams << "damping" << "\t" << damping << endl;
-    saveParams << "Dr" << "\t" << Dr << endl;
+    saveParams.close();
+  }
+
+  void saveActiveLangevinParams(string dirName, double sigma, double damping, double taup, double driving) {
+    string fileParams = dirName + "dynParams.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    saveParams << "sigma" << "\t" << sigma << endl;
+    saveParams << "damping" << "\t" << damping << endl;
+    saveParams << "taup" << "\t" << taup << endl;
     saveParams << "f0" << "\t" << driving << endl;
+    saveParams.close();
+  }
+
+  void saveNoseHooverParams(string dirName) {
+    double mass, damping;
+    sp_->getNoseHooverParams(mass, damping);
+    string fileParams = dirName + "nhParams.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    saveParams << "mass" << "\t" << mass << endl;
+    saveParams << "damping" << "\t" << damping << endl;
+    saveParams.close();
+  }
+
+  void readNoseHooverParams(string dirName) {
+    string fileParams = dirName + "nhParams.dat";
+    ifstream readParams(fileParams.c_str());
+    if (!readParams.is_open()) {
+      cout << "Error: Unable to open file " << fileParams << endl;
+      return;
+    }
+    string paramName;
+    double paramValue, mass = 0, damping = 0;
+    while (readParams >> paramName >> paramValue) {
+      cout << paramName << ":\t" << paramValue << endl;
+      if(paramName == "mass") {
+        mass = paramValue;
+      } else if(paramName == "damping") {
+        damping == paramValue;
+      }
+    }
+    readParams.close();
+    if(mass != 0 && damping != 0) {
+      sp_->setNoseHooverParams(mass, damping);
+    } else {
+      cout << "FileIO::saveNoseHooverParams: mass and damping are not saved in nhParams.dat! Setting mass and damping to 1" << endl;
+      sp_->setNoseHooverParams(1, 1);
+    }
+  }
+
+  void saveFlowParams(string dirName, double sigma, double damping, double gravity, double viscosity, double ew) {
+    string fileParams = dirName + "flowParams.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    saveParams << "sigma" << "\t" << sigma << endl;
+    saveParams << "damping" << "\t" << damping << endl;
+    saveParams << "gravity" << "\t" << gravity << endl;
+    saveParams << "viscosity" << "\t" << viscosity << endl;
+    saveParams << "ew" << "\t" << ew << endl;
     saveParams.close();
   }
 

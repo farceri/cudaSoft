@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
   cout << "Thermal energy scale: " << Tinject << endl;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  ioSP.saveLangevinParams(outDir, sigma, damping);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   strain = strainStep;
   while (strain < (maxStrain + strainStep)) {

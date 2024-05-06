@@ -405,14 +405,40 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 			gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
 			if(particleId < d_num1 && otherId < d_num1) {
 			gradMultiple *= d_eAA;
-		} else if(particleId >= d_num1 && otherId >= d_num1) {
-			gradMultiple *= d_eBB;
-		} else {
-			gradMultiple *= d_eAB;
-		}
+			} else if(particleId >= d_num1 && otherId >= d_num1) {
+				gradMultiple *= d_eBB;
+			} else {
+				gradMultiple *= d_eAB;
+			}
 			return gradMultiple;
 		} else {
 			return 0;
+		}
+		break;
+		case simControlStruct::potentialEnum::LJWCA:
+		ratio = radSum / distance;
+		ratio6 = pow(ratio, 6);
+		ratio12 = ratio6 * ratio6;
+		if(particleId < d_num1 && otherId < d_num1) {
+			if (distance < (d_LJcutoff * radSum)) {
+				forceShift =  d_LJfshift / radSum;
+				return 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
+			} else {
+				return 0;
+			}
+		} else if(particleId >= d_num1 && otherId >= d_num1) {
+			if (distance < (d_LJcutoff * radSum)) {
+				forceShift =  d_LJfshift / radSum;
+				return 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
+			} else {
+				return 0;
+			}
+		} else {
+			if (distance < (WCAcut * radSum)) {
+				return 24 * d_ec * (2 * ratio12 - ratio6) / distance;
+			} else {
+				return 0;
+			}
 		}
 		break;
 		default:
@@ -593,7 +619,7 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 __global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-		long otherId;
+		auto otherId = -1;
     	double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
 		// zero out the force and get particle positions
 		for (long dim = 0; dim < d_nDim; dim++) {
@@ -622,6 +648,16 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					case simControlStruct::potentialEnum::doubleLJ:
 					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
 					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::LJWCA:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					if(particleId < d_num1 && otherId < d_num1) {
+						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					} else if(particleId >= d_num1 && otherId >= d_num1) {
+						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					} else {
+						pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					}
 					break;
 					default:
 					break;
@@ -666,6 +702,14 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
 					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
 					//printf("particleId %ld otherId %ld energy %lf \n", particleId, otherId, pEnergy[particleId]);
 					break;
+					case simControlStruct::potentialEnum::LJWCA:
+					if(particleId < d_num1 && otherId < d_num1) {
+						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					} else if(particleId >= d_num1 && otherId >= d_num1) {
+						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					} else {
+						pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					}
 					default:
 					break;
 				}
@@ -784,6 +828,15 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
 								wallForce[particleId] += calcDoubleLJYforce(thisPos, otherPos, radSum, particleId, otherId);
 								break;
+								case simControlStruct::potentialEnum::LJWCA:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								if(particleId < d_num1 && otherId < d_num1) {
+									wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+								} else if(particleId >= d_num1 && otherId >= d_num1) {
+									wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+								} else {
+									wallForce[particleId] += calcWCAYforce(thisPos, otherPos, radSum);
+								}
 								default:
 								break;
 							}

@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
   cout << " f0: " << driving*forceUnit << ", " << driving << " Dr: " << Dr/timeUnit << ", " << Dr << endl;
   driving = driving*forceUnit;
   Dr = Dr/timeUnit;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveActiveLangevinParams(outDir, sigma, damping, 1/Dr, driving);
   sp.setLEshift(strain);
   if(initialStep == 0) {
     sp.applyLEShear(strain);

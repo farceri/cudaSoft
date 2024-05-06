@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = 1/(tp * timeUnit);
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, Dr, driving);
+  ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
   // initialize simulation
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);

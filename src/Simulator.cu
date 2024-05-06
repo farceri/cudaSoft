@@ -461,7 +461,7 @@ void SoftParticleNoseHoover::integrate() {
 
 void SoftParticleNoseHoover::updateVelocity(double timeStep) {
   // update nose hoover damping
-  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - sp_->nDim * (sp_->numParticles + 1) * config.Tinject / 2);
+  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);
   double s_gamma(gamma);
   long s_nDim(sp_->nDim);
   double s_dt(timeStep);
@@ -481,7 +481,7 @@ void SoftParticleNoseHoover::updateVelocity(double timeStep) {
 
 void SoftParticleNoseHoover::updateThermalVel() {
   // update nose hoover damping
-  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - sp_->nDim * (sp_->numParticles + 1) * config.Tinject / 2);
+  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);
   double s_gamma(gamma);
   long s_nDim(sp_->nDim);
   double s_dt(sp_->dt);

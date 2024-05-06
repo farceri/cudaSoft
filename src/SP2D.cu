@@ -208,8 +208,10 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
     cout << "SP2D: setPotentialType: potentialType: doubleLJ" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
+    cout << "SP2D: setPotentialType: potentialType: LJWCA" << endl;
   } else {
-    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive or doubleLJ" << endl;
+    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ and LJWCA" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -632,7 +634,7 @@ double SP2D::getParticlePhi() {
   } else if(nDim == 3) {
     thrust::device_vector<double> d_radCubed(numParticles);
     thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
-    return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 3 * PI / (4 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+    return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 4 * PI / (3 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
   } else {
     cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
     return 0;
@@ -1478,8 +1480,7 @@ double SP2D::getParticleEnergy() {
 }
 
 double SP2D::getParticleTemperature() {
-  double ekin = getParticleKineticEnergy();
-  return ekin / numParticles;
+  return 2 * getParticleKineticEnergy() / (nDim * numParticles);
 }
 
 void SP2D::adjustKineticEnergy(double prevEtot) {
@@ -1909,6 +1910,18 @@ void SP2D::initSoftParticleNVEDoubleRescale(double Temp1, double Temp2) {
 
 void SP2D::softParticleNVEDoubleRescaleLoop() {
   this->sim_->integrate();
+}
+
+void SP2D::getNoseHooverParams(double &mass, double &damping) {
+  mass = this->sim_->mass;
+  damping = this->sim_->gamma;
+  cout << "SP2D::getNoseHooverParams:: mass: " << this->sim_->mass << " , damping: " << this->sim_->gamma << endl;
+}
+
+void SP2D::setNoseHooverParams(double mass, double damping) {
+  this->sim_->mass = mass;
+  this->sim_->gamma = damping;
+  cout << "SP2D::getNoseHooverParams:: mass: " << this->sim_->mass << " , damping: " << this->sim_->gamma << endl;
 }
 
 //************************* Nose-Hoover integrator ***************************//

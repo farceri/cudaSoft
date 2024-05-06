@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
-  ioSP.saveParticleDynamicalParams(outDir, sigma, damping, 0, 0);
+  ioSP.saveLangevinParams(outDir, sigma, damping);
   range *= LJcut * sigma;
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
