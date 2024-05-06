@@ -23,9 +23,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = true, readState = true, lj = false, doublelj = true, wca = false;
+  bool read = false, readState = false, lj = true, doublelj = false, wca = false;
   bool gforce = false, fixedbc = false, alltoall = false, nve = false, scaleVel = false;
-  long numParticles = atol(argv[4]), nDim = 2;
+  long numParticles = atol(argv[4]), nDim = 3;
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    //sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly);
-    sp.setScaledMonoRandomParticles(phi0, lx, ly);
+    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly);
+    //sp.setScaledMonoRandomParticles(phi0, lx, ly);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
@@ -185,6 +185,7 @@ int main(int argc, char **argv) {
     // save minimized configuration
     ioSP.saveParticlePacking(currentDir);
     ioSP.saveParticleNeighbors(currentDir);
+    ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     ioSP.closeEnergyFile();
     //ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     // check if target density is met

@@ -861,7 +861,10 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
+    boxSize[2] = ly;
+    setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
+    boxSize[2] = ly * scale;
   } else {
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
@@ -890,7 +893,10 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
+    boxSize[2] = ly;
+    setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
+    boxSize[2] = ly * scale;
   } else {
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
@@ -921,7 +927,10 @@ void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly) {
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
+    boxSize[2] = ly;
+    setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
+    boxSize[2] = ly * scale;
   } else {
     cout << "SP2D::setScaledBiRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
