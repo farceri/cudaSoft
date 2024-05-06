@@ -32,8 +32,8 @@ int main(int argc, char **argv) {
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double mass = 1, LJcut = 2.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), damping, inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.8;
-  double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[5]), ly = atof(argv[6]), gravity = 9.8e-04;
-  double ea = 1, eb = 1, eab = 0.1;
+  double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[5]), ly = atof(argv[6]), lz = atof(argv[7]);
+  double ea = 1, eb = 1, eab = 0.1, gravity = 9.8e-04;
   long num1 = int(numParticles / 2);
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
@@ -63,9 +63,9 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly);
-    //sp.setScaledMonoRandomParticles(phi0, lx, ly);
-    //sp.setScaledBiRandomParticles(phi0, lx, ly);
+    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly, lz);
+    //sp.setScaledMonoRandomParticles(phi0, lx, ly, lz);
+    //sp.setScaledBiRandomParticles(phi0, lx, ly, lz);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);

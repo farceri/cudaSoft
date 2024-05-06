@@ -844,7 +844,7 @@ void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
   setLengthScaleToOne();
 }
 
-void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly) {
+void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly, double lz) {
   thrust::host_vector<double> boxSize(nDim);
   double r1, r2, randNum, mean = 0, sigma, scale;
   sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
@@ -861,10 +861,10 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
-    boxSize[2] = ly;
+    boxSize[2] = lz;
     setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
-    boxSize[2] = ly * scale;
+    boxSize[2] = lz * scale;
   } else {
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
@@ -882,7 +882,7 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
   setLengthScaleToOne();
 }
 
-void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
+void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly, double lz) {
   thrust::host_vector<double> boxSize(nDim);
   double scale;
   // generate polydisperse particle size
@@ -893,10 +893,10 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
-    boxSize[2] = ly;
+    boxSize[2] = lz;
     setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
-    boxSize[2] = ly * scale;
+    boxSize[2] = lz * scale;
   } else {
     cout << "SP2D::setScaledPolyRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }
@@ -914,7 +914,7 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly) {
   setLengthScaleToOne();
 }
 
-void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly) {
+void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly, double lz) {
   thrust::host_vector<double> boxSize(nDim);
   double scale;
   long halfNum = int(numParticles / 2);
@@ -927,10 +927,10 @@ void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly) {
   if(nDim == 2) {
     scale = sqrt(getParticlePhi() / phi0);
   } else if(nDim == 3) {
-    boxSize[2] = ly;
+    boxSize[2] = lz;
     setBoxSize(boxSize);
     scale = cbrt(getParticlePhi() / phi0);
-    boxSize[2] = ly * scale;
+    boxSize[2] = lz * scale;
   } else {
     cout << "SP2D::setScaledBiRandomSoftParticles: only dimesions 2 and 3 are allowed!" << endl;
   }

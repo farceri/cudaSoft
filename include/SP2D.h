@@ -256,11 +256,11 @@ public:
   // initialization functions
   void setPolyRandomParticles(double phi0, double polyDispersity);
 
-  void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly);
+  void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly, double lz);
 
-  void setScaledMonoRandomParticles(double phi0, double lx, double ly);
+  void setScaledMonoRandomParticles(double phi0, double lx, double ly, double lz);
 
-  void setScaledBiRandomParticles(double phi0, double lx, double ly);
+  void setScaledBiRandomParticles(double phi0, double lx, double ly, double lz);
 
   void pressureScaleParticles(double pscale);
 
