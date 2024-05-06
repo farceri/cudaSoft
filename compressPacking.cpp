@@ -65,6 +65,7 @@ int main(int argc, char **argv) {
     // initialize polydisperse packing
     sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly);
     //sp.setScaledMonoRandomParticles(phi0, lx, ly);
+    //sp.setScaledBiRandomParticles(phi0, lx, ly);
     sp.scaleParticlePacking();
     sigma = 2 * sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
