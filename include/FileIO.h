@@ -95,6 +95,19 @@ public:
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
+  void saveParticleNoseHooverEnergy(long step, double timeStep, long numParticles) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    double mass, damping;
+    sp_->getNoseHooverParams(mass, damping);
+    energyFile << setprecision(precision) << damping << endl;
+  }
+
   void saveParticleDoubleEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy() / numParticles;
     std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
@@ -504,7 +517,7 @@ public:
     saveParams.close();
   }
 
-  void readNoseHooverParams(string dirName) {
+  void readNoseHooverParams(string dirName, double &mass, double &damping) {
     string fileParams = dirName + "nhParams.dat";
     ifstream readParams(fileParams.c_str());
     if (!readParams.is_open()) {
@@ -512,21 +525,17 @@ public:
       return;
     }
     string paramName;
-    double paramValue, mass = 0, damping = 0;
+    double paramValue;
     while (readParams >> paramName >> paramValue) {
-      cout << paramName << ":\t" << paramValue << endl;
       if(paramName == "mass") {
         mass = paramValue;
       } else if(paramName == "damping") {
-        damping == paramValue;
+        damping = paramValue;
       }
     }
     readParams.close();
-    if(mass != 0 && damping != 0) {
-      sp_->setNoseHooverParams(mass, damping);
-    } else {
+    if(mass == 1 && damping == 1) {
       cout << "FileIO::saveNoseHooverParams: mass and damping are not saved in nhParams.dat! Setting mass and damping to 1" << endl;
-      sp_->setNoseHooverParams(1, 1);
     }
   }
 

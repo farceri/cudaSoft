@@ -445,9 +445,8 @@ public:
 
   // Nose-Hoover integrator
   void getNoseHooverParams(double &mass, double &damping);
-  void setNoseHooverParams(double mass, double damping);
 
-  void initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState);
+  void initSoftParticleNoseHoover(double Temp, double mass, double gamma, bool readState);
 
   void softParticleNoseHooverLoop();
 

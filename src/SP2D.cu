@@ -1923,26 +1923,21 @@ void SP2D::softParticleNVEDoubleRescaleLoop() {
 void SP2D::getNoseHooverParams(double &mass, double &damping) {
   mass = this->sim_->mass;
   damping = this->sim_->gamma;
-  cout << "SP2D::getNoseHooverParams:: mass: " << this->sim_->mass << " , damping: " << this->sim_->gamma << endl;
-}
-
-void SP2D::setNoseHooverParams(double mass, double damping) {
-  this->sim_->mass = mass;
-  this->sim_->gamma = damping;
-  cout << "SP2D::getNoseHooverParams:: mass: " << this->sim_->mass << " , damping: " << this->sim_->gamma << endl;
+  //cout << "SP2D::getNoseHooverParams:: damping: " << this->sim_->gamma << endl;
 }
 
 //************************* Nose-Hoover integrator ***************************//
-void SP2D::initSoftParticleNoseHoover(double Temp, double gamma, double mass, bool readState) {
+void SP2D::initSoftParticleNoseHoover(double Temp, double mass, double gamma, bool readState) {
   this->sim_ = new SoftParticleNoseHoover(this, SimConfig(Temp, 0, 0));
-  this->sim_->gamma = gamma;
   this->sim_->mass = mass;
+  this->sim_->gamma = gamma;
   resetLastPositions();
   shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleNoseHoover:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << "SP2D::initSoftParticleNoseHoover:: current temperature: " << setprecision(12) << getParticleTemperature();
+  cout << " mass: " << this->sim_->mass << ", damping: " << this->sim_->gamma << endl;
 }
 
 void SP2D::softParticleNoseHooverLoop() {

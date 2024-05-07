@@ -58,7 +58,7 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-EXE = compressPacking
+#EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -67,6 +67,7 @@ EXE = compressPacking
 #EXE = runNVE
 #EXE = runNVE2LJ
 #EXE = runNPT
+EXE = runNH2LJ
 #EXE = runNVTLJ
 #EXE = runNVT2LJ
 #EXE = runActiveLJ

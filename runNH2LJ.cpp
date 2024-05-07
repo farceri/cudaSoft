@@ -23,16 +23,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false, ljwca = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave = false, linSave = true, alltoall = false, fixedbc = false;
-  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
+  long numParticles = atol(argv[6]), nDim = 3, maxStep = atof(argv[4]), num1 = atol(argv[7]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]), mass = 1, damping = 1;
+  double ec = 1, ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), mass = 10, damping = 1;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   std::tuple<double, double> Temps;
@@ -41,8 +41,14 @@ int main(int argc, char **argv) {
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  if(ljwca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
+    sp.setEnergyCostant(ec);
+    sp.setLJWCAparams(LJcut, num1);
+  } else {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -81,7 +87,7 @@ int main(int argc, char **argv) {
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
-    ioSP.readNoseHooverParams(inDir);
+    ioSP.readNoseHooverParams(inDir, mass, damping);
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -92,7 +98,7 @@ int main(int argc, char **argv) {
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   // initialize simulation
-  sp.initSoftParticleNoseHoover(Tinject, damping, mass, readState);
+  sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
@@ -112,7 +118,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleNoseHooverLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleNoseHooverEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
@@ -129,6 +135,9 @@ int main(int argc, char **argv) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveParticleNeighbors(outDir);
           ioSP.saveNoseHooverParams(outDir);
+          if(nDim == 3) {
+            ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+          }
         }
       }
     }
@@ -167,6 +176,9 @@ int main(int argc, char **argv) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleNeighbors(outDir);
     ioSP.saveNoseHooverParams(outDir);
+    if(nDim == 3) {
+      ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+    }
   }
   ioSP.closeEnergyFile();
 
