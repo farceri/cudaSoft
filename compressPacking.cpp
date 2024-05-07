@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = false, wca = false, doublelj = false, ljwca = true;
-  bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = true, scaleVel = false;
+  bool read = false, readState = false, lj = true, wca = false, doublelj = false, ljwca = false;
+  bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = false, scaleVel = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 2e04, step = 0, maxSearchStep = 1500, searchStep = 0;

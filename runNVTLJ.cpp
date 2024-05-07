@@ -27,13 +27,16 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = false, fixedSides = false;
-  long numParticles = atol(argv[7]), nDim = 2, maxStep = atof(argv[4]);
+  long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, timeStep = atof(argv[2]);//n = 12, m = 6
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 2;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
+  if(nDim == 3) {
+    LJcut = 2.5;
+  }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -131,6 +134,10 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
+          ioSP.saveParticleNeighbors(outDir);
+          if(nDim == 3) {
+            ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+          }
         }
       }
     }
@@ -146,7 +153,6 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -155,7 +161,9 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
-        //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
+        //if(nDim == 3) {
+        //  ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+        //}
       }
     }
     step += 1;
@@ -169,6 +177,9 @@ int main(int argc, char **argv) {
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleNeighbors(outDir);
+    if(nDim == 3) {
+      ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+    }
   }
   ioSP.closeEnergyFile();
 
