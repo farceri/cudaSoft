@@ -281,6 +281,8 @@ public:
 
   void setLJcutoff(double LJcutoff_);
 
+  void setLJWCAparams(double LJcutoff_, long num1_);
+
   void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_);
 
   void setMieParams(double LJcutoff_, double nPower_, double mPower_);

@@ -578,14 +578,20 @@ public:
     outputFile << 0 << "\t" << boxSize[1] << endl;
     if(nDim_ == 3) {
       outputFile << 0 << "\t" << boxSize[2] << endl;
-      outputFile << "ITEM: ATOMS id radius xu yu zu" << endl;
+      outputFile << "ITEM: ATOMS id type radius xu yu zu" << endl;
     } else {
-      outputFile << "ITEM: ATOMS id radius xu yu" << endl;
+      outputFile << "ITEM: ATOMS id type radius xu yu" << endl;
     }
+    int type = 1;
     for (long particleId = 0; particleId < numParticles_; particleId++) {
+      if(particleId < sp_->num1) {
+        type = 1;
+      } else {
+        type = 2;
+      }
       //outputFile << particleId + 1 << "\t" << 1 << "\t" << particleId + 1 << "\t";
       //outputFile << rad[particleId] << "\t" << pos[particleId * nDim] << "\t" << pos[particleId * nDim + 1] << "\t" << pos[particleId * nDim + 2] << endl;
-      outputFile << particleId + 1 << "\t" << rad[particleId] << "\t";
+      outputFile << particleId + 1 << "\t" << type << "\t" << rad[particleId] << "\t";
       if(nDim_ == 3) {
         outputFile << pos[particleId * nDim_] << "\t" << pos[particleId * nDim_ + 1] << "\t" << pos[particleId * nDim_ + 2] << endl;
       } else {

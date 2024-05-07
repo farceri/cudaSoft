@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = true, scaleVel = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 2e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double LJcut = 2.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
     cout << "Setting WCA potential" << endl;
   } else if(ljwca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
-    sp.setLJcutoff(LJcut);
+    sp.setLJWCAparams(LJcut, num1);
     cout << "Setting LJ-WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;

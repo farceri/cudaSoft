@@ -41,6 +41,7 @@ SP2D::SP2D(long nParticles, long dim) {
   dimBlock = 256;
   nDim = dim;
   numParticles = nParticles;
+  num1 = numParticles;
   // the default is monodisperse size distribution
   setDimBlock(dimBlock);
   setNDim(nDim);
@@ -157,17 +158,17 @@ void SP2D::syncSimControlFromDevice() {
 void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
 	simControl.geometryType = geometryType_;
   if(simControl.geometryType == simControlStruct::geometryEnum::normal) {
-    cout << "SP2D: setGeometryType: geometryType: normal" << endl;
+    cout << "SP2D::setGeometryType: geometryType: normal" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
-    cout << "SP2D: setGeometryType: geometryType: leesEdwards" << endl;
+    cout << "SP2D::setGeometryType: geometryType: leesEdwards" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedBox) {
-    cout << "SP2D: setGeometryType: geometryType: fixedBox" << endl;
+    cout << "SP2D::setGeometryType: geometryType: fixedBox" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides2D) {
-    cout << "SP2D: setGeometryType: geometryType: fixedSides2D" << endl;
+    cout << "SP2D:;setGeometryType: geometryType: fixedSides2D" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides3D) {
-    cout << "SP2D: setGeometryType: geometryType: fixedSides3D" << endl;
+    cout << "SP2D::setGeometryType: geometryType: fixedSides3D" << endl;
   } else {
-    cout << "SP2D: setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox, fixedSides2D or fixedSides3D" << endl;
+    cout << "SP2D::setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox, fixedSides2D or fixedSides3D" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -180,11 +181,11 @@ simControlStruct::geometryEnum SP2D::getGeometryType() {
 void SP2D::setNeighborType(simControlStruct::neighborEnum neighborType_) {
 	simControl.neighborType = neighborType_;
   if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
-    cout << "SP2D: setNeighborType: neighborType: neighbor" << endl;
+    cout << "SP2D::setNeighborType: neighborType: neighbor" << endl;
   } else if(simControl.neighborType == simControlStruct::neighborEnum::allToAll) {
-    cout << "SP2D: setNeighborType: neighborType: allToAll" << endl;
+    cout << "SP2D::setNeighborType: neighborType: allToAll" << endl;
   } else {
-    cout << "SP2D: setNeighborType: please specify valid neighborType: neighbor or allToAll" << endl;
+    cout << "SP2D::setNeighborType: please specify valid neighborType: neighbor or allToAll" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -197,21 +198,21 @@ simControlStruct::neighborEnum SP2D::getNeighborType() {
 void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
 	simControl.potentialType = potentialType_;
   if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
-    cout << "SP2D: setPotentialType: potentialType: harmonic" << endl;
+    cout << "SP2D::setPotentialType: potentialType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    cout << "SP2D: setPotentialType: potentialType: lennardJones" << endl;
+    cout << "SP2D::setPotentialType: potentialType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
-    cout << "SP2D: setPotentialType: potentialType: Mie" << endl;
+    cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
-    cout << "SP2D: setPotentialType: potentialType: WCA" << endl;
+    cout << "SP2D::setPotentialType: potentialType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
-    cout << "SP2D: setPotentialType: potentialType: adhesive" << endl;
+    cout << "SP2D::setPotentialType: potentialType: adhesive" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    cout << "SP2D: setPotentialType: potentialType: doubleLJ" << endl;
+    cout << "SP2D::setPotentialType: potentialType: doubleLJ" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
-    cout << "SP2D: setPotentialType: potentialType: LJWCA" << endl;
+    cout << "SP2D::setPotentialType: potentialType: LJWCA" << endl;
   } else {
-    cout << "SP2D: setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ and LJWCA" << endl;
+    cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ and LJWCA" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -224,11 +225,11 @@ simControlStruct::potentialEnum SP2D::getPotentialType() {
 void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
 	simControl.boxType = boxType_;
   if(simControl.boxType == simControlStruct::boxEnum::harmonic) {
-    cout << "SP2D: setBoxType: boxType: harmonic" << endl;
+    cout << "SP2D::setBoxType: boxType: harmonic" << endl;
   } else if(simControl.boxType == simControlStruct::boxEnum::WCA) {
-    cout << "SP2D: setBoxType: boxType: WCA" << endl;
+    cout << "SP2D::setBoxType: boxType: WCA" << endl;
   } else {
-    cout << "SP2D: setBoxType: please specify valid boxType: on or off" << endl;
+    cout << "SP2D::setBoxType: please specify valid boxType: on or off" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -241,11 +242,11 @@ simControlStruct::boxEnum SP2D::getBoxType() {
 void SP2D::setGravityType(simControlStruct::gravityEnum gravityType_) {
 	simControl.gravityType = gravityType_;
   if(simControl.gravityType == simControlStruct::gravityEnum::on) {
-    cout << "SP2D: setGravityType: gravityType: on" << endl;
+    cout << "SP2D::setGravityType: gravityType: on" << endl;
   } else if(simControl.gravityType == simControlStruct::gravityEnum::off) {
-    cout << "SP2D: setGravityType: gravityType: off" << endl;
+    cout << "SP2D::setGravityType: gravityType: off" << endl;
   } else {
-    cout << "SP2D: setGravityType: please specify valid gravityType: on or off" << endl;
+    cout << "SP2D::setGravityType: please specify valid gravityType: on or off" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1019,7 +1020,14 @@ void SP2D::setLJcutoff(double LJcutoff_) {
   double ratio6 = pow(LJcutoff, 6);
 	LJfshift = 24 * ec * (2 / ratio6 - 1) / (LJcutoff * ratio6);
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
-  cout << "SP2D::setLJcutoff: LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
+  cout << "SP2D::setLJcutoff::LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
+}
+
+void SP2D::setLJWCAparams(double LJcutoff_, long num1_) {
+  setLJcutoff(LJcutoff_);
+  num1 = num1_;
+  cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
+  cout << "SP2D::setLJWCAparams::num1: " << num1 << endl;
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
@@ -1038,7 +1046,7 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
-  cout << "SP2D::setDoubleLJconstants: eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB;
+  cout << "SP2D::setDoubleLJconstants::eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB;
   cout << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " LJfshift: " << LJfshift << " num1: " << num1 << endl;
 }
 
