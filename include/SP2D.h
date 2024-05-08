@@ -24,7 +24,7 @@ using std::tuple;
 struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
-  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJWCA} potentialType;
+  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
   enum class boxEnum {harmonic, WCA} boxType;
   enum class gravityEnum {on, off} gravityType;
 };
@@ -70,6 +70,7 @@ public:
   double l1, l2;
   // Lennard-Jones constants
   double LJcutoff, LJecut, LJfshift;
+  double LJecutPlus, LJfshiftPlus;
   // double Lennard-Jones constants
   double eAA, eAB, eBB;
   long num1;
@@ -281,9 +282,11 @@ public:
 
   void setLJcutoff(double LJcutoff_);
 
-  void setLJWCAparams(double LJcutoff_, long num1_);
-
   void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_);
+
+  void setLJMinusPlusParams(double LJcutoff_, long num1_);
+
+  void setLJWCAparams(double LJcutoff_, long num1_);
 
   void setMieParams(double LJcutoff_, double nPower_, double mPower_);
 

@@ -36,6 +36,8 @@ __constant__ double d_l2;
 __constant__ double d_LJcutoff;
 __constant__ double d_LJecut;
 __constant__ double d_LJfshift;
+__constant__ double d_LJecutPlus;
+__constant__ double d_LJfshiftPlus;
 // Double Lennard-Jones
 __constant__ double d_eAA;
 __constant__ double d_eAB;
@@ -345,6 +347,7 @@ inline __device__ double calcMieForceShift(const double radSum) {
 inline __device__ double calcGradMultiple(const long particleId, const long otherId, const double* thisPos, const double* otherPos, const double radSum) {
 	auto distance = calcDistance(thisPos, otherPos);
 	double overlap, ratio, ratio6, ratio12, ration, ratiom, forceShift, gradMultiple = 0.0;
+	double sign = -1.0;
 	switch (d_simControl.potentialType) {
 		case simControlStruct::potentialEnum::harmonic:
 		overlap = 1 - distance / radSum;
@@ -411,6 +414,21 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 				gradMultiple *= d_eAB;
 			}
 			return gradMultiple;
+		} else {
+			return 0;
+		}
+		break;
+		case simControlStruct::potentialEnum::LJMinusPlus:
+		ratio = radSum / distance;
+		ratio6 = pow(ratio, 6);
+		ratio12 = ratio6 * ratio6;
+		if (distance < (d_LJcutoff * radSum)) {
+			forceShift = d_LJfshift / radSum;
+			if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+				sign = 1.0;
+				forceShift = d_LJfshiftPlus / radSum;
+			}
+			return 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
 		} else {
 			return 0;
 		}
@@ -615,6 +633,35 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 	}
 }
 
+inline __device__ double calcLJMinusPlusInteraction(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId, double* currentForce) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto sign = -1.0;
+		auto forceShift = d_LJfshiftPlus / radSum;
+		auto ecut = d_LJecut;
+		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+			sign = 1.0;
+			forceShift = d_LJfshiftPlus / radSum;
+			ecut = d_LJecutPlus;
+		}
+		auto gradMultiple = 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
+		auto epot = 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+	    	currentForce[dim] += gradMultiple * delta[dim] / distance;
+	  	}
+		return epot;
+	} else {
+		return 0.0;
+	}
+}
+
 // particle-particle interaction
 __global__ void kernelCalcParticleInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -648,6 +695,10 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					case simControlStruct::potentialEnum::doubleLJ:
 					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
 					pEnergy[particleId] += calcDoubleLJInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
+					break;
+					case simControlStruct::potentialEnum::LJMinusPlus:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					pEnergy[particleId] += calcLJMinusPlusInteraction(thisPos, otherPos, radSum, particleId, otherId, &pForce[particleId*d_nDim]);
 					break;
 					case simControlStruct::potentialEnum::LJWCA:
 					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];

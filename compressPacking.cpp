@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   double LJcut = 2.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.6;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
-  double ea = 1, eb = 1, eab = 0.1, gravity = 9.8e-04, mass = 10, damping = 1;
+  double gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);

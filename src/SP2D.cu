@@ -209,10 +209,12 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     cout << "SP2D::setPotentialType: potentialType: adhesive" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
+    cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
     cout << "SP2D::setPotentialType: potentialType: LJWCA" << endl;
   } else {
-    cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ and LJWCA" << endl;
+    cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -670,6 +672,12 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     case simControlStruct::potentialEnum::doubleLJ:
     cutDistance = LJcutoff;
     break;
+    case simControlStruct::potentialEnum::LJMinusPlus:
+    cutDistance = LJcutoff;
+    break;
+    case simControlStruct::potentialEnum::LJWCA:
+    cutDistance = LJcutoff;
+    break;
     default:
     break;
   }
@@ -1014,20 +1022,12 @@ void SP2D::setAdhesionParams(double l1_, double l2_) {
 
 void SP2D::setLJcutoff(double LJcutoff_) {
   LJcutoff = LJcutoff_;
-  cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
-  LJecut = 4 * ec * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
+  double ratio6 = 1 / pow(LJcutoff, 6);
+  LJecut = 4 * ec * (ratio6 * ratio6 - ratio6);
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  double ratio6 = pow(LJcutoff, 6);
-	LJfshift = 24 * ec * (2 / ratio6 - 1) / (LJcutoff * ratio6);
+	LJfshift = 24 * ec * (2 * ratio6 - 1) * ratio6 / LJcutoff;
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   cout << "SP2D::setLJcutoff::LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
-}
-
-void SP2D::setLJWCAparams(double LJcutoff_, long num1_) {
-  setLJcutoff(LJcutoff_);
-  num1 = num1_;
-  cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
-  cout << "SP2D::setLJWCAparams::num1: " << num1 << endl;
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
@@ -1039,15 +1039,41 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_eAA, &eAA, sizeof(eAA));
   cudaMemcpyToSymbol(d_eAB, &eAB, sizeof(eAB));
   cudaMemcpyToSymbol(d_eBB, &eBB, sizeof(eBB));
-  LJecut = 4 * (1 / pow(LJcutoff, 12) - 1 / pow(LJcutoff, 6));
+  double ratio6 = 1 / pow(LJcutoff, 6);
+  LJecut = 4 * (ratio6 * ratio6 - ratio6);
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
-  double ratio6 = pow(LJcutoff, 6);
-	LJfshift = 24 * (2 / ratio6 - 1) / (LJcutoff * ratio6);
+	LJfshift = 24 * (2 * ratio6 - 1) * ratio6 / LJcutoff;
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
   cout << "SP2D::setDoubleLJconstants::eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB;
   cout << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " LJfshift: " << LJfshift << " num1: " << num1 << endl;
+}
+
+void SP2D::setLJWCAparams(double LJcutoff_, long num1_) {
+  setLJcutoff(LJcutoff_);
+  num1 = num1_;
+  cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
+  cout << "SP2D::setLJWCAparams::num1: " << num1 << endl;
+}
+
+void SP2D::setLJMinusPlusParams(double LJcutoff_, long num1_) {
+  LJcutoff = LJcutoff_;
+  cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
+  double ratio6 = 1 / pow(LJcutoff, 6);
+  LJecut = 4 * ec * (ratio6 * ratio6 - ratio6);
+  cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
+	LJfshift = 24 * ec * (2 * ratio6 - 1) * ratio6 / LJcutoff;
+  cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
+  // repulsive Lennard-Jones
+  LJecutPlus = 4 * ec * (ratio6 * ratio6 + ratio6);
+  cudaMemcpyToSymbol(d_LJecutPlus, &LJecutPlus, sizeof(LJecutPlus));
+	LJfshiftPlus = 24 * ec * (2 * ratio6 + 1) * ratio6 / LJcutoff;
+  cudaMemcpyToSymbol(d_LJfshiftPlus, &LJfshiftPlus, sizeof(LJfshiftPlus));
+  cout << "SP2D::setLJMinusPlusParams::LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
+  num1 = num1_;
+  cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
+  cout << "SP2D::setLJMinusPlusParams::num1: " << num1 << endl;
 }
 
 void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
