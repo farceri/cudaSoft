@@ -114,7 +114,6 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);

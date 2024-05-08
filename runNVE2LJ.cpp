@@ -23,19 +23,22 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel, doubleT = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel = false, doubleT = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave = false, linSave = true, alltoall = false, fixedbc = false;
-  long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]), num1 = atol(argv[7]);
+  long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]), num1 = atol(argv[8]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = 1, eb = 1, eab = 0.25, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
+  double ea = 1, eb = 1, eab = 0.1, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   std::tuple<double, double> Temps;
+  if(nDim == 3) {
+    LJcut = 2.5;
+  }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
@@ -123,8 +126,6 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   // run integrator
-  ioSP.saveParticlePacking(outDir);
-  ioSP.saveParticleNeighbors(outDir);
   while(step != maxStep) {
     if(scaleVel == true) {
       if(doubleT == true) {
@@ -161,6 +162,9 @@ int main(int argc, char **argv) {
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveParticleNeighbors(outDir);
+          if(nDim == 3) {
+            ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+          }
         }
       }
     }
@@ -198,6 +202,9 @@ int main(int argc, char **argv) {
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleNeighbors(outDir);
+    if(nDim == 3) {
+      ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+    }
   }
   ioSP.closeEnergyFile();
 

@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = true, wca = false, doublelj = false, ljwca = false;
+  bool read = false, readState = false, lj = true, wca = false;
   bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = false, scaleVel = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   double LJcut = 2.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.6;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
-  double ea = 2, eb = 2, eab = 0.5, gravity = 9.8e-04, mass = 10, damping = 1;
+  double ea = 1, eb = 1, eab = 0.1, gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
@@ -98,14 +98,6 @@ int main(int argc, char **argv) {
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-  } else if(doublelj == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
-    cout << "Setting WCA potential" << endl;
-  } else if(ljwca == true) {
-    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
-    sp.setLJWCAparams(LJcut, num1);
-    cout << "Setting LJ-WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;
   }
