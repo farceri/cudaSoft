@@ -1317,7 +1317,11 @@ __global__ void kernelCalcParticleActivePressure(const double* pAngle, const dou
 		double activeForce[MAXDIM], thisPos[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		for (long dim = 0; dim < d_nDim; dim++) {
-      		activeForce[dim] = driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
+			if(d_nDim == 2) {
+      			activeForce[dim] = driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
+			} else if(d_nDim == 3) {
+				activeForce[dim] = driving * pAngle[particleId * d_nDim + dim];
+			}
 			activeWork += activeForce[dim] * thisPos[dim];
     	}
 	}

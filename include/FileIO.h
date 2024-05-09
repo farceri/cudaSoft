@@ -375,7 +375,9 @@ public:
     string fileParams = dirName + "params.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
+    long nDim = sp_->getNDim();
     saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
+    saveParams << "nDim" << "\t" << nDim << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
     saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
@@ -384,7 +386,6 @@ public:
     // save vectors
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-    //save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
@@ -399,7 +400,9 @@ public:
   string fileParams = dirName + "params.dat";
   ofstream saveParams(fileParams.c_str());
   openOutputFile(fileParams);
+  long nDim = sp_->getNDim();
   saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
+  saveParams << "nDim" << "\t" << nDim << endl;
   saveParams << "dt" << "\t" << sp_->dt << endl;
   saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
   saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
@@ -408,11 +411,15 @@ public:
   // save vectors
   save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
   save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-  save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+  if(nDim == 2) {
+    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+  } else {
+    save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), nDim);
+  }
   //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-  save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-  save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-  save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+  save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
+  save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
+  save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), nDim);
   //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
   //sp_->calcParticleContacts(0.);
   //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
@@ -451,15 +458,17 @@ public:
   void readParticleActiveState(string dirName, long numParticles_, long nDim_) {
     thrust::host_vector<double> particleAngle_(numParticles_);
     thrust::host_vector<double> particleVel_(numParticles_ * nDim_);
-    particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
-    sp_->setParticleAngles(particleAngle_);
     if(nDim_ == 2) {
+      particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
       particleVel_ = read2DFile(dirName + "particleVel.dat", numParticles_);
     } else if(nDim_ == 3) {
+      particleAngle_.resize(numParticles_ * nDim_);
+      particleAngle_ = read3DFile(dirName + "particleAngles.dat", numParticles_);
       particleVel_ = read3DFile(dirName + "particleVel.dat", numParticles_);
     } else {
       cout << "FileIO::readParticleActiveState: only dimensions 2 and 3 are allowed!" << endl;
     }
+    sp_->setParticleAngles(particleAngle_);
     sp_->setParticleVelocities(particleVel_);
   }
 
@@ -470,7 +479,11 @@ public:
   }
 
   void saveParticleActiveState(string dirName) {
-    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+    if(sp_->nDim == 2) {
+      save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+    } else {
+      save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
+    }
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
   }

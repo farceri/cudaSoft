@@ -103,7 +103,11 @@ void SP2D::initParticleVariables(long numParticles_) {
   d_particleVel.resize(numParticles_ * nDim);
   d_particleForce.resize(numParticles_ * nDim);
   d_particleEnergy.resize(numParticles_);
-  d_particleAngle.resize(numParticles_);
+  if(nDim == 2) {
+    d_particleAngle.resize(numParticles_);
+  } else if(nDim == 3) {
+    d_particleAngle.resize(numParticles_ * nDim);
+  }
   thrust::fill(d_particleRad.begin(), d_particleRad.end(), double(0));
   thrust::fill(d_particlePos.begin(), d_particlePos.end(), double(0));
   thrust::fill(d_particleVel.begin(), d_particleVel.end(), double(0));
@@ -994,11 +998,24 @@ void SP2D::computeParticleAngleFromVel() {
   double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
 
-  auto computeParticleAngle = [=] __device__ (long particleId) {
-    pAngle[particleId] = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
-  };
+  if(nDim == 2) {
+    auto computeParticleAngle2D = [=] __device__ (long particleId) {
+      pAngle[particleId] = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
+    };
 
-  thrust::for_each(r, r + numParticles, computeParticleAngle);
+    thrust::for_each(r, r + numParticles, computeParticleAngle2D);
+    
+  } else if(nDim == 3) {
+      auto computeParticleAngle3D = [=] __device__ (long particleId) {
+      auto theta = acos(pVel[particleId * p_nDim + 2]);
+      auto phi = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
+      pAngle[particleId * p_nDim] = cos(theta) * cos(phi);
+      pAngle[particleId * p_nDim + 1] = sin(theta) * cos(phi);
+      pAngle[particleId * p_nDim + 2] = sin(phi);
+    };
+
+    thrust::for_each(r, r + numParticles, computeParticleAngle3D);
+  }
 }
 
 //*************************** force and energy *******************************//
@@ -1988,7 +2005,7 @@ void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving
   this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(numParticles);
+  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
@@ -2013,7 +2030,7 @@ void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, 
   this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(numParticles);
+  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   // subset variables
   this->sim_->firstIndex = firstIndex;
@@ -2043,7 +2060,7 @@ void SP2D::initSoftParticleActiveExtField(double Temp, double Dr, double driving
   this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(numParticles);
+  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();

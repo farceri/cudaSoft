@@ -528,24 +528,62 @@ void SoftParticleActiveLangevin::updateThermalVel() {
   // generate active forces
   double amplitude = sqrt(2. * config.Dr * sp_->dt);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles, d_pActiveAngle.begin(), gaussNum(0.f,1.f));
   double s_driving(config.driving);
-  const double *pActiveAngle = thrust::raw_pointer_cast(&d_pActiveAngle[0]);
   double *pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
-	double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+  double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 
-  auto langevinUpdateThermalNoise = [=] __device__ (long particleId) {
-    pAngle[particleId] += amplitude * pActiveAngle[particleId];
-    #pragma unroll (MAXDIM)
-    for (long dim = 0; dim < s_nDim; dim++) {
-      thermalVel[particleId * s_nDim + dim] = s_lcoeff1 * (0.5 * rand[particleId * s_nDim + dim] + rando[particleId * s_nDim + dim] / sqrt(3));
-      rand[particleId * s_nDim + dim] *= s_lcoeff2;
-      rando[particleId * s_nDim + dim] *= s_lcoeff3;
-      pForce[particleId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
-    }
-  };
+  if(sp_->nDim == 2) {
+    thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles, d_pActiveAngle.begin(), gaussNum(0.f,1.f));
+    const double *pActiveAngle = thrust::raw_pointer_cast(&d_pActiveAngle[0]);
 
-  thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise);
+    auto langevinUpdateThermalNoise2D = [=] __device__ (long particleId) {
+      pAngle[particleId] += amplitude * pActiveAngle[particleId];
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        thermalVel[particleId * s_nDim + dim] = s_lcoeff1 * (0.5 * rand[particleId * s_nDim + dim] + rando[particleId * s_nDim + dim] / sqrt(3));
+        rand[particleId * s_nDim + dim] *= s_lcoeff2;
+        rando[particleId * s_nDim + dim] *= s_lcoeff3;
+        pForce[particleId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
+      }
+    };
+
+    thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise2D);
+
+  } else if(sp_->nDim == 3) {
+    auto s = thrust::counting_iterator<long>(0);
+    thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_pActiveAngle.begin(), gaussNum(0.f,1.f));
+    double *pActiveAngle = thrust::raw_pointer_cast(&d_pActiveAngle[0]);
+
+    auto normalizeVector = [=] __device__ (long particleId) {
+      auto norm = 0.0;
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        norm += pActiveAngle[particleId * s_nDim + dim] * pActiveAngle[particleId * s_nDim + dim];
+      }
+      norm = sqrt(norm);
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pActiveAngle[particleId * s_nDim + dim] /= norm;
+      }
+    };
+
+    thrust::for_each(s, s + sp_->numParticles, normalizeVector);
+
+    auto langevinUpdateThermalNoise3D = [=] __device__ (long particleId) {
+      pAngle[particleId * s_nDim] += amplitude * (pAngle[particleId * s_nDim + 1] * pActiveAngle[particleId * s_nDim + 2] - pAngle[particleId * s_nDim + 2] * pActiveAngle[particleId * s_nDim + 1]);
+      pAngle[particleId * s_nDim + 1] += amplitude * (pAngle[particleId * s_nDim + 2] * pActiveAngle[particleId * s_nDim] - pAngle[particleId * s_nDim] * pActiveAngle[particleId * s_nDim + 2]);
+      pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * pActiveAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * pActiveAngle[particleId * s_nDim]);
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        thermalVel[particleId * s_nDim + dim] = s_lcoeff1 * (0.5 * rand[particleId * s_nDim + dim] + rando[particleId * s_nDim + dim] / sqrt(3));
+        rand[particleId * s_nDim + dim] *= s_lcoeff2;
+        rando[particleId * s_nDim + dim] *= s_lcoeff3;
+        pForce[particleId * s_nDim + dim] += s_driving * pAngle[particleId * s_nDim + dim];
+      }
+    };
+
+    thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise3D);
+  }
 }
 
 //*********** soft particle active langevin with massive particles ***********//
