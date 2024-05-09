@@ -42,7 +42,7 @@ __constant__ double d_LJfshiftPlus;
 __constant__ double d_eAA;
 __constant__ double d_eAB;
 __constant__ double d_eBB;
-__constant__ double d_num1;
+__constant__ long d_num1;
 // Mie constants
 __constant__ double d_nPower;
 __constant__ double d_mPower;
@@ -406,12 +406,18 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 		if (distance < (d_LJcutoff * radSum)) {
 			forceShift = d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 			gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
-			if(particleId < d_num1 && otherId < d_num1) {
-			gradMultiple *= d_eAA;
-			} else if(particleId >= d_num1 && otherId >= d_num1) {
-				gradMultiple *= d_eBB;
+			if(particleId < d_num1) {
+				if(otherId < d_num1) {
+					gradMultiple *= d_eAA;
+				} else {
+					gradMultiple *= d_eAB;
+				}
 			} else {
-				gradMultiple *= d_eAB;
+				if(otherId >= d_num1) {
+					gradMultiple *= d_eBB;
+				} else {
+					gradMultiple *= d_eAB;
+				}
 			}
 			return gradMultiple;
 		} else {
@@ -613,15 +619,22 @@ inline __device__ double calcDoubleLJInteraction(const double* thisPos, const do
 		auto gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
 		auto epot = 0.5 * (4 * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 		// set energy scale based on particle indices
-		if(particleId < d_num1 && otherId < d_num1) {
-			gradMultiple *= d_eAA;
-			epot *= d_eAA;
-		} else if(particleId >= d_num1 && otherId >= d_num1) {
-			gradMultiple *= d_eBB;
-			epot *= d_eBB;
+		if(particleId < d_num1) {
+			if(otherId < d_num1) {
+				gradMultiple *= d_eAA;
+				epot *= d_eAA;
+			} else {
+				gradMultiple *= d_eAB;
+				epot *= d_eAB;
+			}
 		} else {
-			gradMultiple *= d_eAB;
-			epot *= d_eAB;
+			if(otherId >= d_num1) {
+				gradMultiple *= d_eBB;
+				epot *= d_eBB;
+			} else {
+				gradMultiple *= d_eAB;
+				epot *= d_eAB;
+			}
 		}
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
@@ -645,13 +658,15 @@ inline __device__ double calcLJMinusPlusInteraction(const double* thisPos, const
 		auto sign = -1.0;
 		auto forceShift = d_LJfshift / radSum;
 		auto ecut = d_LJecut;
+		auto multiple = 1;
 		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+			//printf("particleId %ld otherId %ld d_num1: %ld\n", particleId, otherId, d_num1);
 			sign = 1.0;
 			forceShift = d_LJfshiftPlus / radSum;
 			ecut = d_LJecutPlus;
 		}
-		auto gradMultiple = 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
-		auto epot = 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+		auto gradMultiple = multiple * 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
+		auto epot = multiple * 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 	    	currentForce[dim] += gradMultiple * delta[dim] / distance;
@@ -702,12 +717,10 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 					break;
 					case simControlStruct::potentialEnum::LJWCA:
 					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
-					if(particleId < d_num1 && otherId < d_num1) {
-						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
-					} else if(particleId >= d_num1 && otherId >= d_num1) {
-						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
-					} else {
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
 						pEnergy[particleId] += calcWCAInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
+					} else {
+						pEnergy[particleId] += calcLJInteraction(thisPos, otherPos, radSum, &pForce[particleId*d_nDim]);
 					}
 					break;
 					default:
@@ -824,12 +837,18 @@ inline __device__ double calcDoubleLJYforce(const double* thisPos, const double*
 		auto forceShift = d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
 		auto gradMultiple = 24 * (2 * ratio12 - ratio6) / distance - forceShift;
 		// set energy scale based on particle indices
-		if(particleId < d_num1 && otherId < d_num1) {
-			gradMultiple *= d_eAA;
-		} else if(particleId >= d_num1 && otherId >= d_num1) {
-			gradMultiple *= d_eBB;
+		if(particleId < d_num1) {
+			if(otherId < d_num1) {
+				gradMultiple *= d_eAA;
+			} else {
+				gradMultiple *= d_eAB;
+			}
 		} else {
-			gradMultiple *= d_eAB;
+			if(otherId >= d_num1) {
+				gradMultiple *= d_eBB;
+			} else {
+				gradMultiple *= d_eAB;
+			}
 		}
 		return gradMultiple * delta[1] / distance;
 	} else {

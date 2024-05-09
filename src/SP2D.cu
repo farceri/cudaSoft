@@ -1047,15 +1047,20 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
+  long num1FromDevice = 0;
+  cudaMemcpyFromSymbol(&num1FromDevice, d_num1, sizeof(d_num1));
   cout << "SP2D::setDoubleLJconstants::eAA: " << eAA << " eAB: " << eAB << " eBB: " << eBB;
-  cout << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " LJfshift: " << LJfshift << " num1: " << num1 << endl;
+  cout << " LJcutoff: " << LJcutoff << " LJecut: " << LJecut << " LJfshift: " << LJfshift;
+  cout << " num1: " << num1 << " from device: " << num1FromDevice << endl;
 }
 
 void SP2D::setLJWCAparams(double LJcutoff_, long num1_) {
   setLJcutoff(LJcutoff_);
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
-  cout << "SP2D::setLJWCAparams::num1: " << num1 << endl;
+  long num1FromDevice = 0;
+  cudaMemcpyFromSymbol(&num1FromDevice, d_num1, sizeof(d_num1));
+  cout << "SP2D::setLJWCAparams::num1: " << num1 << " from device: " << num1FromDevice << endl;
 }
 
 void SP2D::setLJMinusPlusParams(double LJcutoff_, long num1_) {
@@ -1074,7 +1079,9 @@ void SP2D::setLJMinusPlusParams(double LJcutoff_, long num1_) {
   cout << "SP2D::setLJMinusPlusParams::LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
   num1 = num1_;
   cudaMemcpyToSymbol(d_num1, &num1, sizeof(num1));
-  cout << "SP2D::setLJMinusPlusParams::num1: " << num1 << endl;
+  long num1FromDevice = 0;
+  cudaMemcpyFromSymbol(&num1FromDevice, d_num1, sizeof(d_num1));
+  cout << "SP2D::setLJMinusPlusParams::num1: " << num1 << " from device: " << num1FromDevice << endl;
 }
 
 void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
