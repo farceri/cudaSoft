@@ -643,7 +643,7 @@ inline __device__ double calcLJMinusPlusInteraction(const double* thisPos, const
 	auto ratio12 = ratio6 * ratio6;
 	if (distance < (d_LJcutoff * radSum)) {
 		auto sign = -1.0;
-		auto forceShift = d_LJfshiftPlus / radSum;
+		auto forceShift = d_LJfshift / radSum;
 		auto ecut = d_LJecut;
 		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
 			sign = 1.0;
@@ -837,6 +837,29 @@ inline __device__ double calcDoubleLJYforce(const double* thisPos, const double*
 	}
 }
 
+inline __device__ double calcLJMinusPlusYforce(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto sign = -1.0;
+		auto forceShift = d_LJfshift / radSum;
+		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+			sign = 1.0;
+			forceShift = d_LJfshiftPlus / radSum;
+		}
+		auto gradMultiple = 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
+		return gradMultiple * delta[1] / distance;
+	} else {
+		return 0.0;
+	}
+}
+
+
 // particle-particle interaction across fictitious wall at half height in 2D
 __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -878,6 +901,10 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 								case simControlStruct::potentialEnum::doubleLJ:
 								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
 								wallForce[particleId] += calcDoubleLJYforce(thisPos, otherPos, radSum, particleId, otherId);
+								break;
+								case simControlStruct::potentialEnum::LJMinusPlus:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								wallForce[particleId] += calcLJMinusPlusYforce(thisPos, otherPos, radSum, particleId, otherId);
 								break;
 								case simControlStruct::potentialEnum::LJWCA:
 								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];

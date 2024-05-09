@@ -1022,6 +1022,7 @@ void SP2D::setAdhesionParams(double l1_, double l2_) {
 
 void SP2D::setLJcutoff(double LJcutoff_) {
   LJcutoff = LJcutoff_;
+  cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   double ratio6 = 1 / pow(LJcutoff, 6);
   LJecut = 4 * ec * (ratio6 * ratio6 - ratio6);
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
