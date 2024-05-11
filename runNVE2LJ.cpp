@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool scaleVel = false, doubleT = false, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
@@ -35,7 +35,7 @@ int main(int argc, char **argv) {
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ec = 1, ea = 1, eb = 1, eab = 0.1, Tinject = atof(argv[3]), Tinject2 = atof(argv[8]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh/";
-  dirSample = whichDynamics + "T" + argv[3] + "/nve/video/";
+  dirSample = whichDynamics + "T" + argv[3] + "/nve/";
   std::tuple<double, double> Temps;
   if(nDim == 3) {
     LJcut = 2.5;
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        outDir = outDir + "video/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {

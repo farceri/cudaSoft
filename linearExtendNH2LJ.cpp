@@ -23,13 +23,14 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = true, biaxial = true, centered = false, adjustEkin = false, adjustTemp = false;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false;
+  bool ljwca = false, ljmp = false, adjustEkin = false, adjustTemp = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx, mass = 10, damping = 1;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double ea = 1, eb = 1, eab = 0.1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nh-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -38,12 +39,12 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
-      dirSample = "nve-biaxial-comp";
+      dirSample = "nh-biaxial-comp";
     } else {
-      dirSample = "nve-comp";
+      dirSample = "nh-comp";
     }
   } else if(biaxial == true) {
-    dirSample = "nve-biaxial-ext";
+    dirSample = "nh-biaxial-ext";
   }
   if(adjustEkin == true) {
     dirSample = dirSample + "-adjust";
@@ -51,8 +52,18 @@ int main(int argc, char **argv) {
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  if(ljwca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
+    sp.setEnergyCostant(ec);
+    sp.setLJWCAparams(LJcut, num1);
+  } else if(ljmp == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
+    sp.setEnergyCostant(ec);
+    sp.setLJMinusPlusParams(LJcut, num1);
+  } else {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   //outDir = inDir + dirSample + "/";
@@ -71,6 +82,7 @@ int main(int argc, char **argv) {
   std::experimental::filesystem::create_directory(outDir);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
+    ioSP.readNoseHooverParams(inDir, mass, damping);
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
@@ -83,7 +95,7 @@ int main(int argc, char **argv) {
     cout << endl;
   }
   range *= LJcut * sigma;
-  sp.initSoftParticleNVE(Tinject, readState);
+  sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   if(adjustEkin == true) {
     sp.calcParticleNeighbors(cutDistance);
@@ -141,9 +153,9 @@ int main(int argc, char **argv) {
         ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
         //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
-      sp.softParticleNVELoop();
+      sp.softParticleNoseHooverLoop();
       if(step % checkPointFreq == 0) {
-        cout << "Extend NVE2LJ: current step: " << step;
+        cout << "Extend NH2LJ: current step: " << step;
         cout << " U/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -159,6 +171,7 @@ int main(int argc, char **argv) {
         }
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
+          ioSP.saveNoseHooverParams(currentDir);
         }
       }
       step += 1;
@@ -166,6 +179,7 @@ int main(int argc, char **argv) {
     // save minimized configuration
     if(save == true) {
       ioSP.saveParticlePacking(currentDir);
+      ioSP.saveNoseHooverParams(currentDir);
     }
     strain += strainStep;
     ioSP.closeEnergyFile();
