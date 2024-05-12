@@ -108,15 +108,30 @@ public:
     energyFile << setprecision(precision) << damping << endl;
   }
 
-  void saveParticleDoubleEnergy(long step, double timeStep, long numParticles) {
+  void saveParticleDoubleNoseHooverEnergy(long step, double timeStep, long numParticles, long num1) {
+    double epot = sp_->getParticlePotentialEnergy();
+    std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
+    double etot = epot + get<0>(ekins) + get<1>(ekins);
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << get<0>(ekins) / num1 << "\t";
+    energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    double mass, damping1, damping2;
+    sp_->getDoubleNoseHooverParams(mass, damping1, damping2);
+    energyFile << setprecision(precision) << damping1;
+    energyFile << setprecision(precision) << damping2 << endl;
+  }
+
+  void saveParticleDoubleEnergy(long step, double timeStep, long numParticles, long num1) {
     double epot = sp_->getParticlePotentialEnergy() / numParticles;
     std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
     double etot = epot + get<0>(ekins) + get<1>(ekins);
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot << "\t";
-    energyFile << setprecision(precision) << get<0>(ekins) << "\t";
-    energyFile << setprecision(precision) << get<1>(ekins) << "\t";
-    energyFile << setprecision(precision) << etot << endl;
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << get<0>(ekins) / num1 << "\t";
+    energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
   void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
@@ -549,6 +564,42 @@ public:
     readParams.close();
     if(mass == 1 && damping == 1) {
       cout << "FileIO::saveNoseHooverParams: mass and damping are not saved in nhParams.dat! Setting mass and damping to 1" << endl;
+    }
+  }
+
+  void saveDoubleNoseHooverParams(string dirName) {
+    double mass, damping1, damping2;
+    sp_->getDoubleNoseHooverParams(mass, damping1, damping2);
+    string fileParams = dirName + "nhParams.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    saveParams << "mass" << "\t" << mass << endl;
+    saveParams << "damping1" << "\t" << damping1 << endl;
+    saveParams << "damping2" << "\t" << damping2 << endl;
+    saveParams.close();
+  }
+
+  void readDoubleNoseHooverParams(string dirName, double &mass, double &damping1, double &damping2) {
+    string fileParams = dirName + "nhParams.dat";
+    ifstream readParams(fileParams.c_str());
+    if (!readParams.is_open()) {
+      cout << "Error: Unable to open file " << fileParams << endl;
+      return;
+    }
+    string paramName;
+    double paramValue;
+    while (readParams >> paramName >> paramValue) {
+      if(paramName == "mass") {
+        mass = paramValue;
+      } else if(paramName == "damping1") {
+        damping1 = paramValue;
+      } else if(paramName == "damping2") {
+        damping2 = paramValue;
+      }
+    }
+    readParams.close();
+    if(mass == 1 && damping1 == 1 && damping2 == 1) {
+      cout << "FileIO::saveDoubleNoseHooverParams: mass and damping are not saved in nhParams.dat! Setting mass, damping1 and damping2 to 1" << endl;
     }
   }
 

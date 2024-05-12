@@ -453,6 +453,12 @@ public:
 
   void softParticleNoseHooverLoop();
 
+  void getDoubleNoseHooverParams(double &mass, double &damping1, double &damping2);
+
+  void initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double mass, double gamma1, double gamma2, bool readState);
+
+  void softParticleDoubleNoseHooverLoop();
+
   // Active integrators
   void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
 

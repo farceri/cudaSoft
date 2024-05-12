@@ -1995,6 +1995,33 @@ void SP2D::softParticleNoseHooverLoop() {
   this->sim_->integrate();
 }
 
+void SP2D::getDoubleNoseHooverParams(double &mass, double &damping1, double &damping2) {
+  mass = this->sim_->mass;
+  damping1 = this->sim_->lcoeff1;
+  damping2 = this->sim_->lcoeff2;
+  //cout << "SP2D::getNoseHooverParams:: damping: " << this->sim_->gamma << endl;
+}
+
+//********************** double T Nose-Hoover integrator *********************//
+void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double mass, double gamma1, double gamma2, bool readState) {
+  this->sim_ = new SoftParticleDoubleNoseHoover(this, SimConfig(Temp1, 0, Temp2));
+  this->sim_->mass = mass;
+  this->sim_->lcoeff1 = gamma1;
+  this->sim_->lcoeff2 = gamma2;
+  resetLastPositions();
+  shift = true;
+  if(readState == false) {
+    this->sim_->injectKineticEnergy();
+  }
+  std::tuple<double, double> Temps = getParticleT1T2();
+  cout << "SP2D::initSoftParticleDoubleNoseHoover:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << endl;
+  cout << " mass: " << this->sim_->mass << ", damping1: " << this->sim_->lcoeff1 << " damping2: " << this->sim_->lcoeff2 << endl;
+}
+
+void SP2D::softParticleDoubleNoseHooverLoop() {
+  this->sim_->integrate();
+}
+
 //**************************** Active integrators ****************************//
 void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
   this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving));

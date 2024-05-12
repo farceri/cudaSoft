@@ -108,6 +108,7 @@ int main(int argc, char **argv) {
   timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
+  cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
   // initialize simulation
   sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
