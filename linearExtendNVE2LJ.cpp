@@ -54,13 +54,13 @@ int main(int argc, char **argv) {
   sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
   sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
   //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/strain" + argv[8] + "/";
+    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/strain" + argv[6] + "/";
     //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
