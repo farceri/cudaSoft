@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -33,14 +33,14 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma, mass = 10;
   double ea = 1, eb = 1, eab = 0.1, Tinject = atof(argv[3]), Tinject2 = atof(argv[4]), damping = 1, damping2 = 1;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "double-nh/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "2T-2lj/";
   std::tuple<double, double> Temps;
   if(ljwca == true) {
-    whichDynamics = "double-nh-ljwca/";
+    whichDynamics = "2T-ljwca/";
   } else if(ljmp == true) {
-    whichDynamics = "double-nh-ljmp/";
+    whichDynamics = "2T-ljmp/";
   }
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  dirSample = whichDynamics + "T1" + argv[3] + "-T2" + argv[4] + "/";
   if(nDim == 3) {
     LJcut = 2.5;
   }

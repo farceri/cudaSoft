@@ -511,8 +511,8 @@ void SoftParticleDoubleNoseHoover::integrate() {
 void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {
   // update nose hoover damping
   std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
-  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);//T1
-  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * sp_->numParticles + 1) * config.driving / 2);//T2
+  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
+  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
   double s_gamma1(lcoeff1);
   double s_gamma2(lcoeff2);
   long s_nDim(sp_->nDim);
@@ -539,8 +539,8 @@ void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {
 void SoftParticleDoubleNoseHoover::updateThermalVel() {
   // update nose hoover damping
   std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
-  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);//T1
-  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * sp_->numParticles + 1) * config.driving / 2);//T2
+  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
+  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
   double s_gamma1(lcoeff1);
   double s_gamma2(lcoeff2);
   long s_nDim(sp_->nDim);

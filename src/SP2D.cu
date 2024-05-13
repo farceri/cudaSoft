@@ -1592,8 +1592,8 @@ std::tuple<double, double> SP2D::getParticleT1T2() {
   thrust::device_vector<double> velSq2(numParticles-num1);
   thrust::copy(velSquared.begin(), velSquared.begin() + num1, velSq1.begin());
   thrust::copy(velSquared.end() - (numParticles-num1), velSquared.end(), velSq2.begin());
-  double T1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / num1;
-  double T2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (numParticles - num1);
+  double T1 = 2 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / (nDim * num1);
+  double T2 = 2 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (nDim * (numParticles - num1));
   return std::make_tuple(T1, T2);
 }
 
