@@ -372,9 +372,9 @@ public:
 
   void adjustTemperature(double targetTemp);
 
-  std::tuple<double, double> getParticleT1T2();
+  std::tuple<double, double, double> getParticleT1T2();
 
-  std::tuple<double, double> getParticleKineticEnergy12();
+  std::tuple<double, double, double> getParticleKineticEnergy12();
 
   double getMassiveTemperature(long firstIndex, double mass);
 

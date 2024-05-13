@@ -110,28 +110,30 @@ public:
 
   void saveParticleDoubleNoseHooverEnergy(long step, double timeStep, long numParticles, long num1) {
     double epot = sp_->getParticlePotentialEnergy();
-    std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
-    double etot = epot + get<0>(ekins) + get<1>(ekins);
+    std::tuple<double, double, double> ekins = sp_->getParticleKineticEnergy12();
+    double etot = epot + get<2>(ekins);
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << get<0>(ekins) / num1 << "\t";
     energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
+    energyFile << setprecision(precision) << get<2>(ekins) / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << "\t";
     double mass, damping1, damping2;
     sp_->getDoubleNoseHooverParams(mass, damping1, damping2);
-    energyFile << setprecision(precision) << damping1;
+    energyFile << setprecision(precision) << damping1 << "\t";
     energyFile << setprecision(precision) << damping2 << endl;
   }
 
   void saveParticleDoubleEnergy(long step, double timeStep, long numParticles, long num1) {
     double epot = sp_->getParticlePotentialEnergy() / numParticles;
-    std::tuple<double, double> ekins = sp_->getParticleKineticEnergy12();
-    double etot = epot + get<0>(ekins) + get<1>(ekins);
+    std::tuple<double, double, double> ekins = sp_->getParticleKineticEnergy12();
+    double etot = epot + get<2>(ekins);
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << get<0>(ekins) / num1 << "\t";
     energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << get<2>(ekins) / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
   }
 
   void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {

@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool scaleVel = false, doubleT = false, ljwca = false, ljmp = false;
+  bool readNH = true, scaleVel = false, doubleT = false, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -90,6 +90,9 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(inDir + whichDynamics);
       }
       outDir = inDir + dirSample;
+      if(readNH == true) {
+        inDir = inDir + whichDynamics + "T" + argv[3] + "/";
+      }
     }
     std::experimental::filesystem::create_directory(outDir);
   }

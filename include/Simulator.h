@@ -190,6 +190,7 @@ public:
   SoftParticleDoubleNoseHoover() = default;
   SoftParticleDoubleNoseHoover(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
 
+  virtual void injectKineticEnergy();
   virtual void updateVelocity(double timeStep);
   virtual void updateThermalVel();
   virtual void integrate();

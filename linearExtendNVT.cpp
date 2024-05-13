@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
       }
     }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << sign * strain << ", density: " << sp.getParticlePhi() << endl;
+    cout << "strain: " << sign * strain << endl;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";

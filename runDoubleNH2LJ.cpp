@@ -23,24 +23,24 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, alltoall = false, fixedbc = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[5]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma, mass = 10;
   double ea = 1, eb = 1, eab = 0.1, Tinject = atof(argv[3]), Tinject2 = atof(argv[4]), damping = 1, damping2 = 1;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "2T-2lj/";
-  std::tuple<double, double> Temps;
+  std::tuple<double, double, double> Temps;
   if(ljwca == true) {
     whichDynamics = "2T-ljwca/";
   } else if(ljmp == true) {
     whichDynamics = "2T-ljmp/";
   }
-  dirSample = whichDynamics + "T1" + argv[3] + "-T2" + argv[4] + "/";
+  dirSample = whichDynamics + "T1-" + argv[3] + "-T2-" + argv[4] + "/";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -112,6 +112,7 @@ int main(int argc, char **argv) {
   cout << "T1: " << Tinject << " T2: " << Tinject2 << " time step: " << timeStep << endl;
   // initialize simulation
   sp.initSoftParticleDoubleNoseHoover(Tinject, Tinject2, mass, damping, damping2, readState);
+  //sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
@@ -133,7 +134,7 @@ int main(int argc, char **argv) {
         cout << "Double NH: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         Temps = sp.getParticleT1T2();
-        cout << " T1: " << get<0>(Temps) << " T2: " << get<1>(Temps);
+        cout << " T1: " << get<0>(Temps) << " T2: " << get<1>(Temps) << " T: " << get<2>(Temps);
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {

@@ -5,6 +5,7 @@
 // FUNCTION DECLARATIONS
 
 #include "../include/SP2D.h"
+#include "../include/defs.h"
 #include "../include/cudaKernel.cuh"
 #include "../include/Simulator.h"
 #include "../include/FIRE.h"
@@ -1348,7 +1349,7 @@ void SP2D::printThreeParticles() {
    // extract +-1 random forces
    d_particleDelta.resize(numParticles);
    thrust::fill(d_particleDelta.begin(), d_particleDelta.end(), double(0));
-   thrust::counting_iterator<long> index_sequence_begin(lrand48());
+   thrust::counting_iterator<long> index_sequence_begin(0);
    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleDelta.begin(), randInt(0,1));
    thrust::transform(d_particleDelta.begin(), d_particleDelta.end(), thrust::make_constant_iterator(2), d_particleDelta.begin(), thrust::multiplies<double>());
    thrust::transform(d_particleDelta.begin(), d_particleDelta.end(), thrust::make_constant_iterator(1), d_particleDelta.begin(), thrust::minus<double>());
@@ -1534,12 +1535,34 @@ double SP2D::getParticleKineticEnergy() {
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
 
+double SP2D::getParticleTemperature() {
+  return 2 * getParticleKineticEnergy() / (nDim * numParticles);
+}
+
 double SP2D::getParticleEnergy() {
   return (getParticlePotentialEnergy() + getParticleKineticEnergy());
 }
 
-double SP2D::getParticleTemperature() {
-  return 2 * getParticleKineticEnergy() / (nDim * numParticles);
+std::tuple<double, double, double> SP2D::getParticleKineticEnergy12() {
+  thrust::device_vector<double> velSquared(d_particleVel.size());
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
+  thrust::device_vector<double> velSq1(num1 * nDim);
+  thrust::device_vector<double> velSq2((numParticles-num1) * nDim);
+  thrust::copy(velSquared.begin(), velSquared.begin() + num1 * nDim, velSq1.begin());
+  thrust::copy(velSquared.begin() + num1 * nDim, velSquared.end(), velSq2.begin());
+  double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>());
+  double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>());
+  double ekin = 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(ekin1, ekin2, ekin);
+}
+
+std::tuple<double, double, double> SP2D::getParticleT1T2() {
+  std::tuple<double, double, double> ekins = getParticleKineticEnergy12();
+  double T1 = 2 * get<0>(ekins) / (nDim * num1);
+  double T2 = 2 * get<1>(ekins) / (nDim * (numParticles - num1));
+  double T = 2 * get<2>(ekins) / (nDim * numParticles);
+  //double T = 2 * getParticleKineticEnergy() / (nDim * numParticles);
+  return std::make_tuple(T1, T2, T);
 }
 
 void SP2D::adjustKineticEnergy(double prevEtot) {
@@ -1583,30 +1606,6 @@ void SP2D::adjustTemperature(double targetTemp) {
 
   //cout << "SP2D::adjustTemperature:: scale: " << scale << endl;
   thrust::for_each(r, r + numParticles, adjustParticleTemp);
-}
-
-std::tuple<double, double> SP2D::getParticleT1T2() {
-  thrust::device_vector<double> velSquared(d_particleVel.size());
-  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  thrust::device_vector<double> velSq1(num1);
-  thrust::device_vector<double> velSq2(numParticles-num1);
-  thrust::copy(velSquared.begin(), velSquared.begin() + num1, velSq1.begin());
-  thrust::copy(velSquared.end() - (numParticles-num1), velSquared.end(), velSq2.begin());
-  double T1 = 2 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / (nDim * num1);
-  double T2 = 2 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (nDim * (numParticles - num1));
-  return std::make_tuple(T1, T2);
-}
-
-std::tuple<double, double> SP2D::getParticleKineticEnergy12() {
-  thrust::device_vector<double> velSquared(d_particleVel.size());
-  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  thrust::device_vector<double> velSq1(num1);
-  thrust::device_vector<double> velSq2(numParticles-num1);
-  thrust::copy(velSquared.begin(), velSquared.begin() + num1, velSq1.begin());
-  thrust::copy(velSquared.end() - (numParticles-num1), velSquared.end(), velSq2.begin());
-  double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>()) / num1;
-  double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>()) / (numParticles - num1);
-  return std::make_tuple(ekin1, ekin2);
 }
 
 double SP2D::getMassiveTemperature(long firstIndex, double mass) {
@@ -1963,8 +1962,8 @@ void SP2D::initSoftParticleNVEDoubleRescale(double Temp1, double Temp2) {
   this->sim_ = new SoftParticleNVEDoubleRescale(this, SimConfig(Temp1, 0, Temp2));
   resetLastPositions();
   shift = true;
-  std::tuple<double, double> Temps = getParticleT1T2();
-  cout << "SP2D::initSoftParticleNVEDoubleRescale:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << endl;
+  std::tuple<double, double, double> Temps = getParticleT1T2();
+  cout << "SP2D::initSoftParticleNVEDoubleRescale:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << " T: " << get<2>(Temps) << endl;
 }
 
 void SP2D::softParticleNVEDoubleRescaleLoop() {
@@ -2013,8 +2012,8 @@ void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double m
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  std::tuple<double, double> Temps = getParticleT1T2();
-  cout << "SP2D::initSoftParticleDoubleNoseHoover:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << endl;
+  std::tuple<double, double, double> Temps = getParticleT1T2();
+  cout << "SP2D::initSoftParticleDoubleNoseHoover:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << " T: " << get<2>(Temps) << endl;
   cout << " mass: " << this->sim_->mass << ", damping1: " << this->sim_->lcoeff1 << " damping2: " << this->sim_->lcoeff2 << endl;
 }
 
