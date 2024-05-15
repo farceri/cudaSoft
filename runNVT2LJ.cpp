@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double Tinject = atof(argv[3]), damping, sigma, forceUnit, timeUnit, range = 2;
-  double ea = 1, eb = 1, eab = 0.25, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[6]);
+  double ea = 2, eb = 2, eab = 0.5, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[6]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nvt/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   // initialize sp object

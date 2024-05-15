@@ -27,14 +27,17 @@ int main(int argc, char **argv) {
   bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = false, scaleVel = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 2e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
-  double LJcut = 2.5, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
+  double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
   double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.6;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   double gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
+  if(nDim == 3) {
+    LJcut = 2.5;
+  }
   std::string currentDir, outDir = argv[1], inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a

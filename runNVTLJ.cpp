@@ -134,9 +134,7 @@ int main(int argc, char **argv) {
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveParticleNeighbors(outDir);
-          if(nDim == 3) {
-            ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
-          }
+          ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
         }
       }
     }
@@ -160,9 +158,7 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
-        //if(nDim == 3) {
-        //  ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
-        //}
+        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step);
       }
     }
     step += 1;
@@ -176,9 +172,7 @@ int main(int argc, char **argv) {
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleNeighbors(outDir);
-    if(nDim == 3) {
-      ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
-    }
+    ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
   }
   ioSP.closeEnergyFile();
 
