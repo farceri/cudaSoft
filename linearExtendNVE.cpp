@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = false, biaxial = true, centered = false, adjustEkin = false, adjustTemp = false;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false, adjustEkin = true, adjustTemp = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[8]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
@@ -44,6 +44,9 @@ int main(int argc, char **argv) {
     }
   } else if(biaxial == true) {
     dirSample = "nve-biaxial-ext";
+  }
+  if(adjustEkin == true) {
+    dirSample = dirSample + "-adjust";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
