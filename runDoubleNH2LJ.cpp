@@ -23,11 +23,11 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = true, alltoall = false, fixedbc = false;
+  bool readState = true, saveFinal = true, logSave = true, linSave = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[5]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         ioSP.saveDoubleNoseHooverParams(outDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;

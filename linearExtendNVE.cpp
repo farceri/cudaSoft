@@ -23,13 +23,13 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
-  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false, adjustEkin = false, adjustTemp = false;
+  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long numParticles = atol(argv[8]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
-  double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "1nve-ext";
+  double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -38,12 +38,12 @@ int main(int argc, char **argv) {
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
-      dirSample = "1nve-biaxial-comp";
+      dirSample = "nve-biaxial-comp";
     } else {
-      dirSample = "1nve-comp";
+      dirSample = "nve-comp";
     }
   } else if(biaxial == true) {
-    dirSample = "1nve-biaxial-ext";
+    dirSample = "nve-biaxial-ext";
   }
   if(centered == true) {
     dirSample = dirSample + "-centered";
@@ -53,13 +53,13 @@ int main(int argc, char **argv) {
   cout << "Setting Lennard-Jones potential" << endl;
   sp.setLJcutoff(LJcut);
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
+  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
   //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/strain" + argv[8] + "/";
+    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/strain" + argv[6] + "/";
     //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
@@ -84,14 +84,18 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  //sp.calcParticleNeighbors(cutDistance);
-  //sp.calcParticleForceEnergy();
+  if(adjustEkin == true) {
+    sp.calcParticleNeighbors(cutDistance);
+    sp.calcParticleForceEnergy();
+  }
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
-    //prevEnergy = sp.getParticleEnergy();
-    //cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    if(adjustEkin == true) {
+      prevEnergy = sp.getParticleEnergy();
+      cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    }
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
       strainx = -sign * strain / (1 + sign * strain);
@@ -121,11 +125,12 @@ int main(int argc, char **argv) {
     ioSP.openEnergyFile(energyFile);
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
-    // adjust kinetic energy to preserve energy conservation
-    //cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-    //sp.adjustKineticEnergy(prevEnergy);
-    //sp.calcParticleForceEnergy();
-    //cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    if(adjustEkin == true) {
+      cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustKineticEnergy(prevEnergy);
+      sp.calcParticleForceEnergy();
+      cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    }
     sp.resetUpdateCount();
     step = 0;
     sp.setInitialPositions();
@@ -147,6 +152,9 @@ int main(int argc, char **argv) {
           cout << " no updates" << endl;
         }
         sp.resetUpdateCount();
+        if(adjustTemp == true) {
+          sp.adjustTemperature(Tinject);
+        }
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
         }

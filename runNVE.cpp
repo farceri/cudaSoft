@@ -26,13 +26,20 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false, lj = true, wca = false, alltoall = false, fixedbc = false;
+  bool readNH = true, readState = true, saveFinal = true, logSave, linSave = false;
+  bool lj = true, wca = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
+  if(readNH == true) {
+    whichDynamics = "nh/";
+    dirSample = whichDynamics + "T" + argv[3] + "/nve/";
+  } else {
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
@@ -82,6 +89,9 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(inDir + whichDynamics);
       }
       outDir = inDir + dirSample;
+      if(readNH == true) {
+        inDir = inDir + whichDynamics + "T" + argv[3] + "/";
+      }
     }
     std::experimental::filesystem::create_directory(outDir);
   }
@@ -161,7 +171,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     if(linSave == true) {
@@ -169,7 +179,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;

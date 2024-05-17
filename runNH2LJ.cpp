@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         ioSP.saveNoseHooverParams(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
