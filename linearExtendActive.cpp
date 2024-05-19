@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[8]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[9]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, initStrain = atof(argv[10]);
-  double ec = 1, cutDistance, cutoff = 1, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), strainx, strainStepx, range = 3;
+  double ec = 1, cutDistance, cutoff = 1, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), strainx, range = 3;
   double sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), sign = 1, prevEnergy = 0;
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "extend";
   thrust::host_vector<double> boxSize(nDim);
@@ -99,7 +99,6 @@ int main(int argc, char **argv) {
   sp.calcParticleForceEnergy();
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
-  strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
     prevEnergy = sp.getParticleEnergy();
     cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
@@ -109,9 +108,9 @@ int main(int argc, char **argv) {
       newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep);
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
       }
     } else {
       newBoxSize = initBoxSize;

@@ -24,14 +24,14 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, lj = true, wca = false;
-  bool gforce = false, fixedbc = false, alltoall = false, nve = false, noseHoover = false, scaleVel = false;
+  bool gforce = false, fixedbc = false, alltoall = false, nve = true, noseHoover = false, scaleVel = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 1e-02, scaleFactor, prevEnergy = 0;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
-  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.6;
+  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.06, phiTh = 0.8;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   double gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
@@ -114,7 +114,7 @@ int main(int argc, char **argv) {
   previousPhi = currentPhi;
   timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(dt*timeUnit);
-  if(nve == true) {
+  if(nve == true || noseHoover == true) {
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else {
     damping = sqrt(inertiaOverDamping) / sigma;
@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
   if(nve == true) {
     sp.initSoftParticleNVE(Tinject, readState);
   } else if(noseHoover == true) {
-    sp.initSoftParticleNoseHoover(Tinject, damping, mass, readState);
+    sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
   } else if(scaleVel == true) {
     sp.initSoftParticleNVE(Tinject, readState); // this is done to inject velocities
     sp.initSoftParticleNVERescale(Tinject);

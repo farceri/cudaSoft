@@ -375,19 +375,22 @@ void SP2D::applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSiz
 	thrust::for_each(r, r+numParticles, extendPosition);
 }
 
-void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_) {
+void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strainy_) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
 	auto r = thrust::counting_iterator<long>(0);
 	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
 
+  double strainx = -strainy_ / (1 + strainy_);
+  cout << "strainx: " << strainx << " strainy: " << strainy_ << endl;
+
 	auto biaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
-		extendPos = (1 + shifty_) * pPos[particleId * d_nDim + 1];
+		extendPos = (1 + strainy_) * pPos[particleId * d_nDim + 1];
 		extendPos -= floor(extendPos / boxSize[1]) * boxSize[1];
 		pPos[particleId * d_nDim + 1] = extendPos;
-		compressPos = (1 + shiftx_) * pPos[particleId * d_nDim];
+		compressPos = (1 + strainx) * pPos[particleId * d_nDim];
 		compressPos -= floor(compressPos / boxSize[0]) * boxSize[0];
 		pPos[particleId * d_nDim] = compressPos;
 	};
@@ -395,19 +398,21 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 	thrust::for_each(r, r+numParticles, biaxialPosition);
 }
 
-void SP2D::applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, double shiftx_) {
+void SP2D::applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strainy_) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
 	auto r = thrust::counting_iterator<long>(0);
 	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
 
+  double strainx = -strainy_ / (1 + strainy_);
+
 	auto centeredBiaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
-		extendPos = pPos[particleId * d_nDim + 1] + shifty_ * (pPos[particleId * d_nDim + 1] - boxSize[1] * 0.5);
+		extendPos = pPos[particleId * d_nDim + 1] + strainy_ * (pPos[particleId * d_nDim + 1] - boxSize[1] * 0.5);
 		extendPos -= floor(extendPos / boxSize[1]) * boxSize[1];
 		pPos[particleId * d_nDim + 1] = extendPos;
-		compressPos = pPos[particleId * d_nDim] + shiftx_ * (pPos[particleId * d_nDim] - boxSize[0] * 0.5);
+		compressPos = pPos[particleId * d_nDim] + strainx * (pPos[particleId * d_nDim] - boxSize[0] * 0.5);
 		compressPos -= floor(compressPos / boxSize[0]) * boxSize[0];
 		pPos[particleId * d_nDim] = compressPos;
 	};

@@ -58,7 +58,7 @@ INC_DIR = include
 
 # make packings
 #EXE = jamPacking
-EXE = compressPacking
+#EXE = compressPacking
 
 #EXE = measurePressure
 #EXE = measureTemperature
@@ -78,7 +78,7 @@ EXE = compressPacking
 
 # mechanics
 #EXE = linearShearFIRE
-#EXE = linearExtendNVE
+EXE = linearExtendNVE
 #EXE = linearExtendNVE2LJ
 #EXE = linearExtendNH2LJ
 #EXE = simpleNVE

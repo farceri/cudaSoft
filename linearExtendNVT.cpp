@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   bool readState = true, save = true, lj = true, adh = false, wca = false, compress = false, biaxial = true, centered = false;
   long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx, strainStepx;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx;
   double ec = 1, cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
   double l1 = pow(2, 1/6), l2 = 3.3, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nvt-ext";
@@ -96,7 +96,6 @@ int main(int argc, char **argv) {
   cutDistance = sp.setDisplacementCutoff(cutoff);
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
-  strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
     if(biaxial == true) {
       newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
@@ -104,9 +103,9 @@ int main(int argc, char **argv) {
       newBoxSize[0] = (1 + sign * strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep);
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
       }
     } else {
       newBoxSize = initBoxSize;

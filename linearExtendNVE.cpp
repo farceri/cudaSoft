@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
   bool readState = true, save = true, compress = false, biaxial = true, centered = false, adjustEkin = true, adjustTemp = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[8]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, strainStepx;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
-  double strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strainx, sign = 1, range = 3, prevEnergy = 0;
+  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain;
+  double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -93,7 +93,6 @@ int main(int argc, char **argv) {
   }
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
-  strainStepx = -sign * strainStep / (1 + sign * strainStep);
   while (strain < (maxStrain + strainStep)) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
@@ -105,9 +104,9 @@ int main(int argc, char **argv) {
       newBoxSize[0] = (1 + strainx) * initBoxSize[0];
       cout << "strainx: " << strainx << endl;
       if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep);
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep, strainStepx);
+        sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
       }
     } else {
       newBoxSize = initBoxSize;

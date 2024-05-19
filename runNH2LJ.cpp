@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveNoseHooverParams(currentDir);
+        //ioSP.saveNoseHooverParams(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
       }
     }
@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveNoseHooverParams(currentDir);
+        //ioSP.saveNoseHooverParams(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
       }
     }
