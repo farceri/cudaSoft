@@ -383,7 +383,7 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
   double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
 
   double strainx = -strainy_ / (1 + strainy_);
-  cout << "strainx: " << strainx << " strainy: " << strainy_ << endl;
+  //cout << "strainx: " << strainx << " strainy: " << strainy_ << endl;
 
 	auto biaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
@@ -1808,6 +1808,7 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
@@ -1837,6 +1838,7 @@ void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstI
   this->sim_->mass = mass;
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
@@ -1862,6 +1864,7 @@ void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool read
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
@@ -1886,6 +1889,7 @@ void SP2D::initSoftParticleLangevinPerturb(double Temp, double gamma, double ext
   this->sim_->extForce = extForce;
   this->sim_->firstIndex = firstIndex;
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
@@ -1909,6 +1913,7 @@ void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readStat
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   calcSurfaceHeight();
   calcFlowVelocity();
   if(readState == false) {
@@ -1926,6 +1931,7 @@ void SP2D::initSoftParticleFlow(double gamma, bool readState) {
   this->sim_ = new SoftParticleFlow(this, SimConfig(0, 0, 0));
   this->sim_->gamma = gamma;
   resetLastPositions();
+  setInitialPositions();
   calcSurfaceHeight();
   calcFlowVelocity();
   cout << "SP2D::initSoftParticleFlow:: current temperature: " << setprecision(10) << getParticleTemperature() << " surface height: " << getSurfaceHeight() << endl;
@@ -1939,6 +1945,7 @@ void SP2D::softParticleFlowLoop() {
 void SP2D::initSoftParticleNVE(double Temp, bool readState) {
   this->sim_ = new SoftParticleNVE(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
+  setInitialPositions();
   shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
@@ -1954,6 +1961,7 @@ void SP2D::softParticleNVELoop() {
 void SP2D::initSoftParticleNVERescale(double Temp) {
   this->sim_ = new SoftParticleNVERescale(this, SimConfig(Temp, 0, 0));
   resetLastPositions();
+  setInitialPositions();
   shift = true;
   cout << "SP2D::initSoftParticleNVERescale:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
@@ -1966,6 +1974,7 @@ void SP2D::softParticleNVERescaleLoop() {
 void SP2D::initSoftParticleNVEDoubleRescale(double Temp1, double Temp2) {
   this->sim_ = new SoftParticleNVEDoubleRescale(this, SimConfig(Temp1, 0, Temp2));
   resetLastPositions();
+  setInitialPositions();
   shift = true;
   std::tuple<double, double, double> Temps = getParticleT1T2();
   cout << "SP2D::initSoftParticleNVEDoubleRescale:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << " T: " << get<2>(Temps) << endl;
@@ -1987,6 +1996,7 @@ void SP2D::initSoftParticleNoseHoover(double Temp, double mass, double gamma, bo
   this->sim_->mass = mass;
   this->sim_->gamma = gamma;
   resetLastPositions();
+  setInitialPositions();
   shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
@@ -2013,6 +2023,7 @@ void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double m
   this->sim_->lcoeff1 = gamma1;
   this->sim_->lcoeff2 = gamma2;
   resetLastPositions();
+  setInitialPositions();
   shift = true;
   if(readState == false) {
     this->sim_->injectKineticEnergy();
@@ -2040,6 +2051,7 @@ void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
     computeParticleAngleFromVel();
@@ -2068,6 +2080,7 @@ void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, 
   this->sim_->mass = mass;
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
     computeParticleAngleFromVel();
@@ -2095,6 +2108,7 @@ void SP2D::initSoftParticleActiveExtField(double Temp, double Dr, double driving
   this->sim_->d_thermalVel.resize(d_particleVel.size());
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
+  setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
     computeParticleAngleFromVel();
