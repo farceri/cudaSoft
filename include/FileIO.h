@@ -494,6 +494,10 @@ public:
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
   }
 
+  void saveParticleEnergies(string dirName) {
+    save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+  }
+
   void saveParticleActiveState(string dirName) {
     if(sp_->nDim == 2) {
       save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());

@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = true, readState = true, saveFinal = true, logSave, linSave = false;
+  bool readNH = false, readState = true, saveFinal = true, logSave, linSave = false;
   bool lj = true, wca = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = 2, maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);

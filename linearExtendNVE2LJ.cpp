@@ -23,7 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = false, biaxial = true, centered = false, adjustEkin = true, adjustTemp = false;
+  bool readState = true, save = true, compress = false, biaxial = true, centered = false;
+  bool adjustEkin = true, adjustTemp = false, ljwca = true, ljmp = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[8]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, strainx, sign = 1;
@@ -51,8 +52,18 @@ int main(int argc, char **argv) {
   if(centered == true) {
     dirSample = dirSample + "-centered";
   }
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  if(ljwca == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
+    sp.setEnergyCostant(ec);
+    sp.setLJWCAparams(LJcut, num1);
+  } else if(ljmp == true) {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
+    sp.setEnergyCostant(ec);
+    sp.setLJMinusPlusParams(LJcut, num1);
+  } else {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
   //outDir = inDir + dirSample + "/";
@@ -158,6 +169,7 @@ int main(int argc, char **argv) {
         }
         if(save == true) {
           ioSP.saveParticlePacking(currentDir);
+          ioSP.saveParticleEnergies(currentDir);
         }
       }
       step += 1;
