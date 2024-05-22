@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
       }
       sp.softParticleNVELoop();
       if((step + 1) % checkPointFreq == 0) {
-        cout << "Extend NVE2LJ: current step: " << step;
+        cout << "Extend NVE2LJ: current step: " << step + 1;
         cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
