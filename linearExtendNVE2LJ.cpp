@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, strainx, sign = 1, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
   double ea = 1, eb = 1, eab = 0.1, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nve-ext";
+  std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   std::experimental::filesystem::create_directory(outDir);
   if(save == false) {
     currentDir = outDir;
-    energyFile = currentDir + "energy.dat";
+    energyFile = outDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
     linFreq = checkPointFreq;
   }
@@ -109,6 +109,8 @@ int main(int argc, char **argv) {
   waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   long countStep = 0;
+  long saveFreq = int(strainFreq / strainStep);
+  cout << "SAVING FREQUENCY: " << saveFreq << endl;
   while (strain < (maxStrain + strainStep)) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
@@ -138,7 +140,7 @@ int main(int argc, char **argv) {
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
     cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
     saveCurrent = false;
-    if(fmod(strain, strainFreq) < 1e-05) {
+    if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;
       saveCurrent = true;
       currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
@@ -161,7 +163,7 @@ int main(int argc, char **argv) {
     sp.resetUpdateCount();
     step = 0;
     while(step != maxStep) {
-      if(step % linFreq == 0) {
+      if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
@@ -171,7 +173,7 @@ int main(int argc, char **argv) {
         }
       }
       sp.softParticleNVELoop();
-      if(step % checkPointFreq == 0) {
+      if((step + 1) % checkPointFreq == 0) {
         cout << "Extend NVE2LJ: current step: " << step;
         cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
@@ -197,7 +199,9 @@ int main(int argc, char **argv) {
     // save current configuration
     if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);
-      ioSP.closeEnergyFile();
+      if(save == true) {
+        ioSP.closeEnergyFile();
+      }
     }
     strain += strainStep;
   }
