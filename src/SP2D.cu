@@ -391,9 +391,9 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 		extendPos = (1 + strain_) * pPos[particleId * d_nDim + direction_];
 		extendPos -= floor(extendPos / boxSize[direction_]) * boxSize[direction_];
 		pPos[particleId * d_nDim + direction_] = extendPos;
-		compressPos = (1 + otherStrain) * pPos[particleId * d_nDim + direction_];
+		compressPos = (1 + otherStrain) * pPos[particleId * d_nDim + !direction_];
 		compressPos -= floor(compressPos / boxSize[!direction_]) * boxSize[!direction_];
-		pPos[particleId * d_nDim + direction_] = compressPos;
+		pPos[particleId * d_nDim + !direction_] = compressPos;
 	};
 
 	thrust::for_each(r, r+numParticles, biaxialPosition);

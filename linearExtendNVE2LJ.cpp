@@ -24,12 +24,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = true, biaxial = true, adjustEkin = false;
-  bool save = false, saveCurrent, adjustTemp = false, ljwca = false, ljmp = true;
+  bool equilibrate = true, save = false, saveCurrent, adjustTemp = false, ljwca = false, ljmp = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
-  double ea = 3, eb = 3, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  double ea = 2, eb = 2, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -103,11 +103,19 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleNVE(Tinject, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  if(adjustEkin == true) {
-    sp.calcParticleNeighbors(cutDistance);
-    sp.calcParticleForceEnergy();
+  sp.calcParticleNeighbors(cutDistance);
+  sp.calcParticleForceEnergy();
+  if(equilibrate == true) {
+    // run NVE at zero strain to make sure the system is in equilibrium
+    step = 0;
+    while(step != maxStep) {
+      sp.softParticleNVELoop();
+      step += 1;
+    }
+    cout << "NVE2LJ: initial equilibration";
+    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " T: " << sp.getParticleTemperature() << endl;
   }
-  waveQ = sp.getSoftWaveNumber();
   // strain by strainStep up to maxStrain
   long countStep = 0;
   long saveFreq = int(strainFreq / strainStep);
@@ -162,6 +170,7 @@ int main(int argc, char **argv) {
     }
     sp.resetUpdateCount();
     step = 0;
+    waveQ = sp.getSoftWaveNumber();
     while(step != maxStep) {
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
