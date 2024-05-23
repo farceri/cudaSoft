@@ -174,17 +174,6 @@ int main(int argc, char **argv) {
       }
       sp.softParticleNVELoop();
       if((step + 1) % checkPointFreq == 0) {
-        //cout << "Extend NVE2LJ: current step: " << step + 1;
-        //cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
-        //cout << " T: " << sp.getParticleTemperature();
-        //cout << " ISF: " << sp.getParticleISF(waveQ);
-        updateCount = sp.getUpdateCount();
-        if(step != 0 && updateCount > 0) {
-          //cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
-        } else {
-          //cout << " no updates" << endl;
-        }
-        sp.resetUpdateCount();
         if(adjustTemp == true) {
           sp.adjustTemperature(Tinject);
         }
@@ -198,7 +187,9 @@ int main(int argc, char **argv) {
     cout << "NVE2LJ: current step: " << step;
     cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
-    cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
+    cout << " ISF: " << sp.getParticleISF(waveQ);
+    updateCount = sp.getUpdateCount();
+    cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
