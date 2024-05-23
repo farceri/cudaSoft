@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -31,9 +31,9 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]), num1 = atol(argv[8]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ec = 1, ea = 1, eb = 1, eab = 0.1, Tinject = atof(argv[3]), mass = 10, damping = 1;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh/";
+  double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
+  double ea = 2, eb = 2, eab = 0.5, Tinject = atof(argv[3]), mass = 10, damping = 1;
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh2/";
   if(ljwca == true) {
     whichDynamics = "nh-ljwca/";
   } else if(ljmp == true) {

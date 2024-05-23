@@ -159,15 +159,15 @@ public:
 
   void applyLEShear(double LEshift_);
 
-  void applyExtension(double shifty_);
+  void applyExtension(double strainy_);
 
-  void applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
+  void applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
 
-  void applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_, long direction_);
+  void applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
 
-  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
+  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
 
-  void applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double shifty_);
+  void applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
 
   void setDimBlock(long dimBlock_);
   long getDimBlock();

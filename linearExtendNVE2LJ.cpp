@@ -24,12 +24,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, compress = true, biaxial = true, adjustEkin = false;
-  bool save = false, saveCurrent, centered = false, adjustTemp = false, ljwca = false, ljmp = true;
+  bool save = false, saveCurrent, adjustTemp = false, ljwca = false, ljmp = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[8]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, strainx, sign = 1, strainFreq = 0.02;
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
-  double ea = 1, eb = 1, eab = 0.1, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  double ea = 3, eb = 3, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(compress == true) {
-    sign = -1;
+    direction = 0;
     if(biaxial == true) {
       dirSample = "nve-biaxial-comp";
     } else {
@@ -48,9 +48,6 @@ int main(int argc, char **argv) {
   }
   if(adjustEkin == true) {
     dirSample = dirSample + "-adjust";
-  }
-  if(centered == true) {
-    dirSample = dirSample + "-centered";
   }
   if(ljwca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
@@ -79,6 +76,10 @@ int main(int argc, char **argv) {
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     initBoxSize = sp.getBoxSize();
   }
+  double boxRatio = initBoxSize[direction] / initBoxSize[!direction];
+  double targetBoxRatio = 1 / boxRatio;
+  cout << "Direction: " << direction << " other direction: " << !direction;
+  cout << " starting from box ratio: " << boxRatio << " target: " << targetBoxRatio << endl;
   std::experimental::filesystem::create_directory(outDir);
   if(save == false) {
     currentDir = outDir;
@@ -110,35 +111,34 @@ int main(int argc, char **argv) {
   // strain by strainStep up to maxStrain
   long countStep = 0;
   long saveFreq = int(strainFreq / strainStep);
-  cout << "SAVING FREQUENCY: " << saveFreq << endl;
-  while (strain < (maxStrain + strainStep)) {
+  if(saveFreq % 10 != 0) saveFreq += 1;
+  cout << "Saving frequency: " << saveFreq << endl;
+  boxSize = sp.getBoxSize();
+  while (strain < (maxStrain + strainStep) or (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     }
     if(biaxial == true) {
-      newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
-      strainx = -sign * strain / (1 + sign * strain);
-      newBoxSize[0] = (1 + strainx) * initBoxSize[0];
-      cout << "strainx: " << strainx << endl;
-      if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep);
+      newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
+      otherStrain = -strain / (1 + strain);
+      newBoxSize[!direction] = (1 + otherStrain) * initBoxSize[!direction];
+      if(direction == 1) {
+        cout << "\nStrain y: " << strain << ", x: " << otherStrain << endl;
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
+        cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
       }
+      sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
     } else {
       newBoxSize = initBoxSize;
-      newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
-      if(centered == true) {
-        sp.applyCenteredUniaxialExtension(newBoxSize, sign * strainStep, direction);
-      } else {
-        sp.applyUniaxialExtension(newBoxSize, sign * strainStep, direction);
-      }
+      newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
+      sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
+      cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << sign * strain << endl;
-    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
-    cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
+    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1];
+    cout << ", box ratio: " << boxSize[direction] / boxSize[!direction] << endl;
+    cout << "Abox / Abox0: " << boxSize[0]*boxSize[1]/initBoxSize[0]*initBoxSize[1] << endl;
     saveCurrent = false;
     if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;
@@ -174,15 +174,15 @@ int main(int argc, char **argv) {
       }
       sp.softParticleNVELoop();
       if((step + 1) % checkPointFreq == 0) {
-        cout << "Extend NVE2LJ: current step: " << step + 1;
-        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
-        cout << " T: " << sp.getParticleTemperature();
-        cout << " ISF: " << sp.getParticleISF(waveQ);
+        //cout << "Extend NVE2LJ: current step: " << step + 1;
+        //cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+        //cout << " T: " << sp.getParticleTemperature();
+        //cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
-          cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+          //cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
         } else {
-          cout << " no updates" << endl;
+          //cout << " no updates" << endl;
         }
         sp.resetUpdateCount();
         if(adjustTemp == true) {
@@ -195,6 +195,10 @@ int main(int argc, char **argv) {
       }
       step += 1;
     }
+    cout << "NVE2LJ: current step: " << step;
+    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " T: " << sp.getParticleTemperature();
+    cout << " ISF: " << sp.getParticleISF(waveQ) << endl;
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
