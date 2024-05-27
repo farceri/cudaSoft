@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     exit(1);
   }
   if(saveForce == true) {
-    dirSample + "-wall";
+    dirSample += "-wall";
   }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
