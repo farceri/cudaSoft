@@ -53,6 +53,9 @@ int main(int argc, char **argv) {
     cout << "Please specify a strain type between compression and extension" << endl;
     exit(1);
   }
+  if(saveForce == true) {
+    dirSample + "-wall";
+  }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);

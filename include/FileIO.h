@@ -133,7 +133,7 @@ public:
     energyFile << setprecision(precision) << get<0>(ekins) / num1 << "\t";
     energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
     energyFile << setprecision(precision) << get<2>(ekins) / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
   void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
@@ -144,8 +144,7 @@ public:
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
-    energyFile << setprecision(precision) << sp_->getTotalParticleWallCount() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << endl;
   }
 
   void saveParticleActiveWallEnergy(long step, double timeStep, long numParticles, double range, double driving) {
