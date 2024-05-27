@@ -27,23 +27,42 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = false, fixedSides = false;
-  long numParticles = atol(argv[7]), nDim = 2, maxStep = atof(argv[4]), num1 = atof(argv[8]);
+  long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atof(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double Tinject = atof(argv[3]), damping, sigma, forceUnit, timeUnit, range = 2;
-  double ea = 1, eb = 1, eab = 0.1, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[6]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nvt/";
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  double ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[6]);
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nvt";
+  if(nDim == 3) {
+    LJcut = 2.5;
+  }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setBoxType(simControlStruct::boxEnum::WCA);
     sp.setBoxEnergyScale(ew);
   }
+  if(potType == "ljwca") {
+    whichDynamics = "nvt-ljwca/";
+    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
+    sp.setEnergyCostant(ec);
+    sp.setLJWCAparams(LJcut, num1);
+  } else if(potType == "ljmp") {
+    whichDynamics = "nvt-ljmp/";
+    sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
+    sp.setEnergyCostant(ec);
+    sp.setLJMinusPlusParams(LJcut, num1);
+  } else if(potType == "2lj") {
+    whichDynamics = whichDynamics + argv[11] + "/";
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else {
+    cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
+    exit(1);
+  }
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics

@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
-  bool readNH = false, scaleVel = false, doubleT = false, ljwca = false, ljmp = false;
+  bool readNH = false, scaleVel = false, doubleT = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -33,8 +33,8 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = 3, eb = 3, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve3/";
+  double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]);
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
   std::tuple<double, double, double> Temps;
   if(nDim == 3) {
     LJcut = 2.5;
@@ -44,19 +44,23 @@ int main(int argc, char **argv) {
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
-  if(ljwca == true) {
+  if(potType == "ljwca") {
+    whichDynamics = "nve-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
-    whichDynamics = "nve-ljwca/";
-  } else if(ljmp == true) {
+  } else if(potType == "ljmp") {
+    whichDynamics = "nve-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-    whichDynamics = "nve-ljmp/";
-  } else {
+  } else if(potType == "2lj") {
+    whichDynamics = whichDynamics + argv[11] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else {
+    cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
+    exit(1);
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);

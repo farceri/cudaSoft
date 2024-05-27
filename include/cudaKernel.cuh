@@ -593,7 +593,7 @@ inline __device__ double calcAdhesiveInteraction(const double* thisPos, const do
 		epot = 0.5 * d_ec * (overlap * overlap - d_l1 * d_l2) * 0.5;
 	} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
 		gradMultiple = -d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
-		epot = -0.5 * d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2);
+		epot = -0.5 * d_ec * (d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) * (overlap + d_l2) * 0.5;
 	} else {
 		return 0.0;
 	}
@@ -658,15 +658,14 @@ inline __device__ double calcLJMinusPlusInteraction(const double* thisPos, const
 		auto sign = -1.0;
 		auto forceShift = d_LJfshift / radSum;
 		auto ecut = d_LJecut;
-		auto multiple = 1;
 		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
 			//printf("particleId %ld otherId %ld d_num1: %ld\n", particleId, otherId, d_num1);
 			sign = 1.0;
 			forceShift = d_LJfshiftPlus / radSum;
 			ecut = d_LJecutPlus;
 		}
-		auto gradMultiple = multiple * 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
-		auto epot = multiple * 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+		auto gradMultiple = 24 * d_ec * (2 * ratio12 + sign * ratio6) / distance - forceShift;
+		auto epot = 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 	    	currentForce[dim] += gradMultiple * delta[dim] / distance;

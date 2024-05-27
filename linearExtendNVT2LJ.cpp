@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, saveCurrent, biaxial = true, equilibrate = false;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true, equilibrate = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[9]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
@@ -168,11 +168,17 @@ int main(int argc, char **argv) {
     while(step != maxStep) {
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
-          //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-          ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+          if(saveForce == true) {
+            ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+          } else {
+            ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+          }
         } else {
-          //ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
-          ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+          if(saveForce == true) {
+            ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+          } else {
+            ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+          }
         }
       }
       sp.softParticleLangevinLoop();

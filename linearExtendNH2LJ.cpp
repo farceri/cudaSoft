@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
@@ -158,11 +158,17 @@ int main(int argc, char **argv) {
     while(step != maxStep) {
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
-          //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-          ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+          if(saveForce == true) {
+            ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+          } else {
+            ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+          }
         } else {
-          //ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
-          ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+          if(saveForce == true) {
+            ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+          } else {
+            ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+          }
         }
       }
       sp.softParticleNoseHooverLoop();
@@ -181,7 +187,7 @@ int main(int argc, char **argv) {
     updateCount = sp.getUpdateCount();
     cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
     countStep += 1;
-    // save minimized configuration
+    // save current configuration
     if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);
       ioSP.saveNoseHooverParams(currentDir);
