@@ -23,43 +23,50 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, compress = true, biaxial = true, adjustEkin = false;
-  bool equilibrate = true, save = false, saveCurrent, adjustTemp = false, ljwca = false, ljmp = true;
-  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
+  bool readState = true, biaxial = true, save = false, saveCurrent, adjustEkin = false, equilibrate = false;
+  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
   double ea = 2, eb = 2, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], outDir, currentDir, energyFile, dirSample = "nve-ext";
+  std::string inDir = argv[1], strainType = argv[10], potType = argv[11], outDir, currentDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(compress == true) {
+  if(strainType == "compress") {
     direction = 0;
     if(biaxial == true) {
       dirSample = "nve-biaxial-comp";
     } else {
       dirSample = "nve-comp";
     }
-  } else if(biaxial == true) {
-    dirSample = "nve-biaxial-ext";
+  } else if(strainType == "extend") {
+    direction = 1;
+    if(biaxial == true) {
+      dirSample = "nve-biaxial-ext";
+    } else {
+      dirSample = "nve-ext";
+    }
+  } else {
+    cout << "Please specify a strain type between compression and extension" << endl;
+    exit(1);
   }
-  if(adjustEkin == true) {
-    dirSample = dirSample + "-adjust";
-  }
-  if(ljwca == true) {
+  if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
-  } else if(ljmp == true) {
+  } else if(potType == "ljmp") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-  } else {
+  } else if(potType == "2lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else {
+    cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
+    exit(1);
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
@@ -108,7 +115,7 @@ int main(int argc, char **argv) {
   if(equilibrate == true) {
     // run NVE at zero strain to make sure the system is in equilibrium
     step = 0;
-    while(step != maxStep) {
+    while(step != initMaxStep) {
       sp.softParticleNVELoop();
       step += 1;
     }
@@ -122,7 +129,7 @@ int main(int argc, char **argv) {
   if(saveFreq % 10 != 0) saveFreq += 1;
   cout << "Saving frequency: " << saveFreq << endl;
   boxSize = sp.getBoxSize();
-  while (strain < (maxStrain + strainStep) or (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+  while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
@@ -183,12 +190,8 @@ int main(int argc, char **argv) {
       }
       sp.softParticleNVELoop();
       if((step + 1) % checkPointFreq == 0) {
-        if(adjustTemp == true) {
-          sp.adjustTemperature(Tinject);
-        }
         if(saveCurrent == true) {
           ioSP.saveParticlePacking(currentDir);
-          ioSP.saveParticleEnergies(currentDir);
         }
       }
       step += 1;

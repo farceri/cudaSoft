@@ -23,34 +23,51 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, save = true, compress = true, biaxial = true, centered = false, rescaleVel = false;
-  long step, maxStep = atof(argv[6]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
-  long numParticles = atol(argv[7]), nDim = 2, minStep = 20, numStep = 0, updateCount = 0, direction = 0, num1 = atol(argv[9]);
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strainx;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), sign = 1, range = 3, prevEnergy = 0;
-  double ea = 1, eb = 1, eab = 0.1, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], outDir, currentDir, timeDir, energyFile, dirSample = "nvt-ext";
+  bool readState = true, save = true, saveCurrent, biaxial = true, equilibrate = false;
+  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 100);
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[9]), initMaxStep = 1e03;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
+  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.02;
+  double ea = 2, eb = 2, eab = 0.5, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  std::string inDir = argv[1], strainType = argv[10], potType = argv[11], outDir, currentDir, timeDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(compress == true) {
-    sign = -1;
+  if(strainType == "compress") {
+    direction = 0;
     if(biaxial == true) {
       dirSample = "nvt-biaxial-comp";
     } else {
       dirSample = "nvt-comp";
     }
-  } else if(biaxial == true) {
-    dirSample = "nvt-biaxial-ext";
+  } else if(strainType == "extend") {
+    direction = 1;
+    if(biaxial == true) {
+      dirSample = "nvt-biaxial-ext";
+    } else {
+      dirSample = "nvt-ext";
+    }
+  } else {
+    cout << "Please specify a strain type between compression and extension" << endl;
+    exit(1);
   }
-  if(centered == true) {
-    dirSample = dirSample + "-centered";
+  if(potType == "ljwca") {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
+    sp.setEnergyCostant(ec);
+    sp.setLJWCAparams(LJcut, num1);
+  } else if(potType == "ljmp") {
+    sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
+    sp.setEnergyCostant(ec);
+    sp.setLJMinusPlusParams(LJcut, num1);
+  } else if(potType == "2lj") {
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else {
+    cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
+    exit(1);
   }
-  sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-  cout << "Setting double Lennard-Jones potential" << endl;
-  sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[6] + "/";
   //outDir = inDir + dirSample + "/";
@@ -66,7 +83,17 @@ int main(int argc, char **argv) {
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     initBoxSize = sp.getBoxSize();
   }
+  double boxRatio = initBoxSize[direction] / initBoxSize[!direction];
+  double targetBoxRatio = 1 / boxRatio;
+  cout << "Direction: " << direction << " other direction: " << !direction;
+  cout << " starting from box ratio: " << boxRatio << " target: " << targetBoxRatio << endl;
   std::experimental::filesystem::create_directory(outDir);
+  if(save == false) {
+    currentDir = outDir;
+    energyFile = outDir + "energy.dat";
+    ioSP.openEnergyFile(energyFile);
+    linFreq = checkPointFreq;
+  }
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
@@ -81,70 +108,98 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
-  waveQ = sp.getSoftWaveNumber();
+  sp.calcParticleNeighbors(cutDistance);
+  sp.calcParticleForceEnergy();
+  if(equilibrate == true) {
+    // run NVT at zero strain to make sure the system is in equilibrium
+    step = 0;
+    while(step != initMaxStep) {
+      sp.softParticleLangevinLoop();
+      step += 1;
+    }
+    cout << "NVT2LJ: initial equilibration";
+    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " T: " << sp.getParticleTemperature() << endl;
+  }
   // strain by strainStep up to maxStrain
-  while (strain < (maxStrain + strainStep)) {
+  long countStep = 0;
+  long saveFreq = int(strainFreq / strainStep);
+  if(saveFreq % 10 != 0) saveFreq += 1;
+  cout << "Saving frequency: " << saveFreq << endl;
+  boxSize = sp.getBoxSize();
+  while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
     if(biaxial == true) {
-      newBoxSize[1] = (1 + sign * strain) * initBoxSize[1];
-      strainx = -sign * strain / (1 + sign * strain);
-      newBoxSize[0] = (1 + strainx) * initBoxSize[0];
-      cout << "strainx: " << strainx << endl;
-      if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, sign * strainStep);
+      newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
+      otherStrain = -strain / (1 + strain);
+      newBoxSize[!direction] = (1 + otherStrain) * initBoxSize[!direction];
+      if(direction == 1) {
+        cout << "\nStrain y: " << strain << ", x: " << otherStrain << endl;
       } else {
-        sp.applyBiaxialExtension(newBoxSize, sign * strainStep);
+        cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
       }
+      sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
     } else {
       newBoxSize = initBoxSize;
-      newBoxSize[direction] = (1 + sign * strain) * initBoxSize[direction];
-      if(centered == true) {
-        sp.applyCenteredUniaxialExtension(newBoxSize, sign * strainStep, direction);
-      } else {
-        sp.applyUniaxialExtension(newBoxSize, sign * strainStep, direction);
-      }
+      newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
+      sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
+      cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();
-    cout << "strain: " << sign * strain << endl;
-    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1] << ", Abox: " << boxSize[0]*boxSize[1] << endl;
-    cout << "old box - Lx0: " << initBoxSize[0] << ", Ly0: " << initBoxSize[1] << ", Abox0: " << initBoxSize[0]*initBoxSize[1] << endl;
-    currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
-    std::experimental::filesystem::create_directory(currentDir);
-    energyFile = currentDir + "energy.dat";
-    ioSP.openEnergyFile(energyFile);
+    cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1];
+    cout << ", box ratio: " << boxSize[direction] / boxSize[!direction] << endl;
+    cout << "Abox / Abox0: " << boxSize[0]*boxSize[1]/initBoxSize[0]*initBoxSize[1] << endl;
+    saveCurrent = false;
+    if((countStep + 1) % saveFreq == 0) {
+      cout << "SAVING AT STRAIN: " << strain << endl;
+      saveCurrent = true;
+      currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
+      std::experimental::filesystem::create_directory(currentDir);
+      sp.setInitialPositions();
+      if(save == true) {
+        energyFile = currentDir + "energy.dat";
+        ioSP.openEnergyFile(energyFile);
+      }
+    }
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     sp.resetUpdateCount();
     step = 0;
-    sp.setInitialPositions();
+    waveQ = sp.getSoftWaveNumber();
     while(step != maxStep) {
-      if(step % linFreq == 0) {
-        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
-        //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      if((step + 1) % linFreq == 0) {
+        if(saveCurrent == true and save == true) {
+          //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+          ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        } else {
+          //ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+          ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+        }
       }
       sp.softParticleLangevinLoop();
-      if(step % checkPointFreq == 0) {
-        cout << "Extend NVT2LJ: current step: " << step;
-        cout << " U/N: " << sp.getParticleEnergy() / numParticles;
-        cout << " T: " << sp.getParticleTemperature();
-        cout << " ISF: " << sp.getParticleISF(waveQ);
-        updateCount = sp.getUpdateCount();
-        if(step != 0 && updateCount > 0) {
-          cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
-        } else {
-          cout << " no updates" << endl;
-        }
-        sp.resetUpdateCount();
-        if(save == true) {
+      if((step + 1) % checkPointFreq == 0) {
+        if(saveCurrent == true) {
           ioSP.saveParticlePacking(currentDir);
         }
       }
       step += 1;
     }
-    // save minimized configuration
-    if(save == true) {
+    cout << "NVT2LJ: current step: " << step;
+    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " T: " << sp.getParticleTemperature();
+    cout << " ISF: " << sp.getParticleISF(waveQ);
+    updateCount = sp.getUpdateCount();
+    cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
+    countStep += 1;
+    // save current configuration
+    if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);
+      if(save == true) {
+        ioSP.closeEnergyFile();
+      }
     }
     strain += strainStep;
+  }
+  if(save == false) {
     ioSP.closeEnergyFile();
   }
   return 0;
