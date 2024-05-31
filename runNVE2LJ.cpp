@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]);
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh";
   std::tuple<double, double, double> Temps;
   if(nDim == 3) {
     LJcut = 2.5;
@@ -45,12 +45,12 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
   if(potType == "ljwca") {
-    whichDynamics = "nve-ljwca/";
+    whichDynamics = "nh-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
-    whichDynamics = "nve-ljmp/";
+    whichDynamics = "nh-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);

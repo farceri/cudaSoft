@@ -137,11 +137,11 @@ int main(int argc, char **argv) {
     step = 0;
     sp.setInitialPositions();
     while(step != maxStep) {
+      sp.softParticleNVELoop();
       if(step % linFreq == 0) {
         ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
         //ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
       }
-      sp.softParticleNVELoop();
       if(step % checkPointFreq == 0) {
         cout << "Extend NVE: current step: " << step;
         cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;

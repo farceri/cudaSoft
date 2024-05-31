@@ -169,6 +169,7 @@ int main(int argc, char **argv) {
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     while(step != maxStep) {
+      sp.softParticleLangevinLoop();
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
@@ -184,7 +185,6 @@ int main(int argc, char **argv) {
           }
         }
       }
-      sp.softParticleLangevinLoop();
       if((step + 1) % checkPointFreq == 0) {
         if(saveCurrent == true) {
           ioSP.saveParticlePacking(currentDir);
