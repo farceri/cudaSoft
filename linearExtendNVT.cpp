@@ -178,7 +178,9 @@ int main(int argc, char **argv) {
       }
       if((step + 1) % checkPointFreq == 0) {
         if(saveCurrent == true) {
+          cout << "ciao1" << endl;
           ioSP.saveParticlePacking(currentDir);
+          cout << "ciao2" << endl;
         }
       }
       step += 1;
@@ -188,7 +190,11 @@ int main(int argc, char **argv) {
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();
-    cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
+    if(updateCount > 0) {
+      cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+    } else {
+      cout << " no updates" << endl;
+    }
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
@@ -198,6 +204,7 @@ int main(int argc, char **argv) {
       }
     }
     strain += strainStep;
+    cout << "end strain loop" << endl;
   }
   if(save == false) {
     ioSP.closeEnergyFile();

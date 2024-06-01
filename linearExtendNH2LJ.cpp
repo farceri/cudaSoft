@@ -188,7 +188,11 @@ int main(int argc, char **argv) {
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();
-    cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
+    if(updateCount > 0) {
+      cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+    } else {
+      cout << " no updates" << endl;
+    }
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {

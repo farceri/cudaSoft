@@ -23,7 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true, adjustEkin = false, equilibrate = false;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
+  bool adjustEkin = false, equilibrate = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
@@ -210,7 +211,11 @@ int main(int argc, char **argv) {
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();
-    cout << " number of updates: " << updateCount << " frequency " << maxStep / updateCount << endl;
+    if(updateCount > 0) {
+      cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+    } else {
+      cout << " no updates" << endl;
+    }
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
