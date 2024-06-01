@@ -66,7 +66,7 @@ INC_DIR = include
 # run dynamics
 #EXE = runNVE
 #EXE = runNH
-#EXE = runNVT
+EXE = runNVT
 #EXE = runNVE2LJ
 #EXE = runNH2LJ
 #EXE = runNVT2LJ
@@ -85,7 +85,7 @@ INC_DIR = include
 #EXE = shearNVT
 #EXE = linearShearNVT
 #EXE = extendNVT
-EXE = linearExtendNVT
+#EXE = linearExtendNVT
 #EXE = linearExtendNVT2LJ
 #EXE = simplNVT
 #EXE = shearActive

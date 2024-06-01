@@ -22,17 +22,17 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave, linSave = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
   bool lj = true, wca = false, fixedSides = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, timeStep = atof(argv[2]);
-  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 2;
+  double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin-lj/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(nDim == 3) {
@@ -40,7 +40,6 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
   sp.setEnergyCostant(ec);
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -113,7 +112,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
-  sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   range *= LJcut * sigma;
   // record simulation time
@@ -144,7 +142,7 @@ int main(int argc, char **argv) {
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveParticleNeighbors(outDir);
-          ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+          //ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
         }
       }
     }
@@ -168,7 +166,7 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
-        ioSP.saveDumpPacking(currentDir, numParticles, nDim, step);
+        //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step);
       }
     }
     step += 1;
@@ -182,7 +180,7 @@ int main(int argc, char **argv) {
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleNeighbors(outDir);
-    ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
+    //ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
   }
   ioSP.closeEnergyFile();
 

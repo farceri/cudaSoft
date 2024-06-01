@@ -38,7 +38,7 @@ void SoftParticleLangevin::integrate() {
 void SoftParticleLangevin::injectKineticEnergy() {
   double amplitude(sqrt(config.Tinject));
   // generate random numbers between 0 and noiseVar for thermal noise
-  thrust::counting_iterator<long> index_sequence_begin(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude));
   double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
   kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
@@ -58,7 +58,7 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
 
 void SoftParticleLangevin::updateThermalVel() {
   // generate random numbers between 0 and 1 for thermal noise
-  thrust::counting_iterator<long> index_sequence_begin(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_thermalVel.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
@@ -96,9 +96,9 @@ void SoftParticleLangevin2::integrate() {
 
 void SoftParticleLangevin2::updateThermalVel() {
   // extract two noises and compute noise terms
-  thrust::counting_iterator<long> index_sequence_begin1(0);
+  thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
-  thrust::counting_iterator<long> index_sequence_begin2(0);
+  thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
@@ -175,9 +175,9 @@ void SoftParticleLangevinSubSet::integrate() {
 
 void SoftParticleLangevinSubSet::updateThermalVel() {
   // extract two noises and compute noise terms
-  thrust::counting_iterator<long> index_sequence_begin1(0);
+  thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
-  thrust::counting_iterator<long> index_sequence_begin2(0);
+  thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
@@ -512,9 +512,9 @@ void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
   double amplitude1(sqrt(config.Tinject));
   double amplitude2(sqrt(config.driving));
   // generate random numbers between 0 and noiseVar for thermal noise
-  thrust::counting_iterator<long> index_sequence_begin1(0);
+  thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->num1 * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude1));
-  thrust::counting_iterator<long> index_sequence_begin2(0);
+  thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + (sp_->numParticles - sp_->num1) * sp_->nDim, sp_->d_particleVel.begin() + sp_->num1 * sp_->nDim, gaussNum(0.f,amplitude2));
   double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
   kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
@@ -589,9 +589,9 @@ void SoftParticleActiveLangevin::integrate() {
 
 void SoftParticleActiveLangevin::updateThermalVel() {
   // extract two noises and compute noise terms
-  thrust::counting_iterator<long> index_sequence_begin1(0);
+  thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
-  thrust::counting_iterator<long> index_sequence_begin2(0);
+  thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
@@ -604,7 +604,7 @@ void SoftParticleActiveLangevin::updateThermalVel() {
   double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
   // generate active forces
   double amplitude = sqrt(2. * config.Dr * sp_->dt);
-  thrust::counting_iterator<long> index_sequence_begin(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
   double s_driving(config.driving);
   double *pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
   double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
@@ -676,9 +676,9 @@ void SoftParticleActiveSubSet::integrate() {
 
 void SoftParticleActiveSubSet::updateThermalVel() {
   // extract two noises and compute noise terms
-  thrust::counting_iterator<long> index_sequence_begin1(0);
+  thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
-  thrust::counting_iterator<long> index_sequence_begin2(0);
+  thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
@@ -702,7 +702,7 @@ void SoftParticleActiveSubSet::updateThermalVel() {
   thrust::for_each(r + firstIndex, r + sp_->numParticles, langevinUpdateThermalNoise);
   // generate active forces
   double amplitude = sqrt(2. * config.Dr * sp_->dt);
-  thrust::counting_iterator<long> index_sequence_begin(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles, d_pActiveAngle.begin(), gaussNum(0.f,1.f));
   double s_driving(config.driving);
   auto s = thrust::counting_iterator<long>(0);
