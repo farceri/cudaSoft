@@ -22,11 +22,11 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -87,7 +87,12 @@ int main(int argc, char **argv) {
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    if(readNVT == true) {
+      ioSP.readParticleState(inDir, numParticles, nDim);
+      sp.computeParticleAngleFromVel();
+    } else {
+      ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    }
   }
   // output file
   energyFile = outDir + "energy.dat";
