@@ -553,7 +553,7 @@ public:
     string fileParams = dirName + "nhParams.dat";
     ifstream readParams(fileParams.c_str());
     if (!readParams.is_open()) {
-      cout << "Error: Unable to open file " << fileParams << endl;
+      cout << "Error: Unable to open file " << fileParams << " - setting default values" << endl;
       return;
     }
     string paramName;
@@ -587,7 +587,7 @@ public:
     string fileParams = dirName + "nhParams.dat";
     ifstream readParams(fileParams.c_str());
     if (!readParams.is_open()) {
-      cout << "Error: Unable to open file " << fileParams << endl;
+      cout << "Error: Unable to open file " << fileParams << " - setting default values" << endl;
       return;
     }
     string paramName;

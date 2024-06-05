@@ -99,10 +99,11 @@ int main(int argc, char **argv) {
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
+  // save initial configuration
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
-  timeUnit = 1 / damping;
+  timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
@@ -178,9 +179,7 @@ int main(int argc, char **argv) {
       }
       if((step + 1) % checkPointFreq == 0) {
         if(saveCurrent == true) {
-          cout << "ciao1" << endl;
           ioSP.saveParticlePacking(currentDir);
-          cout << "ciao2" << endl;
         }
       }
       step += 1;
@@ -204,7 +203,6 @@ int main(int argc, char **argv) {
       }
     }
     strain += strainStep;
-    cout << "end strain loop" << endl;
   }
   if(save == false) {
     ioSP.closeEnergyFile();

@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics;
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(readNH == true) {
     whichDynamics = "nh/";
@@ -48,13 +48,14 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cout << "Setting Lennard-Jones potential" << endl;
+    whichDynamics = "nve-lj/";
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    cout << "Setting WCA potential" << endl;
+    whichDynamics = "nve-wca/";
   } else {
-    cout << "Setting Harmonic potential" << endl;
+    cout << "Setting default harmonic potential" << endl;
+    whichDynamics = "nve/";
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);

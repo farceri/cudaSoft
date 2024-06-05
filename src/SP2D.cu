@@ -399,6 +399,26 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
 	thrust::for_each(r, r+numParticles, biaxialPosition);
 }
 
+void SP2D::applyBiaxialExpExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_) {
+  // first set the new boxSize
+  setBoxSize(newBoxSize_);
+	auto r = thrust::counting_iterator<long>(0);
+	double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+	auto biaxialExpPosition = [=] __device__ (long particleId) {
+		double extendPos, compressPos;
+		extendPos = exp(strain_) * pPos[particleId * d_nDim + direction_];
+		extendPos -= floor(extendPos / boxSize[direction_]) * boxSize[direction_];
+		pPos[particleId * d_nDim + direction_] = extendPos;
+		compressPos = exp(-strain_) * pPos[particleId * d_nDim + !direction_];
+		compressPos -= floor(compressPos / boxSize[!direction_]) * boxSize[!direction_];
+		pPos[particleId * d_nDim + !direction_] = compressPos;
+	};
+
+	thrust::for_each(r, r+numParticles, biaxialExpPosition);
+}
+
 void SP2D::applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_) {
   // first set the new boxSize
   setBoxSize(newBoxSize_);
