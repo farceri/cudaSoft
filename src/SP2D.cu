@@ -383,8 +383,6 @@ void SP2D::applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, doubl
   double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
 
   double otherStrain = -strain_ / (1 + strain_);
-  //if(direction_ == 0) cout << "SP2D::applyBiaxialExtension::strain x: " << strain_ << ", y: " << otherStrain << endl;
-  //if(direction_ == 1) cout << "SP2D::applyBiaxialExtension::strain y: " << strain_ << ", x: " << otherStrain << endl;
 
 	auto biaxialPosition = [=] __device__ (long particleId) {
 		double extendPos, compressPos;
