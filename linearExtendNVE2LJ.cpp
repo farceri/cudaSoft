@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
   bool adjustEkin = false, adjustTemp = false, equilibrate = false, exponential = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
