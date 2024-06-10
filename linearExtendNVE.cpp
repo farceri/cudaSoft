@@ -24,11 +24,11 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
-  bool adjustEkin = false, equilibrate = false;
+  bool adjustEkin = true, adjustTemp = false, equilibrate = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, otherStrain, range = 3, prevEnergy = 0;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain, strainFreq = 0.02;
+  double ec = 2, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain, strainFreq = 0.02;
   double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], outDir, currentDir, strainType = argv[9], energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
@@ -192,6 +192,9 @@ int main(int argc, char **argv) {
         }
       }
       if((step + 1) % checkPointFreq == 0) {
+        if(adjustTemp == true) {
+          sp.adjustTemperature(Tinject);
+        }
         if(saveCurrent == true) {
           ioSP.saveParticlePacking(currentDir);
         }

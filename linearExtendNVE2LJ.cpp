@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false;
-  bool adjustEkin = false, adjustTemp = true, equilibrate = false, exponential = true;
+  bool adjustEkin = false, adjustTemp = false, equilibrate = false, exponential = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
@@ -143,14 +143,14 @@ int main(int argc, char **argv) {
     }
     if(biaxial == true) {
       if(exponential == true) {
-        newBoxSize[direction] = exp(strain) * boxSize[direction];
-        newBoxSize[!direction] = exp(-strain) * boxSize[!direction];
+        newBoxSize[direction] = exp(strainStep) * boxSize[direction];
+        newBoxSize[!direction] = exp(-strainStep) * boxSize[!direction];
         if(direction == 1) {
           cout << "\nStrain y: " << strain << ", x: " << -strain << endl;
         } else {
           cout << "\nStrain x: " << strain << ", y: " << -strain << endl;
         }
-        sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
+        sp.applyBiaxialExpExtension(newBoxSize, strainStep, direction);
       } else {
         newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
         otherStrain = -strain / (1 + strain);
@@ -214,7 +214,9 @@ int main(int argc, char **argv) {
         }
       }
       if((step + 1) % checkPointFreq == 0) {
-        sp.adjustTemperature(Tinject);
+        if(adjustTemp == true) {
+          sp.adjustTemperature(Tinject);
+        }
         if(saveCurrent == true) {
           ioSP.saveParticlePacking(currentDir);
         }
