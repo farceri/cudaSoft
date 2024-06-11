@@ -24,13 +24,13 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
-  bool adjustEkin = true, adjustTemp = false, equilibrate = false;
+  bool adjustEkin = false, adjustTemp = false, equilibrate = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, otherStrain, range = 3, prevEnergy = 0;
-  double ec = 2, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain, strainFreq = 0.02;
+  double ec = atof(argv[9]), cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain, strainFreq = 0.02;
   double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], outDir, currentDir, strainType = argv[9], energyFile, dirSample = "nve-ext";
+  std::string inDir = argv[1], outDir, currentDir, strainType = argv[10], energyFile, dirSample = "nve-ext";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
   }
   sp.setEnergyCostant(ec);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-  cout << "Setting Lennard-Jones potential" << endl;
   sp.setLJcutoff(LJcut);
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
@@ -92,9 +91,9 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma/sqrt(ec);//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  cout << "Time step: " << timeStep << " sigma: " << sigma;
+  cout << "Time step: " << timeStep << " sigma: " << sigma << " epsilon: " << ec;
   if(readState == false) {
     cout << " Tinject: " << Tinject << endl;
   } else {
@@ -202,7 +201,7 @@ int main(int argc, char **argv) {
       step += 1;
     }
     cout << "NVE: current step: " << step;
-    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " E/N: " << sp.getParticleEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();

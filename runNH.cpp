@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleNoseHooverLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleNoseHooverEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

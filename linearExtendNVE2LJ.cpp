@@ -29,8 +29,8 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
-  double ea = 2, eb = 2, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], strainType = argv[10], potType = argv[11], outDir, currentDir, energyFile, dirSample;
+  double ea = atof(argv[10]), eb = ea, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma/sqrt(ea);//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Time step: " << timeStep << " sigma: " << sigma;
   if(readState == false) {
@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
       step += 1;
     }
     cout << "NVE2LJ: current step: " << step;
-    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " E/N: " << sp.getParticleEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();
