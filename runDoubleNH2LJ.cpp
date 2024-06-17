@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, ljwca = false, ljmp = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -32,10 +32,9 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma, mass = 10;
-  double ea = 2, eb = 2, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[4]), damping = 1, damping2 = 1;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "2T/";
+  double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[4]), damping = 1, damping2 = 1;
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "2T";
   std::tuple<double, double, double> Temps;
-  dirSample = whichDynamics + "TA" + argv[3] + "-TB" + argv[4] + "/";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -44,18 +43,25 @@ int main(int argc, char **argv) {
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
-  if(ljwca == true) {
+  if(potType == "ljwca") {
+    whichDynamics = "2T-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
-  } else if(ljmp == true) {
+  } else if(potType == "ljmp") {
+    whichDynamics = "2T-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-  } else {
+  } else if(potType == "2lj") {
+    whichDynamics = whichDynamics + argv[11] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else {
+    cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
+    exit(1);
   }
+  dirSample = whichDynamics + "TA" + argv[3] + "-TB" + argv[4] + "/";
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
