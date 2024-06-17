@@ -71,18 +71,20 @@ INC_DIR = include
 #EXE = runNVE2LJ
 #EXE = runNH2LJ
 #EXE = runNVT2LJ
+#EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
 
 # mechanics
 #EXE = linearShearFIRE
-EXE = linearExtendNVE
+#EXE = linearExtendNVE
 #EXE = linearExtendNVE2LJ
 #EXE = linearExtendNH2LJ
-#EXE = linearExtendNVT2LJ
 #EXE = linearExtendNVT
+#EXE = linearExtendNVT2LJ
 #EXE = linearExtendActive
+EXE = linearExtendActive2LJ
 #EXE = extendNVT
 #EXE = extendActive
 #EXE = linearShearNVT

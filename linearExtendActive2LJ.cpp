@@ -24,12 +24,13 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true, equilibrate = false;
-  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[9]), initMaxStep = 1e03;
-  double timeStep = atof(argv[2]), timeUnit, forceUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.02;
-  double ea = 2, eb = 2, eab = 0.5, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], strainType = argv[10], potType = argv[11], outDir, currentDir, timeDir, energyFile, dirSample;
+  long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[11]), initMaxStep = 1e03;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
+  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.02;
+  double strain, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]);
+  double ec = 1, ea = 2, eb = 2, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
+  std::string inDir = argv[1], strainType = argv[12], potType = argv[13], outDir, currentDir, timeDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -72,13 +73,13 @@ int main(int argc, char **argv) {
     exit(1);
   }
   ioSPFile ioSP(&sp);
-  outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
+  outDir = inDir + dirSample + argv[7] + "-tmax" + argv[9] + "/";
   //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain;
-    inDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/strain" + argv[6] + "/";
+    inDir = inDir + dirSample + argv[7] + "-tmax" + argv[9] + "/strain" + argv[8] + "/";
     //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
@@ -98,19 +99,24 @@ int main(int argc, char **argv) {
     linFreq = checkPointFreq;
   }
   if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim);
+    ioSP.readParticleActiveState(inDir, numParticles, nDim);
   }
-  ioSP.saveParticlePacking(outDir);
+  ioSP.saveParticleActivePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
+  cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
+  damping /= timeUnit;
+  driving = driving*forceUnit;
+  Dr = 1/(tp*timeUnit);
   range *= LJcut * sigma;
-  sp.initSoftParticleLangevin(Tinject, damping, readState);
+  ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
+  // initialize simulation
+  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
@@ -118,10 +124,10 @@ int main(int argc, char **argv) {
     // run NVT at zero strain to make sure the system is in equilibrium
     step = 0;
     while(step != initMaxStep) {
-      sp.softParticleLangevinLoop();
+      sp.softParticleActiveLangevinLoop();
       step += 1;
     }
-    cout << "NVT2LJ: initial equilibration";
+    cout << "Active2LJ: initial equilibration";
     cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature() << endl;
   }
@@ -170,7 +176,7 @@ int main(int argc, char **argv) {
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     while(step != maxStep) {
-      sp.softParticleLangevinLoop();
+      sp.softParticleActiveLangevinLoop();
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
@@ -188,12 +194,12 @@ int main(int argc, char **argv) {
       }
       if((step + 1) % checkPointFreq == 0) {
         if(saveCurrent == true) {
-          ioSP.saveParticlePacking(currentDir);
+          ioSP.saveParticleActivePacking(currentDir);
         }
       }
       step += 1;
     }
-    cout << "NVT2LJ: current step: " << step;
+    cout << "Active2LJ: current step: " << step;
     cout << " E/N: " << sp.getParticleEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -206,7 +212,7 @@ int main(int argc, char **argv) {
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
-      ioSP.saveParticlePacking(currentDir);
+      ioSP.saveParticleActivePacking(currentDir);
       if(save == true) {
         ioSP.closeEnergyFile();
       }

@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, saveStress = true;
   bool adjustEkin = false, adjustTemp = false, equilibrate = false, exponential = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e03;
@@ -59,6 +59,9 @@ int main(int argc, char **argv) {
   }
   if(saveForce == true) {
     dirSample += "-wall";
+  }
+  if(saveStress == true) {
+    dirSample += "-stress";
   }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
@@ -106,7 +109,7 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma/sqrt(ea);//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma/sqrt(ea);// sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Time step: " << timeStep << " sigma: " << sigma;
   if(readState == false) {
@@ -202,12 +205,16 @@ int main(int argc, char **argv) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+          } else if(saveStress == true) {
+            ioSP.saveParticleWallStressEnergy(step, timeStep, numParticles, range);
           } else {
             ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
           }
         } else {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+          } else if(saveStress == true) {
+            ioSP.saveParticleWallStressEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else {
             ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
           }

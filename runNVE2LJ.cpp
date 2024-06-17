@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[4]), initialStep = atof(argv[5]), checkPointFreq = int(maxStep / 10);
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]);
+  double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]), range = 3;
   std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh";
   std::tuple<double, double, double> Temps;
   if(nDim == 3) {
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        outDir = outDir + "dynamics-nve/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma / sqrt(ea);// sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   if(scaleVel == true) {
@@ -144,6 +144,7 @@ int main(int argc, char **argv) {
   sp.resetUpdateCount();
   sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
+  range *= LJcut * sigma;
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -165,7 +166,8 @@ int main(int argc, char **argv) {
       if(doubleT == true) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles, num1);
       } else {
-        ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+        //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
       }
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;

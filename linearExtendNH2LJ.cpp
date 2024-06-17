@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
       step += 1;
     }
     cout << "NH2LJ: current step: " << step;
-    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " E/N: " << sp.getParticleEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();

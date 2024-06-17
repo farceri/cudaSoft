@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10;
+  double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = 10;
   double ec = 1, cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.02;
   double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], strainType = argv[9], potType = argv[10], outDir, currentDir, energyFile, dirSample;
@@ -104,15 +104,11 @@ int main(int argc, char **argv) {
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
+  forceUnit = ec / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  //timeStep = sp.setTimeStep(timeStep);
-  cout << "Time step: " << timeStep << " sigma: " << sigma << " Tinject: " << Tinject << endl;
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
   ioSP.saveLangevinParams(outDir, sigma, damping);
-  if(readState == false) {
-    cout << " Tinject: " << Tinject << endl;
-  } else {
-    cout << endl;
-  }
   range *= LJcut * sigma;
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
@@ -185,7 +181,7 @@ int main(int argc, char **argv) {
       step += 1;
     }
     cout << "NVT: current step: " << step;
-    cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+    cout << " E/N: " << sp.getParticleEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();

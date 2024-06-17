@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atof(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ew = 1e-03, ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double Tinject = atof(argv[3]), damping, sigma, forceUnit, timeUnit, range = 2;
-  double ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[6]);
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nvt";
+  double damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
+  double ew = 1e-03, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, Tinject = atof(argv[3]);
+  double ec = 1, ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]);
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -45,12 +45,12 @@ int main(int argc, char **argv) {
     sp.setBoxEnergyScale(ew);
   }
   if(potType == "ljwca") {
-    whichDynamics = "nvt-ljwca/";
+    whichDynamics = "langevin-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
-    whichDynamics = "nvt-ljmp/";
+    whichDynamics = "langevin-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
@@ -106,8 +106,8 @@ int main(int argc, char **argv) {
   // initialization
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
-  timeUnit = sigma / sqrt(ec);
-  forceUnit = ec / sigma;
+  timeUnit = sigma / sqrt(ea);
+  forceUnit = ea / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
@@ -119,7 +119,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
-  sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   range *= LJcut * sigma;
   // record simulation time
@@ -138,7 +137,7 @@ int main(int argc, char **argv) {
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin LJ: current step: " << step + initialStep;
-        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();

@@ -147,6 +147,18 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << endl;
   }
 
+  void saveParticleWallStressEnergy(long step, double timeStep, long numParticles, double range) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
+  }
+
   void saveParticleActiveWallEnergy(long step, double timeStep, long numParticles, double range, double driving) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
@@ -405,7 +417,7 @@ public:
     //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+    //save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
     //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
     //sp_->calcParticleContacts(0.);
     //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);

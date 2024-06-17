@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ec = 2, Tinject = atof(argv[3]), mass = 10, damping = 1;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh2/";
+  std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nh2/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(nDim == 3) {
     LJcut = 2.5;
@@ -45,11 +45,11 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
   sp.setEnergyCostant(ec);
-  if(lj == true) {
+  if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
     sp.setLJcutoff(LJcut);
-  } else if(wca == true) {
+  } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
   } else {
