@@ -34,23 +34,21 @@ int main(int argc, char **argv) {
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
-  cout << "Parameters: " << timeStep << " " << Tinject << " " << tp << " " << driving << " " << maxStrain << " " << strainStep << " " << initStrain << endl;
-  cout << maxStep << " " << numParticles << " " << num1 << " " << ea << " " << strainType << " " << potType << endl;
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(strainType == "compress") {
     direction = 0;
     if(biaxial == true) {
-      dirSample = "nvt-biaxial-comp";
+      dirSample = "active-biaxial-comp";
     } else {
-      dirSample = "nvt-comp";
+      dirSample = "active-comp";
     }
   } else if(strainType == "extend") {
     direction = 1;
     if(biaxial == true) {
-      dirSample = "nvt-biaxial-ext";
+      dirSample = "active-biaxial-ext";
     } else {
-      dirSample = "nvt-ext";
+      dirSample = "active-ext";
     }
   } else {
     cout << "Please specify a strain type between compression and extension" << endl;
