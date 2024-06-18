@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave = true, linSave = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[5]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atof(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  long initialStep = atol(argv[6]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma, mass = 10;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[4]), damping = 1, damping2 = 1;
   std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "2T";

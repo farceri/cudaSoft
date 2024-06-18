@@ -879,17 +879,16 @@ inline __device__ double calcLJMinusPlusYforce(const double* thisPos, const doub
 
 
 // particle-particle interaction across fictitious wall at half height in 2D
-__global__ void kernelCalcParticleWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
+__global__ void kernelCalcWallForce(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		long otherId;
-		auto midHeight = d_boxSizePtr[1]*0.5;
+		auto midHeight = d_boxSizePtr[1] * 0.5;
 		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
-		// zero out the force and get particle positions
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
 		}
-		wallForce[particleId] = 0;
+		wallForce[particleId] = 0.0;
 		wallCount[particleId] = 0;
 		if(d_partMaxNeighborListPtr[particleId] > 0) {
 			auto thisRad = pRad[particleId];
@@ -897,7 +896,6 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
 			//thisDistance = thisPos[1] - midHeight;
 			//if(thisDistance < 0) {
 			if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
-				// interaction between vertices of neighbor particles
 				for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 					if (extractParticleNeighbor(particleId, nListId, pPosPBC, pRad, otherPos, otherRad)) {
 						auto otherHeight = otherPos[1];// - d_boxSizePtr[1] * floor(otherPos[1] / d_boxSizePtr[1]);
@@ -946,8 +944,134 @@ __global__ void kernelCalcParticleWallForce(const double* pRad, const double* pP
   	}
 }
 
+// particle-particle interaction across fictitious wall at half height in 2D and width less then box width
+__global__ void kernelCalcCenterWallForce(const double* pRad, const double* pPosPBC, const double range, const double width, double* wallForce, long* wallCount) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		long otherId;
+		auto midHeight = d_boxSizePtr[1] * 0.5;
+		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
+		}
+		wallForce[particleId] = 0.0;
+		wallCount[particleId] = 0;
+		auto lowBound = (d_boxSizePtr[0] - width) * 0.5;
+		auto highBound = (d_boxSizePtr[0] + width) * 0.5;
+		if(thisPos[0] > lowBound && thisPos[0] < highBound) {
+			if(d_partMaxNeighborListPtr[particleId] > 0) {
+				auto thisRad = pRad[particleId];
+				auto thisHeight = thisPos[1];
+				if(thisHeight < midHeight && thisHeight > (midHeight - range)) {
+					for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+						if (extractParticleNeighbor(particleId, nListId, pPosPBC, pRad, otherPos, otherRad)) {
+							if(otherPos[0] > lowBound && otherPos[0] < highBound) {
+								auto otherHeight = otherPos[1];
+								if(otherHeight > midHeight && otherHeight < (midHeight + range)) {
+									wallCount[particleId] += 1;
+									auto radSum = thisRad + otherRad;
+									switch (d_simControl.potentialType) {
+										case simControlStruct::potentialEnum::harmonic:
+										wallForce[particleId] += calcContactYforce(thisPos, otherPos, radSum);
+										break;
+										case simControlStruct::potentialEnum::lennardJones:
+										wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+										break;
+										case simControlStruct::potentialEnum::WCA:
+										wallForce[particleId] += calcWCAYforce(thisPos, otherPos, radSum);
+										break;
+										case simControlStruct::potentialEnum::doubleLJ:
+										otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+										wallForce[particleId] += calcDoubleLJYforce(thisPos, otherPos, radSum, particleId, otherId);
+										break;
+										case simControlStruct::potentialEnum::LJMinusPlus:
+										otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+										wallForce[particleId] += calcLJMinusPlusYforce(thisPos, otherPos, radSum, particleId, otherId);
+										break;
+										case simControlStruct::potentialEnum::LJWCA:
+										otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+										if(particleId < d_num1 && otherId < d_num1) {
+											wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+										} else if(particleId >= d_num1 && otherId >= d_num1) {
+											wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+										} else {
+											wallForce[particleId] += calcWCAYforce(thisPos, otherPos, radSum);
+										}
+										default:
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+  	}
+}
+
 // particle-particle interaction across fictitious wall at half height in 2D
-__global__ void kernelAddParticleWallActiveForce(const double* pAngle, const double driving, double* wallForce, long* wallCount) {
+__global__ void kernelCalcWallForceUpDown(const double* pRad, const double* pPosPBC, const double range, double* wallForce, long* wallCount) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		long otherId;
+		auto midHeight = d_boxSizePtr[1] * 0.5;
+		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
+		}
+		wallForce[particleId] = 0.0;
+		wallCount[particleId] = 0;
+		if(d_partMaxNeighborListPtr[particleId] > 0) {
+			auto thisRad = pRad[particleId];
+			auto thisHeight = thisPos[1];
+			if(thisHeight > midHeight && thisHeight < (midHeight - range)) {
+				for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+					if (extractParticleNeighbor(particleId, nListId, pPosPBC, pRad, otherPos, otherRad)) {
+						auto otherHeight = otherPos[1];
+						if(otherHeight < midHeight && otherHeight > (midHeight + range)) {
+							wallCount[particleId] += 1;
+							auto radSum = thisRad + otherRad;
+							switch (d_simControl.potentialType) {
+								case simControlStruct::potentialEnum::harmonic:
+								wallForce[particleId] += calcContactYforce(thisPos, otherPos, radSum);
+								break;
+								case simControlStruct::potentialEnum::lennardJones:
+								wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+								break;
+								case simControlStruct::potentialEnum::WCA:
+								wallForce[particleId] += calcWCAYforce(thisPos, otherPos, radSum);
+								break;
+								case simControlStruct::potentialEnum::doubleLJ:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								wallForce[particleId] += calcDoubleLJYforce(thisPos, otherPos, radSum, particleId, otherId);
+								break;
+								case simControlStruct::potentialEnum::LJMinusPlus:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								wallForce[particleId] += calcLJMinusPlusYforce(thisPos, otherPos, radSum, particleId, otherId);
+								break;
+								case simControlStruct::potentialEnum::LJWCA:
+								otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+								if(particleId < d_num1 && otherId < d_num1) {
+									wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+								} else if(particleId >= d_num1 && otherId >= d_num1) {
+									wallForce[particleId] += calcLJYforce(thisPos, otherPos, radSum);
+								} else {
+									wallForce[particleId] += calcWCAYforce(thisPos, otherPos, radSum);
+								}
+								default:
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+  	}
+}
+
+// particle-particle interaction across fictitious wall at half height in 2D
+__global__ void kernelAddWallActiveForce(const double* pAngle, const double driving, double* wallForce, long* wallCount) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		// if the interaction of particleId has already been counted
@@ -1132,10 +1256,10 @@ __global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight
 	}
 }
 
-__global__ void kernelCalcParticleStressTensor(const double* pRad, const double* pPos, const double* pVel, double* pStress) {
+__global__ void kernelCalcStressTensor(const double* pRad, const double* pPos, const double* pVel, double* pStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], forces[MAXDIM];
+		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], force[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		// thermal stress
@@ -1153,14 +1277,14 @@ __global__ void kernelCalcParticleStressTensor(const double* pRad, const double*
 				if(gradMultiple > 0) {
 					auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 					for (long dim = 0; dim < d_nDim; dim++) {
-						forces[dim] = gradMultiple * delta[dim] / distance;
+						force[dim] = gradMultiple * delta[dim] / distance;
 					}
 					//diagonal terms
-					pStress[0] += delta[0] * forces[0];
-					pStress[3] += delta[1] * forces[1];
+					pStress[0] += delta[0] * force[0];
+					pStress[3] += delta[1] * force[1];
 					// cross terms
-					pStress[1] += delta[0] * forces[1];
-					pStress[2] += delta[1] * forces[0];
+					pStress[1] += delta[0] * force[1];
+					pStress[2] += delta[1] * force[0];
 				}
 			}
 		}
@@ -1207,7 +1331,7 @@ inline __device__ void calcWallWCAStress(const double* thisPos, const double* wa
 	}
 }
 
-__global__ void kernelCalcParticleBoxStress(const double* pRad, const double* pPos, double* wallStress) {
+__global__ void kernelCalcBoxStress(const double* pRad, const double* pPos, double* wallStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
@@ -1272,7 +1396,7 @@ __global__ void kernelCalcParticleBoxStress(const double* pRad, const double* pP
 	}
 }
 
-__global__ void kernelCalcParticleSides2DStress(const double* pRad, const double* pPos, double* wallStress) {
+__global__ void kernelCalcSides2DStress(const double* pRad, const double* pPos, double* wallStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
@@ -1310,19 +1434,59 @@ __global__ void kernelCalcParticleSides2DStress(const double* pRad, const double
 	}
 }
 
-__global__ void kernelCalcParticleActivePressure(const double* pAngle, const double* pPos, const double driving, double activeWork) {
+__global__ void kernelCalcWork(const double* pRad, const double* pPos, const double* pVel, const double width, double &workIn, double &workOut) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double activeForce[MAXDIM], thisPos[MAXDIM];
+		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], force[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
-		for (long dim = 0; dim < d_nDim; dim++) {
-			if(d_nDim == 2) {
-      			activeForce[dim] = driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
-			} else if(d_nDim == 3) {
-				activeForce[dim] = driving * pAngle[particleId * d_nDim + dim];
+		auto thisRad = pRad[particleId];
+		auto work = 0.0;
+		// thermal stress
+		for(long dim = 0; dim < d_nDim; dim++) {
+			work += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+		}
+		// stress between neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+			if(extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+				//if(otherPos[0] > lowBound && otherPos[1] < highBound) {
+				auto radSum = thisRad + otherRad;
+				auto gradMultiple = calcGradMultiple(particleId, otherId, thisPos, otherPos, radSum);
+				if(gradMultiple > 0) {
+					auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+					for (long dim = 0; dim < d_nDim; dim++) {
+						force[dim] = gradMultiple * delta[dim] / distance;
+						work += 0.5 * (force[dim] * delta[dim]);
+					}
+				}
 			}
-			activeWork += activeForce[dim] * thisPos[dim];
-    	}
+		}
+		auto lowBound = (d_boxSizePtr[0] - width) * 0.5;
+		auto highBound = (d_boxSizePtr[0] + width) * 0.5;
+		if(thisPos[0] > lowBound && thisPos[1] < highBound) {
+			workIn += work;
+		} else {
+			workOut += work;
+		}
+	}
+}
+
+__global__ void kernelCalcActiveWork(const double* pPos, const double* pAngle, const double* pVel, const double width, double &aWorkIn, double aWorkOut) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		getParticlePos(particleId, pPos, thisPos);
+		auto activeWork = 0.0;
+		for (long dim = 0; dim < d_nDim; dim++) {
+			activeWork += ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId])) * pVel[particleId * d_nDim + dim];
+		}
+		auto lowBound = (d_boxSizePtr[0] - width) * 0.5;
+		auto highBound = (d_boxSizePtr[0] + width) * 0.5;
+		if(thisPos[0] > lowBound && thisPos[1] < highBound) {
+			aWorkIn += activeWork;
+		} else {
+			aWorkOut += activeWork;
+		}
 	}
 }
 

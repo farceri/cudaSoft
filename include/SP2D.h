@@ -224,10 +224,6 @@ public:
   void setParticleAngles(thrust::host_vector<double> &particleAngle_);
   thrust::host_vector<double> getParticleAngles();
 
-  thrust::host_vector<double> getPerParticleStressTensor();
-
-  thrust::host_vector<double> getStressTensor();
-
   thrust::host_vector<long> getContacts();
 
   void printContacts();
@@ -342,6 +338,10 @@ public:
 
   void calcParticleStressTensor();
 
+  std::tuple<double, double> getParticleWork(double width);
+  
+  std::tuple<double, double> getParticleActiveWork(double driving, double taup, double width);
+
   double getParticlePressure();
 
   double getParticleSurfaceTension();
@@ -350,17 +350,17 @@ public:
 
   double getParticleExtensileStress();
 
-  double getParticleWallForce(double range);
+  std::tuple<double, double, double> getParticleStressComponents();
+
+  double getParticleWallForce(double range, double width);
+  
+  double getParticleWallForceUpDown(double range);
 
   double getParticleActiveWallForce(double range, double driving);
 
   long getTotalParticleWallCount();
 
-  double getWallForceFromVel(double range, double timeStep);
-
   double getParticleWallPressure();
-
-  double getParticleActivePressure(double driving);
 
   double getParticlePotentialEnergy();
 

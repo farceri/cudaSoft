@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true, centered = false;
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, otherStrain, range = 3;
@@ -130,14 +130,23 @@ int main(int argc, char **argv) {
       } else {
         cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
       }
-      sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
+      if(centered == true) {
+        sp.applyCenteredBiaxialExtension(newBoxSize, strainStep, direction);
+      } else {
+        sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
+      }
     } else {
       newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
+      if(centered == true) {
+        sp.applyCenteredUniaxialExtension(newBoxSize, strainStep, direction);
+      } else {
       sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
+      }
       cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();
+    width = boxSize[0] * 0.5;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1];
     cout << ", box ratio: " << boxSize[direction] / boxSize[!direction] << endl;
     cout << "Abox / Abox0: " << boxSize[0]*boxSize[1]/initBoxSize[0]*initBoxSize[1] << endl;
@@ -163,13 +172,21 @@ int main(int argc, char **argv) {
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
-            ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+            if(centered == true) {
+              ioSP.saveParticleCenterWallEnergy(step, timeStep, numParticles, range, width);
+            } else {
+              ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+            }
           } else {
             ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
           }
         } else {
           if(saveForce == true) {
-            ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            if(centered == true) {
+              ioSP.saveParticleCenterWallEnergy(step + countStep * maxStep, timeStep, numParticles, range, width);
+            } else {
+              ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            }
           } else {
             ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
           }

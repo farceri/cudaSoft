@@ -22,14 +22,14 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave, linSave = false, fixedSides = false;
-  long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atof(argv[9]);
+  long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   double ew = 1e-03, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, Tinject = atof(argv[3]);
   double ec = 1, ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]);
@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
-  dirSample = whichDynamics + "T" + argv[3] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "-t" + argv[2] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics

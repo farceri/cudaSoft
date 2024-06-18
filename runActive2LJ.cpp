@@ -27,9 +27,9 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = false;
-  long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atof(argv[11]);
+  long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), waveQ;
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
   double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping;

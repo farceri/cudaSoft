@@ -26,14 +26,15 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = false, saveWork = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ;
+  double ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
   std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics;
+  thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -111,6 +112,10 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = 1/(tp*timeUnit);
+  if(saveWork == true) {
+    width = boxSize[0] * atof(argv[12]);
+    cout << "Measuring work and active work, fluid width: " << width << " centered in Lx / 2" << endl;
+  }
   ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
   // initialize simulation
   sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
@@ -130,6 +135,9 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleActiveLangevinLoop();
     if(step % saveEnergyFreq == 0) {
+      if(saveWork == true) {
+        ioSP.saveParticleWorkEnergy(step+initialStep, timeStep, numParticles, driving, tp, width);
+      }
       ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {

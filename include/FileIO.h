@@ -95,6 +95,22 @@ public:
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
+  void saveParticleWorkEnergy(long step, double timeStep, long numParticles, double driving, double tp, double width) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    std::tuple<double, double> work = sp_->getParticleWork(width);
+    energyFile << setprecision(precision) << get<0>(work) << "\t";
+    energyFile << setprecision(precision) << get<1>(work) << "\t";
+    std::tuple<double, double> activeWork = sp_->getParticleActiveWork(driving, tp, width);
+    energyFile << setprecision(precision) << get<0>(activeWork) << "\t";
+    energyFile << setprecision(precision) << get<1>(activeWork) << endl;
+  }
+
   void saveParticleNoseHooverEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
@@ -144,7 +160,18 @@ public:
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << endl;
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, 0.0) << endl;
+  }
+
+  void saveParticleCenterWallEnergy(long step, double timeStep, long numParticles, double range, double width) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, width) << endl;
   }
 
   void saveParticleWallStressEnergy(long step, double timeStep, long numParticles, double range) {
@@ -155,8 +182,11 @@ public:
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range) << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleWallForceUpDown(range) << "\t";
+    std::tuple<double, double, double> stress = sp_->getParticleStressComponents();
+    energyFile << setprecision(precision) << get<0>(stress) << "\t";
+    energyFile << setprecision(precision) << get<1>(stress) << "\t";
+    energyFile << setprecision(precision) << get<2>(stress) << endl;
   }
 
   void saveParticleActiveWallEnergy(long step, double timeStep, long numParticles, double range, double driving) {

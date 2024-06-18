@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.02;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, mass = 10, damping = 1;
-  double ea = 2, eb = 2, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], strainType = argv[10], potType = argv[11], outDir, currentDir, timeDir, energyFile, dirSample;
+  double ea = atof(argv[10]), eb = ea, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, timeDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);

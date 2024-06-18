@@ -716,7 +716,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
   return cutDistance;
 }
 
-// this function is called after particledisplacement has been computed
+// this function is called after particleDisplacement has been computed
 void SP2D::removeCOMDrift() {
   // compute drift on x
   thrust::device_vector<double> particleDisp_x(d_particleDisp.size() / 2);
@@ -1437,7 +1437,29 @@ void SP2D::calcParticleStressTensor() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *pStress = thrust::raw_pointer_cast(&d_stress[0]);
-  kernelCalcParticleStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pStress);
+  kernelCalcStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pStress);
+}
+
+std::tuple<double, double> SP2D::getParticleWork(double width) {
+  double workIn = 0.0;
+  double workOut = 0.0;
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  kernelCalcWork<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, width, workIn, workOut);
+  return std::make_tuple(workIn, workOut);
+}
+
+std::tuple<double, double> SP2D::getParticleActiveWork(double driving, double taup, double width) {
+  double activeWorkIn = 0.0;
+  double activeWorkOut = 0.0;
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  kernelCalcActiveWork<<<dimGrid, dimBlock>>>(pPos, pAngle, pVel, width, activeWorkIn, activeWorkOut);
+  activeWorkIn *= (driving * taup * 0.5);
+  activeWorkOut *= (driving * taup * 0.5);
+  return std::make_tuple(activeWorkIn, activeWorkOut);
 }
 
 double SP2D::getParticlePressure() {
@@ -1472,7 +1494,15 @@ double SP2D::getParticleExtensileStress() {
 	 return d_stress[3] / (d_boxSize[0] * d_boxSize[1]);
 }
 
-double SP2D::getParticleWallForce(double range) {
+std::tuple<double, double, double> SP2D::getParticleStressComponents() {
+   calcParticleStressTensor();
+   double stress_xx = d_stress[0] / (d_boxSize[0] * d_boxSize[1]);
+   double stress_yy = d_stress[3] / (d_boxSize[0] * d_boxSize[1]);
+   double stress_xy = (d_stress[1] + d_stress[2]) / (nDim * d_boxSize[0] * d_boxSize[1]);
+   return std::make_tuple(stress_xx, stress_yy, stress_xy);
+}
+
+double SP2D::getParticleWallForce(double range, double width) {
   // first get pbc positions
   thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
   d_particlePosPBC = getPBCParticlePositions();
@@ -1485,9 +1515,34 @@ double SP2D::getParticleWallForce(double range) {
   const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
   double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
-  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  if(width == 0.0) {
+    kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  } else {
+    kernelCalcCenterWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, width, wallForce, wallCount);
+  }
   return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
 }
+
+double SP2D::getParticleWallForceUpDown(double range) {
+  // first get pbc positions
+  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
+  d_particlePosPBC = getPBCParticlePositions();
+  // then use them to compute the force across the wall
+  d_wallForce.resize(d_particleEnergy.size());
+  d_wallCount.resize(d_particleEnergy.size());
+  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
+  thrust::fill(d_wallCount.begin(), d_wallCount.end(), long(0));
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
+  double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+  long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
+  kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  double downup = thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
+  kernelCalcWallForceUpDown<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  double updown = thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
+  return (downup + updown);
+}
+
 
 double SP2D::getParticleActiveWallForce(double range, double driving) {
   // first get pbc positions
@@ -1502,9 +1557,9 @@ double SP2D::getParticleActiveWallForce(double range, double driving) {
   const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
   double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
-  kernelCalcParticleWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+  kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
   const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  kernelAddParticleWallActiveForce<<<dimGrid, dimBlock>>>(pAngle, driving, wallForce, wallCount);
+  kernelAddWallActiveForce<<<dimGrid, dimBlock>>>(pAngle, driving, wallForce, wallCount);
   return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
 }
 
@@ -1525,28 +1580,16 @@ double SP2D::getParticleWallPressure() {
     case simControlStruct::geometryEnum::normal:
     break;
 		case simControlStruct::geometryEnum::fixedBox:
-    kernelCalcParticleBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    kernelCalcBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
 		break;
 		case simControlStruct::geometryEnum::fixedSides2D:
-    kernelCalcParticleSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    kernelCalcSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
     break;
     default:
     break;
 	}
 	return (d_stress[0] + d_stress[3]) / (nDim * volume);
 	//return totalStress;
-}
-
-double SP2D::getParticleActivePressure(double driving) {
-  double activeWork = 0, volume = 1;
-  for (long dim = 0; dim < nDim; dim++) {
-    volume *= d_boxSize[dim];
-  }
-	const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  kernelCalcParticleActivePressure<<<dimGrid, dimBlock>>>(pAngle, pPos, driving, activeWork);
-
-  return activeWork / (nDim * volume);
 }
 
 double SP2D::getParticlePotentialEnergy() {

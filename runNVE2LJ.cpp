@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave = false, linSave = false, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]), updateCount = 0;
-  long step, maxStep = atof(argv[4]), initialStep = atof(argv[5]), checkPointFreq = int(maxStep / 10);
+  long step, maxStep = atof(argv[4]), initialStep = atol(argv[5]), checkPointFreq = int(maxStep / 10);
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]), range = 3;
