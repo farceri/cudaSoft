@@ -482,7 +482,7 @@ public:
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
   }
 
-  void readParticleState(string dirName, long numParticles_, long nDim_) {
+  void readParticleVelocity(string dirName, long numParticles_, long nDim_) {
     thrust::host_vector<double> particleVel_(numParticles_ * nDim_);
     if(nDim_ == 2) {
       particleVel_ = read2DFile(dirName + "particleVel.dat", numParticles_);
@@ -492,6 +492,10 @@ public:
       cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed!" << endl;
     }
     sp_->setParticleVelocities(particleVel_);
+  }
+
+  void readParticleState(string dirName, long numParticles_, long nDim_) {
+    readParticleVelocity(dirName, numParticles_, nDim_);
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       thrust::host_vector<double> particleAngle_(numParticles_);
       if(nDim_ == 2) {

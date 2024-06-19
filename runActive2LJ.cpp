@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     if(readNVT == true) {
-      ioSP.readParticleState(inDir, numParticles, nDim);
+      ioSP.readParticleVelocity(inDir, numParticles, nDim);
       sp.computeParticleAngleFromVel();
     } else {
       ioSP.readParticleState(inDir, numParticles, nDim);
