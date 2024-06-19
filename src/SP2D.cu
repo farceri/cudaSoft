@@ -47,6 +47,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setDimBlock(dimBlock);
   setNDim(nDim);
   setNumParticles(numParticles);
+	simControl.particleType = simControlStruct::particleEnum::passive;
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
@@ -158,6 +159,24 @@ void SP2D::syncSimControlToDevice() {
 //get simControl information from the gpu
 void SP2D::syncSimControlFromDevice() {
 	cudaMemcpyFromSymbol(&simControl, d_simControl, sizeof(simControl));
+}
+
+void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
+	simControl.particleType = particleType_;
+  if(simControl.particleType == simControlStruct::particleEnum::passive) {
+    cout << "SP2D::setParticleType: particleType: passive" << endl;
+  } else if(simControl.particleType == simControlStruct::particleEnum::active) {
+    if(nDim == 2) {
+      d_activeAngle.resize(numParticles);
+    } else if(nDim == 3) {
+      d_activeAngle.resize(numParticles * nDim);
+    }
+    thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
+    cout << "SP2D::setParticleType: particleType: active" << endl;
+  } else {
+    cout << "SP2D::setParticleType: please specify valid particleType: passive or active" << endl;
+  }
+	syncSimControlToDevice();
 }
 
 void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
@@ -1055,6 +1074,18 @@ double SP2D::setTimeStep(double dt_) {
   return dt;
 }
 
+void SP2D::setSelfPropulsionParams(double driving_, double taup_) {
+  driving = driving_;
+  taup = taup_;
+  //cout << "SP2D::setSelfPropulsionParams:: driving: " << driving << " taup: " << taup << endl;
+}
+
+void SP2D::getSelfPropulsionParams(double &driving_, double &taup_) {
+  driving_ = driving;
+  taup_ = taup;
+  //cout << "SP2D::getSelfPropulsionParams:: driving: " << driving_ << " taup: " << taup_ << endl;
+}
+
 void SP2D::setAdhesionParams(double l1_, double l2_) {
   l1 = l1_;
   l2 = l2_;
@@ -1208,6 +1239,62 @@ void SP2D::calcParticleInteraction() {
   }
 }
 
+void SP2D::addSelfPropulsion() {
+  int s_nDim(nDim);
+  double s_driving(driving);
+  double amplitude = sqrt(2.0 * dt / taup);
+  auto r = thrust::counting_iterator<long>(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
+  double* pForce = thrust::raw_pointer_cast(&(d_particleForce[0]));
+	if(nDim == 2) {
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,1.f));
+    const double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
+
+    auto langevinUpdateActiveNoise2D = [=] __device__ (long particleId) {
+      pAngle[particleId] += amplitude * activeAngle[particleId];
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pForce[particleId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, langevinUpdateActiveNoise2D);
+
+  } else if(nDim == 3) {
+    auto s = thrust::counting_iterator<long>(0);
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles * nDim, d_activeAngle.begin(), gaussNum(0.f,1.f));
+    double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
+
+    auto normalizeVector = [=] __device__ (long particleId) {
+      auto norm = 0.0;
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < nDim; dim++) {
+        norm += activeAngle[particleId * s_nDim + dim] * activeAngle[particleId * s_nDim + dim];
+      }
+      norm = sqrt(norm);
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        activeAngle[particleId * s_nDim + dim] /= norm;
+      }
+    };
+
+    thrust::for_each(s, s + numParticles, normalizeVector);
+
+    auto langevinUpdateActiveNoise3D = [=] __device__ (long particleId) {
+      pAngle[particleId * s_nDim] += amplitude * (pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim + 2] - pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim + 1]);
+      pAngle[particleId * s_nDim + 1] += amplitude * (pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim] - pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 2]);
+      pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim]);
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pForce[particleId * s_nDim + dim] += driving * pAngle[particleId * s_nDim + dim];
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, langevinUpdateActiveNoise3D);
+  }
+}
+
 void SP2D::addParticleWallInteraction() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
@@ -1237,6 +1324,9 @@ void SP2D::addParticleGravity() {
 
 void SP2D::calcParticleForceEnergy() {
   calcParticleInteraction();
+  if(simControl.particleType == simControlStruct::particleEnum::active) {
+    addSelfPropulsion();
+  }
   if(simControl.geometryType != simControlStruct::geometryEnum::normal) {
     addParticleWallInteraction();
   }

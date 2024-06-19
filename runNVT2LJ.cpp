@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
-  dirSample = whichDynamics + "T" + argv[3] + "-t" + argv[2] + "/";
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics

@@ -603,9 +603,9 @@ void SoftParticleActiveLangevin::updateThermalVel() {
   double *rando = thrust::raw_pointer_cast(&d_rando[0]);
   double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
   // generate active forces
+  double s_driving(config.driving);
   double amplitude = sqrt(2. * config.Dr * sp_->dt);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  double s_driving(config.driving);
   double *pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
   double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 

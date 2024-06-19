@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[11]), initMaxStep = 1e03;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
-  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.02;
+  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.001;
   double strain, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]);
   double ec = 1, ea = atof(argv[12]), eb = ea, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
   std::string inDir = argv[1], strainType = argv[13], potType = argv[14], outDir, currentDir, timeDir, energyFile, dirSample;
@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
   thrust::host_vector<double> newBoxSize(nDim);
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setParticleType(simControlStruct::particleEnum::active);
   if(strainType == "compress") {
     direction = 0;
     if(biaxial == true) {
@@ -99,9 +100,9 @@ int main(int argc, char **argv) {
     linFreq = checkPointFreq;
   }
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
-  ioSP.saveParticleActivePacking(outDir);
+  ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ea);
@@ -114,9 +115,11 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = 1/(tp*timeUnit);
   range *= LJcut * sigma;
-  ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
+  sp.setSelfPropulsionParams(driving, tp);
+  ioSP.saveLangevinParams(outDir, sigma, damping);
   // initialize simulation
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
@@ -176,7 +179,8 @@ int main(int argc, char **argv) {
     step = 0;
     waveQ = sp.getSoftWaveNumber();
     while(step != maxStep) {
-      sp.softParticleActiveLangevinLoop();
+      //sp.softParticleActiveLangevinLoop();
+      sp.softParticleLangevinLoop();
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
@@ -194,7 +198,7 @@ int main(int argc, char **argv) {
       }
       if((step + 1) % checkPointFreq == 0) {
         if(saveCurrent == true) {
-          ioSP.saveParticleActivePacking(currentDir);
+          ioSP.saveParticlePacking(currentDir);
         }
       }
       step += 1;
@@ -212,7 +216,7 @@ int main(int argc, char **argv) {
     countStep += 1;
     // save current configuration
     if(saveCurrent == true) {
-      ioSP.saveParticleActivePacking(currentDir);
+      ioSP.saveParticlePacking(currentDir);
       if(save == true) {
         ioSP.closeEnergyFile();
       }

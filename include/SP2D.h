@@ -22,6 +22,7 @@ using std::string;
 using std::tuple;
 
 struct simControlStruct {
+  enum class particleEnum {passive, active} particleType;
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -66,6 +67,8 @@ public:
   double rho0;
   // energy scale
   double ec;
+  // self-propulsion parameters
+  double driving, taup;
   // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
@@ -97,6 +100,7 @@ public:
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
   thrust::device_vector<double> d_particleAngle;
+  thrust::device_vector<double> d_activeAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
   thrust::device_vector<long> d_wallCount;
@@ -138,6 +142,9 @@ public:
   void syncSimControlToDevice();
   void syncSimControlFromDevice();
   bool testSimControlSync();
+
+  void setParticleType(simControlStruct::particleEnum particleType_);
+	simControlStruct::particleEnum getParticleType();
 
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
@@ -276,6 +283,9 @@ public:
 
   double setTimeStep(double dt_);
 
+  void setSelfPropulsionParams(double driving_, double taup_);
+  void getSelfPropulsionParams(double &driving_, double &taup_);
+
   void setAdhesionParams(double l1_, double l2_);
 
   void setLJcutoff(double LJcutoff_);
@@ -302,6 +312,8 @@ public:
 
   // particle functions
   void calcParticleInteraction();
+
+  void addSelfPropulsion();
 
   void addParticleWallInteraction();
 

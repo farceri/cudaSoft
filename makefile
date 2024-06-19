@@ -71,7 +71,7 @@ INC_DIR = include
 #EXE = runNVE2LJ
 #EXE = runNH2LJ
 #EXE = runNVT2LJ
-#EXE = runActive2LJ
+EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
@@ -84,15 +84,11 @@ INC_DIR = include
 #EXE = linearExtendNVT
 #EXE = linearExtendNVT2LJ
 #EXE = linearExtendActive
-EXE = linearExtendActive2LJ
+#EXE = linearExtendActive2LJ
 #EXE = extendNVT
 #EXE = extendActive
 #EXE = linearShearNVT
 #EXE = shearNVT
-#EXE = shearActive
-#EXE = simpleNVE
-#EXE = simplNVT
-#EXE = simpleActive
 
 # hydrodynamics
 #EXE = runFlow

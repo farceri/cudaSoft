@@ -428,60 +428,41 @@ public:
     save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
-  void saveParticlePacking(string dirName) {
-    // save scalars
+  void savePackingParams(string dirName) {
     string fileParams = dirName + "params.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
     long nDim = sp_->getNDim();
-    saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
+    long numParticles = sp_->getNumParticles();
+    saveParams << "numParticles" << "\t" << numParticles << endl;
     saveParams << "nDim" << "\t" << nDim << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-    saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
+    saveParams << "energy" << "\t" << sp_->getParticleEnergy() / numParticles << endl;
     saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
     saveParams.close();
-    // save vectors
-    save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
-    save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-    //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    //save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
-    //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-    //sp_->calcParticleContacts(0.);
-    //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
-  void saveParticleActivePacking(string dirName) {
-  // save scalars
-  string fileParams = dirName + "params.dat";
-  ofstream saveParams(fileParams.c_str());
-  openOutputFile(fileParams);
-  long nDim = sp_->getNDim();
-  saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
-  saveParams << "nDim" << "\t" << nDim << endl;
-  saveParams << "dt" << "\t" << sp_->dt << endl;
-  saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-  saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
-  saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
-  saveParams.close();
-  // save vectors
-  save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
-  save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-  if(nDim == 2) {
-    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
-  } else {
-    save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), nDim);
+  void saveParticlePacking(string dirName) {
+    savePackingParams(dirName);
+    // save vectors
+    long nDim = sp_->getNDim();
+    save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+    save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
+    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
+    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      if(nDim == 2) {
+        save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+      } else if(nDim == 3) {
+        save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), nDim);
+      } else {
+        cout << "FileIO::saveParticlePacking: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
+      }
+    }
+    //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
+    //save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
   }
-  //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-  save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
-  save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
-  save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), nDim);
-  //save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-  //sp_->calcParticleContacts(0.);
-  //save2DIndexFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
-}
 
   void savePBCParticlePacking(string dirName) {
     // save scalars
@@ -511,42 +492,34 @@ public:
       cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed!" << endl;
     }
     sp_->setParticleVelocities(particleVel_);
-  }
-
-  void readParticleActiveState(string dirName, long numParticles_, long nDim_) {
-    thrust::host_vector<double> particleAngle_(numParticles_);
-    thrust::host_vector<double> particleVel_(numParticles_ * nDim_);
-    if(nDim_ == 2) {
-      particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
-      particleVel_ = read2DFile(dirName + "particleVel.dat", numParticles_);
-    } else if(nDim_ == 3) {
-      particleAngle_.resize(numParticles_ * nDim_);
-      particleAngle_ = read3DFile(dirName + "particleAngles.dat", numParticles_);
-      particleVel_ = read3DFile(dirName + "particleVel.dat", numParticles_);
-    } else {
-      cout << "FileIO::readParticleActiveState: only dimensions 2 and 3 are allowed!" << endl;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      thrust::host_vector<double> particleAngle_(numParticles_);
+      if(nDim_ == 2) {
+        particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
+      } else if(nDim_ == 3) {
+        particleAngle_.resize(numParticles_ * nDim_);
+        particleAngle_ = read3DFile(dirName + "particleAngles.dat", numParticles_);
+      } else {
+        cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
+      }
+      sp_->setParticleAngles(particleAngle_);
     }
-    sp_->setParticleAngles(particleAngle_);
-    sp_->setParticleVelocities(particleVel_);
   }
 
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      if(sp_->nDim == 2) {
+        save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+      } else {
+        save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
+      }
+    }
   }
 
   void saveParticleEnergies(string dirName) {
     save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-  }
-
-  void saveParticleActiveState(string dirName) {
-    if(sp_->nDim == 2) {
-      save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
-    } else {
-      save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
-    }
-    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
   }
 
   void saveParticleContacts(string dirName) {
@@ -566,17 +539,12 @@ public:
     openOutputFile(fileParams);
     saveParams << "sigma" << "\t" << sigma << endl;
     saveParams << "damping" << "\t" << damping << endl;
-    saveParams.close();
-  }
-
-  void saveActiveLangevinParams(string dirName, double sigma, double damping, double taup, double driving) {
-    string fileParams = dirName + "dynParams.dat";
-    ofstream saveParams(fileParams.c_str());
-    openOutputFile(fileParams);
-    saveParams << "sigma" << "\t" << sigma << endl;
-    saveParams << "damping" << "\t" << damping << endl;
-    saveParams << "taup" << "\t" << taup << endl;
-    saveParams << "f0" << "\t" << driving << endl;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double driving, taup;
+      sp_->getSelfPropulsionParams(driving, taup);
+      saveParams << "taup" << "\t" << taup << endl;
+      saveParams << "f0" << "\t" << driving << endl;
+    }
     saveParams.close();
   }
 
@@ -588,6 +556,12 @@ public:
     openOutputFile(fileParams);
     saveParams << "mass" << "\t" << mass << endl;
     saveParams << "damping" << "\t" << damping << endl;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double driving, taup;
+      sp_->getSelfPropulsionParams(driving, taup);
+      saveParams << "taup" << "\t" << taup << endl;
+      saveParams << "f0" << "\t" << driving << endl;
+    }
     saveParams.close();
   }
 
