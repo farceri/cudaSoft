@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = true, savePressure = true;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = 1/(tp*timeUnit);
   sp.setSelfPropulsionParams(driving, tp);
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
   //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   sp.initSoftParticleLangevin(Tinject, damping, readState);

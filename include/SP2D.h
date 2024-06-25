@@ -280,6 +280,7 @@ public:
 
   // force and energy
   void setEnergyCostant(double ec_);
+  double getEnergyCostant();
 
   double setTimeStep(double dt_);
 

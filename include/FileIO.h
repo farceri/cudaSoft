@@ -436,6 +436,8 @@ public:
     long numParticles = sp_->getNumParticles();
     saveParams << "numParticles" << "\t" << numParticles << endl;
     saveParams << "nDim" << "\t" << nDim << endl;
+    saveParams << "sigma" << "\t" << 2 * sp_->getMeanParticleSigma() << endl;
+    saveParams << "epsilon" << "\t" << sp_->getEnergyCostant() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
     saveParams << "energy" << "\t" << sp_->getParticleEnergy() / numParticles << endl;
@@ -537,11 +539,10 @@ public:
     }
   }
 
-  void saveLangevinParams(string dirName, double sigma, double damping) {
+  void saveLangevinParams(string dirName, double damping) {
     string fileParams = dirName + "dynParams.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
-    saveParams << "sigma" << "\t" << sigma << endl;
     saveParams << "damping" << "\t" << damping << endl;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double driving, taup;

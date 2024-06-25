@@ -1068,6 +1068,14 @@ void SP2D::setEnergyCostant(double ec_) {
   cudaMemcpyToSymbol(d_ec, &ec, sizeof(ec));
 }
 
+double SP2D::getEnergyCostant() {
+  if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
+    return (eAA + eBB) * 0.5;
+  } else {
+    return ec;
+  }
+}
+
 double SP2D::setTimeStep(double dt_) {
   dt = dt_;
   cudaMemcpyToSymbol(d_dt, &dt, sizeof(dt));
