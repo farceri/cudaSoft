@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave = true, savePressure = true;
+  bool readState = true, readNVT = true, saveFinal = true, logSave, linSave, savePressure = false, saveWall = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -138,7 +138,11 @@ int main(int argc, char **argv) {
     //sp.softParticleActiveLangevinLoop();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      if(savePressure == true) {
+        ioSP.saveParticlePressureEnergy(step+initialStep, timeStep, numParticles, saveWall);
+      } else {
+        ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      }
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
@@ -178,7 +182,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
         //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }

@@ -196,36 +196,4 @@ public:
   virtual void integrate();
 };
 
-// Soft particle Active Langevin integrator child of softParticleLangevin2
-class SoftParticleActiveLangevin: public SoftParticleLangevin2
-{
-public:
-  SoftParticleActiveLangevin() = default;
-  SoftParticleActiveLangevin(SP2D * spPtr, SimConfig config) : SoftParticleLangevin2:: SoftParticleLangevin2(spPtr, config){;}
-
-  virtual void updateThermalVel();
-  virtual void integrate();
-};
-
-// Soft particle Active Langevin integrator with massive particles child of SoftParticleActiveLangevin
-class SoftParticleActiveSubSet: public SoftParticleLangevinSubSet
-{
-public:
-  SoftParticleActiveSubSet() = default;
-  SoftParticleActiveSubSet(SP2D * spPtr, SimConfig config) : SoftParticleLangevinSubSet:: SoftParticleLangevinSubSet(spPtr, config){;}
-
-  virtual void updateThermalVel();
-  virtual void integrate();
-};
-
-// Soft particle Active Langevin integrator with external field child of SoftParticleActiveLangevin
-class SoftParticleActiveExtField: public SoftParticleActiveLangevin
-{
-public:
-  SoftParticleActiveExtField() = default;
-  SoftParticleActiveExtField(SP2D * spPtr, SimConfig config) : SoftParticleActiveLangevin:: SoftParticleActiveLangevin(spPtr, config){;}
-
-  virtual void integrate();
-};
-
 #endif // SIMULATOR_H //

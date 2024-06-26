@@ -351,11 +351,11 @@ public:
 
   void calcParticleStressTensor();
 
-  std::tuple<double, double> getParticleWork(double width);
-  
-  std::tuple<double, double> getParticleActiveWork(double driving, double taup, double width);
-
   double getParticlePressure();
+
+  void calcParticleActiveStressTensor();
+
+  double getParticleActivePressure();
 
   double getParticleSurfaceTension();
 
@@ -365,15 +365,17 @@ public:
 
   std::tuple<double, double, double> getParticleStressComponents();
 
-  double getParticleWallForce(double range, double width);
-  
-  double getParticleWallForceUpDown(double range);
+  double getParticleWallPressure();
 
-  double getParticleActiveWallForce(double range, double driving);
+  double getParticleBoxPressure();
+
+  std::tuple<double, double> getColumnWork(double width);
+  
+  std::tuple<double, double> getColumnActiveWork(double width);
+
+  double getParticleWallForce(double range, double width);
 
   long getTotalParticleWallCount();
-
-  double getParticleWallPressure();
 
   double getParticlePotentialEnergy();
 
@@ -473,19 +475,6 @@ public:
   void initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double mass, double gamma1, double gamma2, bool readState);
 
   void softParticleDoubleNoseHooverLoop();
-
-  // Active integrators
-  void initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState);
-
-  void softParticleActiveLangevinLoop();
-
-  void initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
-
-  void softParticleActiveSubSetLoop();
-
-  void initSoftParticleActiveExtField(double Temp, double Dr, double driving, double gamma, bool readState);
-
-  void softParticleActiveExtFieldLoop();
 
 };
 

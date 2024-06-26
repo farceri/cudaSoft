@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     // run NVT at zero strain to make sure the system is in equilibrium
     step = 0;
     while(step != initMaxStep) {
-      sp.softParticleActiveLangevinLoop();
+      sp.softParticleLangevinLoop();
       step += 1;
     }
     cout << "Active2LJ: initial equilibration";

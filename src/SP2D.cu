@@ -1066,6 +1066,7 @@ void SP2D::computeParticleAngleFromVel() {
 void SP2D::setEnergyCostant(double ec_) {
   ec = ec_;
   cudaMemcpyToSymbol(d_ec, &ec, sizeof(ec));
+  setBoxEnergyScale(ec);
 }
 
 double SP2D::getEnergyCostant() {
@@ -1085,6 +1086,8 @@ double SP2D::setTimeStep(double dt_) {
 void SP2D::setSelfPropulsionParams(double driving_, double taup_) {
   driving = driving_;
   taup = taup_;
+  cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
+  cudaMemcpyToSymbol(d_taup, &taup, sizeof(taup));
   //cout << "SP2D::setSelfPropulsionParams:: driving: " << driving << " taup: " << taup << endl;
 }
 
@@ -1121,6 +1124,7 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   cudaMemcpyToSymbol(d_eAA, &eAA, sizeof(eAA));
   cudaMemcpyToSymbol(d_eAB, &eAB, sizeof(eAB));
   cudaMemcpyToSymbol(d_eBB, &eBB, sizeof(eBB));
+  setBoxEnergyScale(eAA);
   double ratio6 = 1 / pow(LJcutoff, 6);
   LJecut = 4 * (ratio6 * ratio6 - ratio6);
   cudaMemcpyToSymbol(d_LJecut, &LJecut, sizeof(LJecut));
@@ -1538,35 +1542,34 @@ void SP2D::calcParticleStressTensor() {
   kernelCalcStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pStress);
 }
 
-std::tuple<double, double> SP2D::getParticleWork(double width) {
-  double workIn = 0.0;
-  double workOut = 0.0;
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  kernelCalcWork<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, width, workIn, workOut);
-  return std::make_tuple(workIn, workOut);
-}
-
-std::tuple<double, double> SP2D::getParticleActiveWork(double driving, double taup, double width) {
-  double activeWorkIn = 0.0;
-  double activeWorkOut = 0.0;
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  kernelCalcActiveWork<<<dimGrid, dimBlock>>>(pPos, pAngle, pVel, width, activeWorkIn, activeWorkOut);
-  activeWorkIn *= (driving * taup * 0.5);
-  activeWorkOut *= (driving * taup * 0.5);
-  return std::make_tuple(activeWorkIn, activeWorkOut);
-}
-
 double SP2D::getParticlePressure() {
   calcParticleStressTensor();
-  if(nDim == 2) {
-    return (d_stress[0] + d_stress[3]) / (nDim * d_boxSize[0] * d_boxSize[1]);
-  } else {
-    return 0;
+  double volume = 1.0;
+  double stress = 0.0;
+  for (long dim = 0; dim < nDim; dim++) {
+    volume *= d_boxSize[dim];
+    stress += d_stress[dim * nDim + dim];
   }
+  return stress / (nDim * volume);
+}
+
+void SP2D::calcParticleActiveStressTensor() {
+  thrust::fill(d_stress.begin(), d_stress.end(), double(0));
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *pStress = thrust::raw_pointer_cast(&d_stress[0]);
+  kernelCalcActiveStress<<<dimGrid, dimBlock>>>(pAngle, pVel, pStress);
+}
+
+double SP2D::getParticleActivePressure() {
+  calcParticleActiveStressTensor();
+  double volume = 1.0;
+  double stress = 0.0;
+  for (long dim = 0; dim < nDim; dim++) {
+    volume *= d_boxSize[dim];
+    stress += d_stress[dim * nDim + dim];
+  }
+  return stress / (nDim * volume);
 }
 
 double SP2D::getParticleSurfaceTension() {
@@ -1600,6 +1603,65 @@ std::tuple<double, double, double> SP2D::getParticleStressComponents() {
    return std::make_tuple(stress_xx, stress_yy, stress_xy);
 }
 
+double SP2D::getParticleWallPressure() {
+  thrust::device_vector<double> d_wallStress(d_particleRad.size());
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *wallStress = thrust::raw_pointer_cast(&d_wallStress[0]);
+  kernelCalcBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+  double length = 0.0;
+  for (long dim = 0; dim < nDim; dim++) {
+    length += 2 * d_boxSize[dim];
+  }
+	return thrust::reduce(d_wallStress.begin(), d_wallStress.end(), double(0), thrust::plus<double>()) / length;
+}
+
+double SP2D::getParticleBoxPressure() {
+  thrust::device_vector<double> d_wallStress(d_particleRad.size());
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *wallStress = thrust::raw_pointer_cast(&d_wallStress[0]);
+  switch (simControl.geometryType) {
+    case simControlStruct::geometryEnum::normal:
+    break;
+		case simControlStruct::geometryEnum::fixedBox:
+    kernelCalcBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+		break;
+		case simControlStruct::geometryEnum::fixedSides2D:
+    kernelCalcSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    break;
+    default:
+    break;
+	}
+  double length = 0.0;
+  for (long dim = 0; dim < nDim; dim++) {
+    length += 2 * d_boxSize[dim];
+  }
+	return thrust::reduce(d_wallStress.begin(), d_wallStress.end(), double(0), thrust::plus<double>()) / length;
+}
+
+std::tuple<double, double> SP2D::getColumnWork(double width) {
+  double workIn = 0.0;
+  double workOut = 0.0;
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  kernelCalcColumnWork<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, width, workIn, workOut);
+  return std::make_tuple(workIn, workOut);
+}
+
+std::tuple<double, double> SP2D::getColumnActiveWork(double width) {
+  double activeWorkIn = 0.0;
+  double activeWorkOut = 0.0;
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  kernelCalcColumnActiveWork<<<dimGrid, dimBlock>>>(pPos, pAngle, pVel, width, activeWorkIn, activeWorkOut);
+  activeWorkIn *= (driving * taup * 0.5);
+  activeWorkOut *= (driving * taup * 0.5);
+  return std::make_tuple(activeWorkIn, activeWorkOut);
+}
+
 double SP2D::getParticleWallForce(double range, double width) {
   // first get pbc positions
   thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
@@ -1615,79 +1677,18 @@ double SP2D::getParticleWallForce(double range, double width) {
   long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
   if(width == 0.0) {
     kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
+    if(simControl.particleType == simControlStruct::particleEnum::active) {
+      const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+      kernelAddWallActiveForce<<<dimGrid, dimBlock>>>(pAngle, wallForce, wallCount);
+    }
   } else {
     kernelCalcCenterWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, width, wallForce, wallCount);
   }
   return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
 }
 
-double SP2D::getParticleWallForceUpDown(double range) {
-  // first get pbc positions
-  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
-  d_particlePosPBC = getPBCParticlePositions();
-  // then use them to compute the force across the wall
-  d_wallForce.resize(d_particleEnergy.size());
-  d_wallCount.resize(d_particleEnergy.size());
-  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
-  thrust::fill(d_wallCount.begin(), d_wallCount.end(), long(0));
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
-  double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
-  long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
-  kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
-  double downup = thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
-  kernelCalcWallForceUpDown<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
-  double updown = thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
-  return (downup + updown);
-}
-
-
-double SP2D::getParticleActiveWallForce(double range, double driving) {
-  // first get pbc positions
-  thrust::device_vector<double> d_particlePosPBC(d_particlePos.size());
-  d_particlePosPBC = getPBCParticlePositions();
-  // then use them to compute the force across the wall
-  d_wallForce.resize(d_particleEnergy.size());
-  d_wallCount.resize(d_particleEnergy.size());
-  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
-  thrust::fill(d_wallCount.begin(), d_wallCount.end(), long(0));
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPosPBC = thrust::raw_pointer_cast(&d_particlePosPBC[0]);
-  double *wallForce = thrust::raw_pointer_cast(&d_wallForce[0]);
-  long *wallCount = thrust::raw_pointer_cast(&d_wallCount[0]);
-  kernelCalcWallForce<<<dimGrid, dimBlock>>>(pRad, pPosPBC, range, wallForce, wallCount);
-  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  kernelAddWallActiveForce<<<dimGrid, dimBlock>>>(pAngle, driving, wallForce, wallCount);
-  return thrust::reduce(d_wallForce.begin(), d_wallForce.end(), double(0), thrust::plus<double>());
-}
-
 long SP2D::getTotalParticleWallCount() {
   return thrust::reduce(d_wallCount.begin(), d_wallCount.end(), long(0), thrust::plus<long>());
-}
-
-double SP2D::getParticleWallPressure() {
-	 double volume = 1;
-	 for (long dim = 0; dim < nDim; dim++) {
-     volume *= d_boxSize[dim];
-	 }
-  thrust::fill(d_stress.begin(), d_stress.end(), double(0));
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  double *wallStress = thrust::raw_pointer_cast(&d_stress[0]);
-  switch (simControl.geometryType) {
-    case simControlStruct::geometryEnum::normal:
-    break;
-		case simControlStruct::geometryEnum::fixedBox:
-    kernelCalcBoxStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
-		break;
-		case simControlStruct::geometryEnum::fixedSides2D:
-    kernelCalcSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
-    break;
-    default:
-    break;
-	}
-	return (d_stress[0] + d_stress[3]) / (nDim * volume);
-	//return totalStress;
 }
 
 double SP2D::getParticlePotentialEnergy() {
@@ -2194,88 +2195,5 @@ void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double m
 }
 
 void SP2D::softParticleDoubleNoseHooverLoop() {
-  this->sim_->integrate();
-}
-
-//**************************** Active integrators ****************************//
-void SP2D::initSoftParticleActiveLangevin(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveLangevin(this, SimConfig(Temp, Dr, driving));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  setInitialPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-    computeParticleAngleFromVel();
-    //cout << "SP2D::initSoftParticleActiveLangevin:: damping coefficients: " << this->sim_->lcoeff1 << " " << this->sim_->lcoeff2 << " " << this->sim_->lcoeff3 << endl;
-  }
-  cout << "SP2D::initSoftParticleActiveLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleActiveLangevinLoop() {
-  this->sim_->integrate();
-}
-
-void SP2D::initSoftParticleActiveSubSet(double Temp, double Dr, double driving, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
-  this->sim_ = new SoftParticleActiveSubSet(this, SimConfig(Temp, Dr, driving));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  // subset variables
-  this->sim_->firstIndex = firstIndex;
-  this->sim_->mass = mass;
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  setInitialPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-    computeParticleAngleFromVel();
-  }
-  if(zeroOutMassiveVel == true) {
-    thrust::fill(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, double(0));
-  }
-  cout << "SP2D::initSoftParticleActiveSubSet:: current temperature: " << setprecision(12) << getParticleTemperature() << " mass: " << this->sim_->mass << endl;
-}
-
-void SP2D::softParticleActiveSubSetLoop() {
-  this->sim_->integrate();
-}
-
-void SP2D::initSoftParticleActiveExtField(double Temp, double Dr, double driving, double gamma, bool readState) {
-  this->sim_ = new SoftParticleActiveExtField(this, SimConfig(Temp, Dr, driving));
-  this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_pActiveAngle.resize(d_particleAngle.size());
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
-  resetLastPositions();
-  setInitialPositions();
-  if(readState == false) {
-    this->sim_->injectKineticEnergy();
-    computeParticleAngleFromVel();
-  }
-  cout << "SP2D::initSoftParticleActiveExtField:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
-}
-
-void SP2D::softParticleActiveExtFieldLoop() {
   this->sim_->integrate();
 }
