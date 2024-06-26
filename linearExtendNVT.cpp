@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
             if(centered == true) {
-              ioSP.saveParticleCenterWallEnergy(step, timeStep, numParticles, range, width);
+              ioSP.saveParticleColumnWallEnergy(step, timeStep, numParticles, range, width);
             }
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else {
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
         } else {
           if(saveForce == true) {
             if(centered == true) {
-              ioSP.saveParticleCenterWallEnergy(step + countStep * maxStep, timeStep, numParticles, range, width);
+              ioSP.saveParticleColumnWallEnergy(step + countStep * maxStep, timeStep, numParticles, range, width);
             }
             ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else {
