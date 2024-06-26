@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
   driving = driving*forceUnit;
   Dr = 1/(tp * timeUnit);
   sp.setSelfPropulsionParams(driving, tp);
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  ioSP.saveLangevinParams(outDir, damping);
   range *= LJcut * sigma;
   //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
