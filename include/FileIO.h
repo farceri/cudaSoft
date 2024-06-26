@@ -209,13 +209,14 @@ public:
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, 0.0) << "\t";
     std::tuple<double, double, double> stress = sp_->getParticleStressComponents();
     energyFile << setprecision(precision) << get<0>(stress) << "\t";
     energyFile << setprecision(precision) << get<1>(stress) << "\t";
     energyFile << setprecision(precision) << get<2>(stress) << endl;
   }
 
-  void saveParticleStressEnergy(long step, double timeStep, long numParticles) {
+  void saveParticleStressEnergy(long step, double timeStep, long numParticles, double range) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";

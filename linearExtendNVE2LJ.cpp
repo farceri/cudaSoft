@@ -206,7 +206,7 @@ int main(int argc, char **argv) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else if(saveStress == true) {
-            ioSP.saveParticleWallStressEnergy(step, timeStep, numParticles, range);
+            ioSP.saveParticleStressCompEnergy(step, timeStep, numParticles, range);
           } else {
             ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
           }
@@ -214,7 +214,7 @@ int main(int argc, char **argv) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else if(saveStress == true) {
-            ioSP.saveParticleWallStressEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            ioSP.saveParticleStressCompEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else {
             ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
           }
