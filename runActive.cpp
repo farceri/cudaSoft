@@ -30,10 +30,10 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
+  double ec = atof(argv[12]), LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
-  std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics;
+  std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "active";
   thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
     LJcut = 2.5;
@@ -44,14 +44,14 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    whichDynamics = "active-lj/";
+    whichDynamics = whichDynamics + argv[12] + "/";
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     whichDynamics = "active-wca/";
   } else {
-    cout << "Setting default harmonic potential" << endl;
     whichDynamics = "active/";
+    cout << "Setting default harmonic potential" << endl;
   }
   dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
   ioSPFile ioSP(&sp);
