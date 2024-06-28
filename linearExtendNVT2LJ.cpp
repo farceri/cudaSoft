@@ -23,9 +23,9 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true, equilibrate = true;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, equilibrate = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[9]), initMaxStep = 1e03;
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[9]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, forceUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double ea = atof(argv[10]), eb = ea, eab = 0.5, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);

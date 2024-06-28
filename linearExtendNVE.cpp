@@ -23,10 +23,10 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = true;
-  bool adjustEkin = false, adjustTemp = false, equilibrate = false;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false;
+  bool adjustEkin = false, adjustTemp = false, equilibrate = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e03;
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, otherStrain, range = 3, prevEnergy = 0;
   double ec = atof(argv[9]), cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), strain, strainFreq = 0.01;
   double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
