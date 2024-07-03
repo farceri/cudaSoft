@@ -1263,11 +1263,11 @@ void SP2D::addSelfPropulsion() {
     thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,1.f));
     const double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
 
-    auto langevinUpdateActiveNoise2D = [=] __device__ (long particleId) {
-      pAngle[particleId] += amplitude * activeAngle[particleId];
+    auto langevinUpdateActiveNoise2D = [=] __device__ (long pId) {
+      pAngle[pId] += amplitude * activeAngle[pId];
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
-        pForce[particleId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[particleId]) + dim * sin(pAngle[particleId]));
+        pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
       }
     };
 
@@ -1701,12 +1701,67 @@ double SP2D::getParticleKineticEnergy() {
   return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
 }
 
+double SP2D::getDampingWork() {
+  thrust::device_vector<double> d_dampingWork(d_particleEnergy.size());
+  thrust::fill(d_dampingWork.begin(), d_dampingWork.end(), double(0));
+
+  double s_dt(dt);
+  long s_nDim(nDim);
+  double s_gamma(this->sim_->gamma);
+  auto r = thrust::counting_iterator<long>(0);
+	const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double* dWork = thrust::raw_pointer_cast(&d_dampingWork[0]);
+
+  auto computeDampingWork = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      dWork[pId] -= s_dt * s_gamma * pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, computeDampingWork);
+
+  return thrust::reduce(d_dampingWork.begin(), d_dampingWork.end(), double(0), thrust::plus<double>());
+}
+
+double SP2D::getSelfPropulsionWork() {
+  thrust::device_vector<double> d_activeWork(d_particleEnergy.size());
+  thrust::fill(d_activeWork.begin(), d_activeWork.end(), double(0));
+
+  double s_dt(dt);
+  long s_nDim(nDim);
+  double s_driving(driving);
+  auto r = thrust::counting_iterator<long>(0);
+	const double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+	const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double* aWork = thrust::raw_pointer_cast(&d_activeWork[0]);
+
+  auto computeActiveWork = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      aWork[pId] += s_dt * s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId])) * pVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, computeActiveWork);
+
+  return thrust::reduce(d_activeWork.begin(), d_activeWork.end(), double(0), thrust::plus<double>());
+}
+
 double SP2D::getParticleTemperature() {
   return 2 * getParticleKineticEnergy() / (nDim * numParticles);
 }
 
 double SP2D::getParticleEnergy() {
-  return (getParticlePotentialEnergy() + getParticleKineticEnergy());
+  return getParticlePotentialEnergy() + getParticleKineticEnergy();
+}
+
+double SP2D::getParticleWork() {
+  double work = getDampingWork();
+  if(simControl.particleType == simControlStruct::particleEnum::active) {
+    work += getSelfPropulsionWork();
+  }
+  return work;
 }
 
 std::tuple<double, double, double> SP2D::getParticleKineticEnergy12() {

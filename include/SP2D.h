@@ -381,7 +381,13 @@ public:
 
   double getParticleKineticEnergy();
 
+  double getDampingWork();
+
+  double getSelfPropulsionWork();
+
   double getParticleEnergy();
+
+  double getParticleWork();
 
   double getParticleTemperature();
 

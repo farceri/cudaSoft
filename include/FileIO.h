@@ -95,7 +95,26 @@ public:
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
-  void saveParticleEnergy(long step, double timeStep, double waveNumber, long numParticles) {
+  void saveParticleEnergy(long step, double timeStep, long numParticles) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double edamp = sp_->getDampingWork();
+    double etot = epot + ekin + edamp;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << edamp / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      etot += eactive;
+    } else {
+      energyFile << "\t";
+    }
+    energyFile << setprecision(precision) << etot / numParticles << endl;
+  }
+
+  void saveParticleEnergyISF(long step, double timeStep, double waveNumber, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
@@ -109,7 +128,15 @@ public:
     double etot = epot + ekin;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      etot += sp_->getDampingWork();
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      etot += eactive;
+    } else {
+      energyFile << "\t";
+    }
     energyFile << setprecision(precision) << etot / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure();
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
@@ -125,23 +152,80 @@ public:
   void saveColumnWorkEnergy(long step, double timeStep, long numParticles, double width) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
+    double etot = ekin + epot;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      etot += sp_->getDampingWork();
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      etot += eactive;
+    } else {
+      energyFile << "\t";
+    }
     energyFile << setprecision(precision) << etot / numParticles << "\t";
     std::tuple<double, double> work = sp_->getColumnWork(width);
     energyFile << setprecision(precision) << get<0>(work) << "\t";
     energyFile << setprecision(precision) << get<1>(work) << "\t";
-    std::tuple<double, double> activeWork = sp_->getColumnActiveWork(width);
-    energyFile << setprecision(precision) << get<0>(activeWork) << "\t";
-    energyFile << setprecision(precision) << get<1>(activeWork) << endl;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      std::tuple<double, double> activeWork = sp_->getColumnActiveWork(width);
+      energyFile << setprecision(precision) << get<0>(activeWork) << "\t";
+      energyFile << setprecision(precision) << get<1>(activeWork) << endl;
+    } else {
+      energyFile << endl;
+    }
+  }
+
+  void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = ekin + epot;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      etot += sp_->getDampingWork();
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      etot += eactive;
+    } else {
+      energyFile << "\t";
+    }
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, 0.0) << endl;
+  }
+
+  void saveParticleColumnWallEnergy(long step, double timeStep, long numParticles, double range, double width) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = ekin + epot;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      etot += sp_->getDampingWork();
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      etot += eactive;
+    } else {
+      energyFile << "\t";
+    }
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, width) << endl;
+  }
+
+  void saveStressComponents(long step, double timeStep, long numParticles, double range) {
+    std::tuple<double, double, double> stress = sp_->getParticleStressComponents();
+    energyFile << setprecision(precision) << get<0>(stress) << "\t";
+    energyFile << setprecision(precision) << get<1>(stress) << "\t";
+    energyFile << setprecision(precision) << get<2>(stress) << endl;
   }
 
   void saveParticleNoseHooverEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
+    double etot = sp_->getParticleEnergy();
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
@@ -177,43 +261,6 @@ public:
     energyFile << setprecision(precision) << get<1>(ekins) / (numParticles - num1) << "\t";
     energyFile << setprecision(precision) << get<2>(ekins) / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << endl;
-  }
-
-  void saveParticleWallEnergy(long step, double timeStep, long numParticles, double range) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, 0.0) << endl;
-  }
-
-  void saveParticleColumnWallEnergy(long step, double timeStep, long numParticles, double range, double width) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, width) << endl;
-  }
-
-  void saveParticleStressCompEnergy(long step, double timeStep, long numParticles, double range) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleWallForce(range, 0.0) << "\t";
-    std::tuple<double, double, double> stress = sp_->getParticleStressComponents();
-    energyFile << setprecision(precision) << get<0>(stress) << "\t";
-    energyFile << setprecision(precision) << get<1>(stress) << "\t";
-    energyFile << setprecision(precision) << get<2>(stress) << endl;
   }
 
   void saveParticleStressEnergy(long step, double timeStep, long numParticles, double range) {
@@ -516,6 +563,7 @@ public:
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      save2DFile(dirName + "particleForce.dat", sp_->getParticleForces(), sp_->nDim);
       if(sp_->nDim == 2) {
         save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
       } else {

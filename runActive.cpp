@@ -142,11 +142,12 @@ int main(int argc, char **argv) {
       if(saveWork == true) {
         ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
       }
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
-        cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
+        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " W/N: " << sp.getParticleWork() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();

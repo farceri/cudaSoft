@@ -132,12 +132,13 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveParticleEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "Langevin LJ: current step: " << step + initialStep;
+        cout << "Langevin 2LJ: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " W/N: " << sp.getParticleWork() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();

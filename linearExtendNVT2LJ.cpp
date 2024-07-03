@@ -176,13 +176,13 @@ int main(int argc, char **argv) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+            ioSP.saveParticleEnergy(step, timeStep, numParticles);
           }
         } else {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+            ioSP.saveParticleEnergy(step + countStep * maxStep, timeStep, numParticles);
           }
         }
       }
@@ -193,8 +193,9 @@ int main(int argc, char **argv) {
       }
       step += 1;
     }
-    cout << "NVT2LJ: current step: " << step;
+    cout << "NVT 2LJ: current step: " << step;
     cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+    cout << " W/N: " << sp.getParticleWork() / numParticles;
     cout << " T: " << sp.getParticleTemperature();
     cout << " ISF: " << sp.getParticleISF(waveQ);
     updateCount = sp.getUpdateCount();
