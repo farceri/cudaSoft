@@ -25,12 +25,12 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, equilibrate = false;
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[11]), initMaxStep = 1e03;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, otherStrain;
+  long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[12]), initMaxStep = 1e03;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[11]), otherStrain;
   double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double strain, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]);
-  double ec = 1, ea = atof(argv[12]), eb = ea, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
-  std::string inDir = argv[1], strainType = argv[13], potType = argv[14], outDir, currentDir, timeDir, energyFile, dirSample;
+  double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
+  std::string inDir = argv[1], strainType = argv[14], potType = argv[15], outDir, currentDir, timeDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);

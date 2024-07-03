@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, centered = false;
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction = 1;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = 10, strain, otherStrain, width, range = 3;
+  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[11]), strain, otherStrain, width, range = 3;
   double sigma, forceUnit, waveQ, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), strainFreq = 0.01;
-  double ec = 1, cutDistance, cutoff = 0.5, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]);
-  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample;
+  double ec = atof(argv[12]), cutDistance, cutoff = 0.5, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]);
+  std::string inDir = argv[1], strainType = argv[13], potType = argv[14], outDir, currentDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
