@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, centered = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
-  long numParticles = atol(argv[9]), nDim = 2, updateCount = 0, direction = 1;
-  double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[8]), width;
+  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
+  double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width;
   double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample;
@@ -38,16 +38,16 @@ int main(int argc, char **argv) {
   if(strainType == "compress") {
     direction = 0;
     if(biaxial == true) {
-      dirSample = "biaxial-comp";
+      dirSample = "nvt-biaxial-comp";
     } else {
-      dirSample = "comp";
+      dirSample = "nvt-comp";
     }
   } else if(strainType == "extend") {
     direction = 1;
     if(biaxial == true) {
-      dirSample = "biaxial-ext";
+      dirSample = "nvt-biaxial-ext";
     } else {
-      dirSample = "ext";
+      dirSample = "nvt-ext";
     }
   } else {
     cout << "Please specify a strain type between compression and extension" << endl;

@@ -187,6 +187,8 @@ public:
   void setNumParticles(long numParticles_);
 	long getNumParticles();
 
+  long getTypeNumParticles();
+
   void setParticleLengthScale();
 
   void setLengthScaleToOne();

@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readNH = false, scaleVel = false, doubleT = false;
+  bool readNH = true, scaleVel = false, doubleT = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
   double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]), range = 3;
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh";
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve";
   std::tuple<double, double, double> Temps;
   if(nDim == 3) {
     LJcut = 2.5;
@@ -43,6 +43,9 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  }
+  if(readNH == true) {
+    whichDynamics = "nh";
   }
   if(potType == "ljwca") {
     whichDynamics = "nh-ljwca/";
@@ -66,7 +69,6 @@ int main(int argc, char **argv) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
   if(readNH == true) {
-    whichDynamics = "nh/";
     dirSample = whichDynamics + "T" + argv[3] + "/nve/";
   } else {
     dirSample = whichDynamics + "T" + argv[3] + "/";
@@ -81,7 +83,7 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics-nve/";
+        outDir = outDir + "dynamics/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {

@@ -23,13 +23,14 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, equilibrate = false;
+  bool biaxial = true, reverse = true, equilibrate = false;
+  bool readState = true, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[10]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, forceUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), otherStrain;
   double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, strain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], strainType = argv[12], potType = argv[13], outDir, currentDir, timeDir, energyFile, dirSample;
+  std::string inDir = argv[1], strainType = argv[12], potType = argv[13], outDir, currentDir, timeDir, energyFile, dirSample, dirSave = "strain";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -53,8 +54,15 @@ int main(int argc, char **argv) {
     cout << "Please specify a strain type between compression and extension" << endl;
     exit(1);
   }
+  if(reverse == true) {
+    dirSave = "front";
+    dirSample += "-rev";
+  }
   if(saveForce == true) {
     dirSample += "-wall";
+  }
+  if(equilibrate == true) {
+    dirSample = dirSample + "-eq" + argv[9] + "-";
   }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
@@ -131,7 +139,11 @@ int main(int argc, char **argv) {
   if(saveFreq % 10 != 0) saveFreq += 1;
   cout << "Saving frequency: " << saveFreq << endl;
   boxSize = sp.getBoxSize();
-  while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+  //while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+  bool switched = false;
+  bool forward = (strain < (maxStrain + strainStep));
+  bool backward = false;
+  while (forward || backward) {
     if(biaxial == true) {
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
       otherStrain = -strain / (1 + strain);
@@ -156,7 +168,7 @@ int main(int argc, char **argv) {
     if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;
       saveCurrent = true;
-      currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
+      currentDir = outDir + dirSave + std::to_string(strain).substr(0,6) + "/";
       std::experimental::filesystem::create_directory(currentDir);
       sp.setInitialPositions();
       if(save == true) {
@@ -208,11 +220,26 @@ int main(int argc, char **argv) {
     // save current configuration
     if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);
+      //ioSP.saveParticleNeighbors(currentDir);
       if(save == true) {
         ioSP.closeEnergyFile();
       }
     }
     strain += strainStep;
+    if(strain < (maxStrain + strainStep)) {
+      if(switched == false) {
+        forward = (strain < (maxStrain + strainStep));
+      } else {
+        backward = (strain > 0);
+      }
+    } else if(reverse == true && switched == false) {
+      switched = true;
+      strainStep = -strainStep;
+      forward = false;
+      backward = (strain > 0);
+      dirSave = "back";
+      countStep = 0;
+    }
   }
   if(save == false) {
     ioSP.closeEnergyFile();

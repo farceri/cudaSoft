@@ -132,9 +132,8 @@ void SoftParticleLangevin2::updateVelocity(double timeStep) {
   auto langevinUpdateParticleVel = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma);
-      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) * s_gamma;
-      pVel[pId * s_nDim + dim] += rand[pId * s_nDim + dim] - thermalVel[pId * s_nDim + dim];
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) + rand[pId * s_nDim + dim] -
+      0.5 * s_dt * s_dt * s_gamma * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) - thermalVel[pId * s_nDim + dim];
     }
   };
 

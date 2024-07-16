@@ -479,16 +479,19 @@ public:
     string fileParams = dirName + "params.dat";
     ofstream saveParams(fileParams.c_str());
     openOutputFile(fileParams);
-    long nDim = sp_->getNDim();
     long numParticles = sp_->getNumParticles();
     saveParams << "numParticles" << "\t" << numParticles << endl;
-    saveParams << "nDim" << "\t" << nDim << endl;
+    saveParams << "nDim" << "\t" << sp_->getNDim() << endl;
     saveParams << "sigma" << "\t" << 2 * sp_->getMeanParticleSigma() << endl;
     saveParams << "epsilon" << "\t" << sp_->getEnergyCostant() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
     saveParams << "energy" << "\t" << sp_->getParticleEnergy() / numParticles << endl;
     saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
+    long num1 = sp_->getTypeNumParticles();
+    if(num1 != numParticles) {
+      saveParams << "num1" << "\t" << sp_->getTypeNumParticles() << endl;
+    }
     saveParams.close();
   }
 
@@ -498,8 +501,8 @@ public:
     long nDim = sp_->getNDim();
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
-    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+    save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
+    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       if(nDim == 2) {
         save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
@@ -514,21 +517,13 @@ public:
   }
 
   void savePBCParticlePacking(string dirName) {
-    // save scalars
-    string fileParams = dirName + "params.dat";
-    ofstream saveParams(fileParams.c_str());
-    openOutputFile(fileParams);
-    saveParams << "numParticles" << "\t" << sp_->getNumParticles() << endl;
-    saveParams << "dt" << "\t" << sp_->dt << endl;
-    saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;
-    saveParams << "energy" << "\t" << sp_->getParticlePotentialEnergy() / sp_->getNumParticles() << endl;
-    saveParams << "temperature" << "\t" << sp_->getParticleTemperature() << endl;
-    saveParams.close();
+   savePackingParams(dirName);
     // save vectors
+    long nDim = sp_->getNDim();
     save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
-    save2DFile(dirName + "particlePos.dat", sp_->getPBCParticlePositions(), sp_->nDim);
-    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
+    save2DFile(dirName + "particlePos.dat", sp_->getPBCParticlePositions(), nDim);
+    save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
   }
 
   void readParticleVelocity(string dirName, long numParticles_, long nDim_) {

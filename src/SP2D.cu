@@ -507,6 +507,12 @@ long SP2D::getNumParticles() {
 	return numParticlesFromDevice;
 }
 
+long SP2D::getTypeNumParticles() {
+  long num1FromDevice;
+  cudaMemcpyFromSymbol(&num1FromDevice, d_num1, sizeof(d_num1));
+	return num1FromDevice;
+}
+
 void SP2D::setParticleLengthScale() {
   rho0 = thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>())/numParticles; // set dimensional factor
   cout << " lengthscale: " << rho0 << endl;
