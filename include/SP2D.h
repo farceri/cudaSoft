@@ -395,6 +395,8 @@ public:
 
   void adjustKineticEnergy(double prevEtot);
 
+  void adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_);
+
   void adjustTemperature(double targetTemp);
 
   std::tuple<double, double, double> getParticleT1T2();

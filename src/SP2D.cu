@@ -1817,6 +1817,37 @@ void SP2D::adjustKineticEnergy(double prevEtot) {
   }
 }
 
+void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_) {
+  thrust::device_vector<double> d_prevEnergy = prevEnergy_;
+  // compute new potential energy per particle
+  getParticlePotentialEnergy();
+  // locally rescale velocities
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  const double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+  const double *prevEnergy = thrust::raw_pointer_cast(&d_prevEnergy[0]);
+
+  auto adjustLocalParticleVel = [=] __device__(long pId) {
+    double deltaU = pEnergy[pId] - prevEnergy[pId];
+    double ekin = 0.0;
+    #pragma unroll(MAXDIM)
+    for (long dim = 0; dim < s_nDim; dim++) {
+      ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+    }
+    ekin *= 0.5;
+    if(ekin > deltaU) {
+      double scale = sqrt((ekin - deltaU) / ekin);
+      #pragma unroll(MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pVel[pId * s_nDim + dim] *= scale;
+      }
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, adjustLocalParticleVel);
+}
+
 void SP2D::adjustTemperature(double targetTemp) {
   double scale = sqrt(targetTemp / getParticleTemperature());
   //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;

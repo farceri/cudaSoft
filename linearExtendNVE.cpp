@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false;
-  bool adjustEkin = false, adjustTemp = false, equilibrate = true;
+  bool readState = true, biaxial = true, equilibrate = false;
+  bool adjustEkin = true, adjustTemp = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, otherStrain, range = 3, prevEnergy = 0;
@@ -34,6 +34,7 @@ int main(int argc, char **argv) {
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
+  thrust::host_vector<double> previousEnergy(numParticles);
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(strainType == "compress") {
@@ -56,6 +57,12 @@ int main(int argc, char **argv) {
   }
   if(saveForce == true) {
     dirSample += "-wall";
+  }
+  if(equilibrate == true) {
+    dirSample += "-eq";
+  }
+  if(adjustEkin == true) {
+    dirSample += "-adjust";
   }
   sp.setEnergyCostant(ec);
   sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -128,6 +135,7 @@ int main(int argc, char **argv) {
   while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
+      previousEnergy = sp.getParticleEnergies();
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     }
     if(biaxial == true) {
@@ -166,9 +174,10 @@ int main(int argc, char **argv) {
     sp.calcParticleForceEnergy();
     if(adjustEkin == true) {
       cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-      sp.adjustKineticEnergy(prevEnergy);
-      sp.calcParticleForceEnergy();
-      cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustLocalKineticEnergy(previousEnergy);
+      cout << "Energy after local adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      //sp.adjustKineticEnergy(prevEnergy);
+      //cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     }
     sp.resetUpdateCount();
     step = 0;
