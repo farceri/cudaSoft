@@ -23,17 +23,19 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, centered = false;
+  bool readState = true, biaxial = true, centered = false;
+  bool adjustEkin = true, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width;
   double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
-  double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]), prevEnergy = 0.0;
   std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample;
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
-	// initialize sp object
+  thrust::host_vector<double> previousEnergy(numParticles);
+  // initialize sp object
   SP2D sp(numParticles, nDim);
   if(strainType == "compress") {
     direction = 0;
@@ -55,6 +57,13 @@ int main(int argc, char **argv) {
   }
   if(saveForce == true) {
     dirSample += "-wall";
+  }
+  if (adjustEkin == true) {
+    dirSample += "-adjust";
+    if (adjustGlobal == true)
+    {
+      dirSample += "-global";
+    }
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
@@ -112,6 +121,10 @@ int main(int argc, char **argv) {
   range *= LJcut * sigma;
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
+  if (adjustEkin == true) {
+    sp.calcParticleNeighbors(cutDistance);
+    sp.calcParticleForceEnergy();
+  }
   // strain by strainStep up to maxStrain
   long countStep = 0;
   long saveFreq = int(strainFreq / strainStep);
@@ -119,6 +132,11 @@ int main(int argc, char **argv) {
   cout << "Saving frequency: " << saveFreq << endl;
   boxSize = sp.getBoxSize();
   while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+    if (adjustEkin == true) {
+      prevEnergy = sp.getParticleEnergy();
+      previousEnergy = sp.getParticleEnergies();
+      cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    }
     if(biaxial == true) {
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
       otherStrain = -strain / (1 + strain);
@@ -162,6 +180,16 @@ int main(int argc, char **argv) {
     }
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
+    if (adjustEkin == true) {
+      cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustLocalKineticEnergy(previousEnergy);
+      cout << "Energy after local adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      if (adjustGlobal == true)
+      {
+        sp.adjustKineticEnergy(prevEnergy);
+        cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      }
+    }
     sp.resetUpdateCount();
     step = 0;
     waveQ = sp.getSoftWaveNumber();
