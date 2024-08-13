@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, reverse = false, exponential = false, equilibrate = false;
-  bool adjustEkin = true, adjustGlobal = false, save = false, saveCurrent, saveForce = false, saveStress = false;
+  bool readState = true, biaxial = true, reverse = true, exponential = false, equilibrate = false;
+  bool adjustEkin = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false, saveStress = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01;
@@ -218,6 +218,7 @@ int main(int argc, char **argv) {
         sp.adjustKineticEnergy(prevEnergy);
         cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       }
+      cout << endl;
     }
     sp.resetUpdateCount();
     step = 0;
