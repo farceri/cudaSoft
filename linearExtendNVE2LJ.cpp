@@ -59,10 +59,10 @@ int main(int argc, char **argv) {
     dirSave = "front";
     dirSample += "-rev";
   }
-  if(exponential == true) {
+  if (exponential == true) {
     dirSample += "-exp";
   }
-  if(saveForce == true) {
+  if (saveForce == true) {
     dirSample += "-wall";
   }
   if(saveStress == true) {
@@ -150,6 +150,7 @@ int main(int argc, char **argv) {
   }
   // strain by strainStep up to maxStrain
   long countStep = 0;
+  long saveStep = 0;
   long saveFreq = int(strainFreq / strainStep);
   if(saveFreq % 10 != 0) saveFreq += 1;
   cout << "Saving frequency: " << saveFreq << endl;
@@ -183,12 +184,12 @@ int main(int argc, char **argv) {
         } else {
           cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
         }
-        sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
+        sp.applyCenteredBiaxialExtension(newBoxSize, strainStep, direction);
       }
     } else {
       newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
-      sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
+      sp.applyCenteredUniaxialExtension(newBoxSize, strainStep, direction);
       cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();
@@ -236,11 +237,11 @@ int main(int argc, char **argv) {
           }
         } else {
           if(saveForce == true) {
-            ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            ioSP.saveParticleWallEnergy(step + saveStep * maxStep, timeStep, numParticles, range);
           } else if(saveStress == true) {
-            ioSP.saveParticleStressEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            ioSP.saveParticleStressEnergy(step + saveStep * maxStep, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+            ioSP.saveParticleSimpleEnergy(step + saveStep * maxStep, timeStep, numParticles);
           }
         }
       }
@@ -262,6 +263,7 @@ int main(int argc, char **argv) {
       cout << " no updates" << endl;
     }
     countStep += 1;
+    saveStep += 1;
     // save current configuration
     if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);

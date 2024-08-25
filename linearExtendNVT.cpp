@@ -23,14 +23,14 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, centered = false;
+  bool readState = true, biaxial = true, reverse = true;
   bool adjustEkin = true, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width;
   double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]), prevEnergy = 0.0;
-  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample;
+  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample, dirSave = "strain";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -54,6 +54,10 @@ int main(int argc, char **argv) {
   } else {
     cout << "Please specify a strain type between compression and extension" << endl;
     exit(1);
+  }
+  if (reverse == true) {
+    dirSave = "front";
+    dirSample += "-rev";
   }
   if(saveForce == true) {
     dirSample += "-wall";
@@ -127,11 +131,16 @@ int main(int argc, char **argv) {
   }
   // strain by strainStep up to maxStrain
   long countStep = 0;
+  long saveStep = 0;
   long saveFreq = int(strainFreq / strainStep);
   if(saveFreq % 10 != 0) saveFreq += 1;
   cout << "Saving frequency: " << saveFreq << endl;
   boxSize = sp.getBoxSize();
-  while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+  //while (strain < (maxStrain + strainStep) || (boxSize[direction]/boxSize[!direction]) > targetBoxRatio) {
+  bool switched = false;
+  bool forward = (strain < (maxStrain + strainStep));
+  bool backward = false;
+  while (forward || backward) {
     if (adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
       previousEnergy = sp.getParticleEnergies();
@@ -146,19 +155,11 @@ int main(int argc, char **argv) {
       } else {
         cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
       }
-      if(centered == true) {
-        sp.applyCenteredBiaxialExtension(newBoxSize, strainStep, direction);
-      } else {
-        sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
-      }
+      sp.applyCenteredBiaxialExtension(newBoxSize, strainStep, direction);
     } else {
       newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
-      if(centered == true) {
-        sp.applyCenteredUniaxialExtension(newBoxSize, strainStep, direction);
-      } else {
-        sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
-      }
+      sp.applyCenteredUniaxialExtension(newBoxSize, strainStep, direction);
       cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();
@@ -170,7 +171,7 @@ int main(int argc, char **argv) {
     if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;
       saveCurrent = true;
-      currentDir = outDir + "strain" + std::to_string(strain).substr(0,6) + "/";
+      currentDir = outDir + dirSave + std::to_string(strain).substr(0,6) + "/";
       std::experimental::filesystem::create_directory(currentDir);
       sp.setInitialPositions();
       if(save == true) {
@@ -198,21 +199,15 @@ int main(int argc, char **argv) {
       if((step + 1) % linFreq == 0) {
         if(saveCurrent == true and save == true) {
           if(saveForce == true) {
-            if(centered == true) {
-              ioSP.saveParticleColumnWallEnergy(step, timeStep, numParticles, range, width);
-            }
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else {
             ioSP.saveParticleEnergy(step, timeStep, numParticles);
           }
         } else {
           if(saveForce == true) {
-            if(centered == true) {
-              ioSP.saveParticleColumnWallEnergy(step + countStep * maxStep, timeStep, numParticles, range, width);
-            }
-            ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
+            ioSP.saveParticleWallEnergy(step + saveStep * maxStep, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleEnergy(step + countStep * maxStep, timeStep, numParticles);
+            ioSP.saveParticleEnergy(step + saveStep * maxStep, timeStep, numParticles);
           }
         }
       }
@@ -235,6 +230,7 @@ int main(int argc, char **argv) {
       cout << " no updates" << endl;
     }
     countStep += 1;
+    saveStep += 1;
     // save current configuration
     if(saveCurrent == true) {
       ioSP.saveParticlePacking(currentDir);
@@ -243,6 +239,22 @@ int main(int argc, char **argv) {
       }
     }
     strain += strainStep;
+    if (strain < (maxStrain + strainStep)) {
+      if (switched == false) {
+        forward = (strain < (maxStrain + strainStep));
+      } else {
+        backward = (strain > 0);
+      }
+    }
+    else if (reverse == true && switched == false)
+    {
+      switched = true;
+      strainStep = -strainStep;
+      forward = false;
+      backward = (strain > 0);
+      dirSave = "back";
+      countStep = 0;
+    }
   }
   if(save == false) {
     ioSP.closeEnergyFile();

@@ -22,41 +22,39 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, scaleVel = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, scaleVel = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readState = true, saveFinal = true, logSave = false, linSave = false;
-  bool readNH = false, alltoall = false, fixedbc = false;
+  bool readNH = true, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics;
-  dirSample = whichDynamics + "T" + argv[3] + "/";
-  if(readNH == true) {
-    whichDynamics = "nh/";
-    dirSample = whichDynamics + "T" + argv[3] + "/nve/";
-  } else {
-    dirSample = whichDynamics + "T" + argv[3] + "/";
-  }
+  double ec = atof(argv[9]), LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
+  std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nve";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
   }
+  if(readNH == true) {
+    whichDynamics = "nh";
+  }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
+    whichDynamics = whichDynamics + argv[9] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    whichDynamics = "nve-lj/";
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
+    whichDynamics = whichDynamics + "-wca/";
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    whichDynamics = "nve-wca/";
   } else {
+    whichDynamics = whichDynamics + "/";
     cout << "Setting default harmonic potential" << endl;
-    whichDynamics = "nve/";
   }
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -70,7 +68,11 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        if(readNH == true) {
+          outDir = outDir + "nve/";
+        } else {
+          outDir = outDir + "dynamics/";
+        }
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -91,7 +93,7 @@ int main(int argc, char **argv) {
       }
       outDir = inDir + dirSample;
       if(readNH == true) {
-        inDir = inDir + whichDynamics + "T" + argv[3] + "/";
+        inDir = outDir;
       }
     }
     std::experimental::filesystem::create_directory(outDir);
@@ -156,7 +158,7 @@ int main(int argc, char **argv) {
         }
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -193,7 +195,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

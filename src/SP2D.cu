@@ -1836,12 +1836,15 @@ void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_) {
       ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
     }
     ekin *= 0.5;
+    double scale = 1.0;
     if(ekin > deltaU) {
-      double scale = sqrt((ekin - deltaU) / ekin);
-      #pragma unroll(MAXDIM)
-      for (long dim = 0; dim < s_nDim; dim++) {
-        pVel[pId * s_nDim + dim] *= scale;
-      }
+      scale = sqrt((ekin - deltaU) / ekin);
+    } else {
+      scale = sqrt((deltaU - ekin) / ekin);
+    }
+    #pragma unroll(MAXDIM)
+    for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
     }
   };
 

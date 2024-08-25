@@ -47,20 +47,20 @@ int main(int argc, char **argv) {
   if(readNH == true) {
     whichDynamics = "nh";
   }
-  if(potType == "ljwca") {
-    whichDynamics = "nh-ljwca/";
+  if(potType == "2lj") {
+    whichDynamics = whichDynamics + argv[11] + "/";
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+  } else if(potType == "ljwca") {
+    whichDynamics = whichDynamics + "-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
-    whichDynamics = "nh-ljmp/";
+    whichDynamics = whichDynamics + "-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-  } else if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[11] + "/";
-    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
@@ -68,11 +68,7 @@ int main(int argc, char **argv) {
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
-  if(readNH == true) {
-    dirSample = whichDynamics + "T" + argv[3] + "/nve/";
-  } else {
-    dirSample = whichDynamics + "T" + argv[3] + "/";
-  }
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -83,7 +79,11 @@ int main(int argc, char **argv) {
       if(logSave == true) {
         outDir = outDir + "dynamics-log/";
       } else {
-        outDir = outDir + "dynamics/";
+        if(readNH == true) {
+          outDir = outDir + "nve/";
+        } else {
+          outDir = outDir + "dynamics/";
+        }
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
       }
       outDir = inDir + dirSample;
       if(readNH == true) {
-        inDir = inDir + whichDynamics + "T" + argv[3] + "/";
+        inDir = outDir;
       }
     }
     std::experimental::filesystem::create_directory(outDir);
@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
           if(nDim == 3) {
             ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
           }
@@ -230,7 +230,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
     if(nDim == 3) {
       ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
     }

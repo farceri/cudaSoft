@@ -130,11 +130,11 @@ int main(int argc, char **argv) {
       } else {
         cout << "\nStrain x: " << strain << ", y: " << otherStrain << endl;
       }
-      sp.applyBiaxialExtension(newBoxSize, strainStep, direction);
+      sp.applyCenteredBiaxialExtension(newBoxSize, strainStep, direction);
     } else {
       newBoxSize = initBoxSize;
       newBoxSize[direction] = (1 + strain) * initBoxSize[direction];
-      sp.applyUniaxialExtension(newBoxSize, strainStep, direction);
+      sp.applyCenteredUniaxialExtension(newBoxSize, strainStep, direction);
       cout << "\nStrain: " << strain << endl;
     }
     boxSize = sp.getBoxSize();

@@ -64,7 +64,7 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-#EXE = runNVE
+EXE = runNVE
 #EXE = runNH
 #EXE = runNVT
 #EXE = runActive
@@ -82,7 +82,7 @@ INC_DIR = include
 #EXE = linearExtendNVE2LJ
 #EXE = linearExtendNH2LJ
 #EXE = linearExtendNVT
-EXE = linearExtendNVT2LJ
+#EXE = linearExtendNVT2LJ
 #EXE = linearExtendActive
 #EXE = linearExtendActive2LJ
 #EXE = extendNVT
