@@ -22,12 +22,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, scaleVel = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
+  bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = false;
-  bool readNH = true, alltoall = false, fixedbc = false;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -60,43 +60,52 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   // set input and output
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      if(logSave == true) {
-        outDir = outDir + "dynamics-log/";
-      } else {
+
+  if(justRun == true) {
+    outDir = inDir + "dynamics/";
+    if(std::experimental::filesystem::exists(outDir) == false) {
+      std::experimental::filesystem::create_directory(outDir);
+    }
+  } else {
+    if (readAndSaveSameDir == true) {//keep running the same dynamics
+      readState = true;
+      inDir = inDir + dirSample;
+      outDir = inDir;
+      if(runDynamics == true) {
         if(readNH == true) {
-          outDir = outDir + "nve/";
+          outDir = outDir + "nve";
         } else {
-          outDir = outDir + "dynamics/";
+          outDir = outDir + "dynamics";
+        }
+        if(logSave == true) {
+          outDir = outDir + "-log/";
+        } else {
+          outDir = outDir + "/";
+        }
+        if(std::experimental::filesystem::exists(outDir) == true) {
+          //if(initialStep != 0) {
+          inDir = outDir;
+          //}
+        } else {
+          std::experimental::filesystem::create_directory(outDir);
         }
       }
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        //if(initialStep != 0) {
-        inDir = outDir;
-        //}
+    } else {//start a new dyanmics
+      if(readAndMakeNewDir == true) {
+        scaleVel = true;
+        readState = true;
+        outDir = inDir + "../../" + dirSample;
       } else {
-        std::experimental::filesystem::create_directory(outDir);
+        if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+          std::experimental::filesystem::create_directory(inDir + whichDynamics);
+        }
+        outDir = inDir + dirSample;
+        if(readNH == true) {
+          inDir = outDir;
+        }
       }
+      std::experimental::filesystem::create_directory(outDir);
     }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
-      scaleVel = true;
-      readState = true;
-      outDir = inDir + "../../" + dirSample;
-    } else {
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
-      }
-      outDir = inDir + dirSample;
-      if(readNH == true) {
-        inDir = outDir;
-      }
-    }
-    std::experimental::filesystem::create_directory(outDir);
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {

@@ -64,11 +64,11 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-EXE = runNVE
+#EXE = runNVE
 #EXE = runNH
 #EXE = runNVT
 #EXE = runActive
-#EXE = runNVE2LJ
+EXE = runNVE2LJ
 #EXE = runNH2LJ
 #EXE = runNVT2LJ
 #EXE = runActive2LJ
