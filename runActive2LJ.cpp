@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
   } else if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[13] + "/";
+    whichDynamics = whichDynamics + argv[8] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
         //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 
