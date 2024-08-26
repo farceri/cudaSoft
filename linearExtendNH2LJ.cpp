@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false;
+  bool readState = true, biaxial = true, save = false, saveCurrent, saveForce = false, saveFinal = true;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]);
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01;
@@ -206,6 +206,9 @@ int main(int argc, char **argv) {
   }
   if(save == false) {
     ioSP.closeEnergyFile();
+  }
+  if(saveFinal == true) {
+    ioSP.saveParticlePacking(outDir);
   }
   return 0;
 }
