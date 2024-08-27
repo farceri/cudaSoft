@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, reverse = false, equilibrate = false, saveFinal = true;
+  bool readState = true, biaxial = true, reverse = true, equilibrate = false, saveFinal = true;
   bool adjustEkin = false, adjustGlobal = false, adjustTemp = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07;
@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
   bool switched = false;
   bool forward = (strain < (maxStrain + strainStep));
   bool backward = false;
-  while (forward || backward) {
+  while (forward != backward) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
       previousEnergy = sp.getParticleEnergies();
@@ -250,14 +250,18 @@ int main(int argc, char **argv) {
         backward = (strain > 0);
       }
     }
-    else if (reverse == true && switched == false)
-    {
-      switched = true;
-      strainStep = -strainStep;
-      forward = false;
-      backward = (strain > 0);
-      dirSave = "back";
-      countStep = 0;
+    else {
+      if(reverse == false && strain > maxStrain) {
+        cout << "strain larger than max " << forward << " " << backward << endl;
+        backward = true;
+      } else if (reverse == true && switched == false) {
+        switched = true;
+        strainStep = -strainStep;
+        forward = false;
+        backward = (strain > 0);
+        dirSave = "back";
+        countStep = 0;
+      }
     }
   }
   if(save == false) {

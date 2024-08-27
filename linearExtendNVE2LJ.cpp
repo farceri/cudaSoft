@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
   bool switched = false;
   bool forward = (strain < (maxStrain + strainStep));
   bool backward = false;
-  while (forward || backward) {
+  while (forward != backward) {
     if(adjustEkin == true) {
       prevEnergy = sp.getParticleEnergy();
       previousEnergy = sp.getParticleEnergies();
@@ -279,13 +279,18 @@ int main(int argc, char **argv) {
       else {
         backward = (strain > 0);
       }
-    } else if (reverse == true && switched == false) {
-      switched = true;
-      strainStep = -strainStep;
-      forward = false;
-      backward = (strain > 0);
-      dirSave = "back";
-      countStep = 0;
+    } else {
+      if(reverse == false && strain > maxStrain) {
+        cout << "strain larger than max " << forward << " " << backward << endl;
+        backward = true;
+      } else if (reverse == true && switched == false) {
+        switched = true;
+        strainStep = -strainStep;
+        forward = false;
+        backward = (strain > 0);
+        dirSave = "back";
+        countStep = 0;
+      }
     }
   }
   if(save == false) {
