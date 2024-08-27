@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = true, equilibrate = false, saveFinal = true;
   bool adjustEkin = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
-  long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10);
+  long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[12]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[11]), otherStrain;
   double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
@@ -109,7 +109,6 @@ int main(int argc, char **argv) {
     currentDir = outDir;
     energyFile = outDir + "energy.dat";
     ioSP.openEnergyFile(energyFile);
-    linFreq = checkPointFreq;
   }
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);

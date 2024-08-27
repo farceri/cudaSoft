@@ -95,6 +95,16 @@ public:
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
+  void saveParticleStrainEnergy(long step, double timeStep, long numParticles, double strain) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << strain << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << endl;
+  }
+
   void saveParticleEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
