@@ -174,13 +174,11 @@ int main(int argc, char **argv) {
           }
         }
       }
-      if((step + 1) % checkPointFreq == 0) {
-        if(saveCurrent == true) {
-          ioSP.saveParticlePacking(currentDir);
-          ioSP.saveNoseHooverParams(currentDir);
-        }
-      }
       step += 1;
+    }
+    if(saveCurrent == true) {
+      ioSP.saveParticlePacking(currentDir);
+      ioSP.saveNoseHooverParams(currentDir);
     }
     cout << "NH2LJ: current step: " << step;
     cout << " E/N: " << sp.getParticleEnergy() / numParticles;

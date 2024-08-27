@@ -216,11 +216,11 @@ int main(int argc, char **argv) {
         if(adjustTemp == true) {
           sp.adjustTemperature(Tinject);
         }
-        if(saveCurrent == true) {
-          ioSP.saveParticlePacking(currentDir);
-        }
       }
       step += 1;
+    }
+    if(saveCurrent == true) {
+      ioSP.saveParticlePacking(currentDir);
     }
     cout << "NVE: current step: " << step;
     cout << " E/N: " << sp.getParticleEnergy() / numParticles;
