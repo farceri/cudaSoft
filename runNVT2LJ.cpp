@@ -22,11 +22,11 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readNH = false, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
+  bool readNH = true, readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -65,11 +65,7 @@ int main(int argc, char **argv) {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
-  if(readNH == true) {
-    dirSample = whichDynamics + "T" + argv[3] + "/langevin" + argv[6] + "/";
-  } else {
-    dirSample = whichDynamics + "T" + argv[3] + "/";
-  }
+  dirSample = whichDynamics + "T" + argv[3] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -77,10 +73,15 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      if(logSave == true) {
-        outDir = outDir + "dynamics-log/";
+      if(readNH == true) {
+        outDir = outDir + "damping" + argv[6];
       } else {
-        outDir = outDir + "damping" + argv[6] + "/";
+        outDir = outDir + "dynamics";
+      }
+      if(logSave == true) {
+        outDir = outDir + "-log/";
+      } else {
+        outDir = outDir + "/";
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -101,7 +102,7 @@ int main(int argc, char **argv) {
       }
       outDir = inDir + dirSample;
       if(readNH == true) {
-        inDir = inDir + whichDynamics + "T" + argv[3] + "/";
+        inDir = outDir;
       }
     }
     std::experimental::filesystem::create_directory(outDir);
