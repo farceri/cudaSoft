@@ -74,14 +74,14 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       if(readNH == true) {
-        outDir = outDir + "damping" + argv[6];
-      } else {
-        outDir = outDir + "dynamics";
-      }
-      if(logSave == true) {
-        outDir = outDir + "-log/";
-      } else {
-        outDir = outDir + "/";
+        outDir = outDir + "damping" + argv[6] + "/";
+        inDir =	outDir;
+        if(logSave == true) {
+          outDir = outDir + "dynamics-log/";
+        }
+        if(linSave == true) {
+          outDir = outDir + "dynamics/";
+        }
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
