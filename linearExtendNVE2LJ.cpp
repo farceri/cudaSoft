@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
   }
   ioSP.saveParticlePacking(outDir);
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma/sqrt(ea);// sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma / sqrt(ea);// sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Time step: " << timeStep << " sigma: " << sigma;
   if(readState == false) {

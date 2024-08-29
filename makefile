@@ -70,7 +70,7 @@ INC_DIR = include
 #EXE = runActive
 #EXE = runNVE2LJ
 #EXE = runNH2LJ
-#EXE = runNVT2LJ
+EXE = runNVT2LJ
 #EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
@@ -79,7 +79,7 @@ INC_DIR = include
 # mechanics
 #EXE = linearShearFIRE
 #EXE = linearExtendNVE
-EXE = linearExtendNVE2LJ
+#EXE = linearExtendNVE2LJ
 #EXE = linearExtendNH2LJ
 #EXE = linearExtendNVT
 #EXE = linearExtendNVT2LJ

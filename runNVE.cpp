@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
