@@ -69,11 +69,11 @@ int main(int argc, char **argv) {
       if(readNH == true) {
         outDir = outDir + "damping" + argv[6] + "/";
         if(logSave == true) {
-	  inDir = outDir;
+	        inDir = outDir;
           outDir = outDir + "dynamics-log/";
         }
         if(linSave == true) {
-	  inDir = outDir;
+	        inDir = outDir;
           outDir = outDir + "dynamics/";
         }
       }
