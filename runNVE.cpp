@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, saveFinal = true, logSave = true, linSave = false;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = 2 * sp.getMeanParticleSigma();
-  timeUnit = sigma;//epsilon and mass are 1 sqrt(m sigma^2 / epsilon)
+  timeUnit = sigma / sqrt(ec);//mass is 1 - sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;
   cout << "Tinject: " << Tinject << " time step: " << timeStep << endl;
