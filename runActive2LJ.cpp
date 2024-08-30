@@ -22,11 +22,11 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readNVT = true, readAndMakeNewDir = true, readAndSaveSameDir = true, runDynamics = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, readNVT = true, saveFinal = true, logSave = false, linSave, savePressure = false, saveWall = false;
+  bool readNH = true, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -40,6 +40,9 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
+  if(readNH == true) {
+    whichDynamics = "nh";
+  }
   if(potType == "ljwca") {
     whichDynamics = "active-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
@@ -58,7 +61,11 @@ int main(int argc, char **argv) {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
-  dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+  if(readNH == true) {
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  } else {
+    dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+  }
   ioSPFile ioSP(&sp);
   // set input and output
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -66,10 +73,18 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      if(logSave == true) {
-        outDir = outDir + "dynamics-log/";
-      } else {
-        outDir = outDir + "dynamics/";
+      if(readNH == true) {
+        outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+        if(logSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics-log/";
+          readNVT = false;
+        }
+        if(linSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics/";
+          readNVT = false;
+        }
       }
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
@@ -87,8 +102,12 @@ int main(int argc, char **argv) {
     } else {
       if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
         std::experimental::filesystem::create_directory(inDir + whichDynamics);
+        readNVT = true;
       }
       outDir = inDir + dirSample;
+      if(readNH == true) {
+        inDir = outDir;
+      }
     }
     std::experimental::filesystem::create_directory(outDir);
   }
