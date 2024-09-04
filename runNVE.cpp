@@ -139,8 +139,6 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   // run integrator
-  ioSP.saveParticlePacking(outDir);
-  ioSP.saveParticleNeighbors(outDir);
   while(step != maxStep) {
     if(scaleVel == true) {
       sp.softParticleNVERescaleLoop();

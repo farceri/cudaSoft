@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = true, biaxial = true, reverse = true, equilibrate = false, saveFinal = true;
+  bool readState = true, biaxial = true, reverse = false, equilibrate = false, saveFinal = true;
   bool adjustEkin = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[10]), initMaxStep = 1e07;
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
-    strain = initStrain;
+    strain = initStrain + strainStep;
     inDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/strain" + argv[6] + "/";
     //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
@@ -110,7 +110,11 @@ int main(int argc, char **argv) {
   if(save == false) {
     currentDir = outDir;
     energyFile = outDir + "energy.dat";
-    ioSP.openEnergyFile(energyFile);
+    if(initStrain != 0) {
+      ioSP.reopenEnergyFile(energyFile);
+    } else {
+      ioSP.openEnergyFile(energyFile);
+    }
   }
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);

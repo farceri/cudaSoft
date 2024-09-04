@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
   } else if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[8] + "/";
+    whichDynamics = whichDynamics + argv[13] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {

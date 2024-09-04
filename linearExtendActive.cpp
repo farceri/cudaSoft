@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
-    strain = initStrain;
+    strain = initStrain + strainStep;
     inDir = inDir + dirSample + argv[7] + "-tmax" + argv[9] + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
@@ -92,7 +92,11 @@ int main(int argc, char **argv) {
   if(save == false) {
     currentDir = outDir;
     energyFile = outDir + "energy.dat";
-    ioSP.openEnergyFile(energyFile);
+    if(initStrain != 0) {
+      ioSP.reopenEnergyFile(energyFile);
+    } else {
+      ioSP.openEnergyFile(energyFile);
+    }
   }
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
