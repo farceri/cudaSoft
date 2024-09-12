@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
   double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width, tempTh = 1e-03;
-  double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
+  double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.001;
   double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]), prevEnergy = 0.0;
   std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample, dirSave = "strain";
   thrust::host_vector<double> boxSize(nDim);
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
     width = boxSize[0] * 0.5;
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1];
     cout << ", box ratio: " << boxSize[direction] / boxSize[!direction] << endl;
-    cout << "Abox / Abox0: " << boxSize[0]*boxSize[1]/initBoxSize[0]*initBoxSize[1] << endl;
+    cout << "Abox / Abox0: " << (boxSize[0]*boxSize[1]) / (initBoxSize[0]*initBoxSize[1]) << endl;
     saveCurrent = false;
     if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;

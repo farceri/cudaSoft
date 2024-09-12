@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[12]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[11]), otherStrain;
-  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
+  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.001;
   double strain, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]), prevEnergy = 0.0;
   double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
   std::string inDir = argv[1], strainType = argv[14], potType = argv[15], outDir, currentDir, timeDir, energyFile, dirSample, dirSave = "strain";
@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
     boxSize = sp.getBoxSize();
     cout << "new box - Lx: " << boxSize[0] << ", Ly: " << boxSize[1];
     cout << ", box ratio: " << boxSize[direction] / boxSize[!direction] << endl;
-    cout << "Abox / Abox0: " << boxSize[0]*boxSize[1]/initBoxSize[0]*initBoxSize[1] << endl;
+    cout << "Abox / Abox0: " << (boxSize[0]*boxSize[1]) / (initBoxSize[0]*initBoxSize[1]) << endl;
     saveCurrent = false;
     if((countStep + 1) % saveFreq == 0) {
       cout << "SAVING AT STRAIN: " << strain << endl;
