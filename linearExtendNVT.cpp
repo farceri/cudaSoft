@@ -24,10 +24,10 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = false, saveFinal = true;
-  bool adjustWall = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
+  bool adjustTemp = true, adjustWall = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1;
-  double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width;
+  double timeStep = atof(argv[2]), forceUnit, timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[9]), width, tempTh = 1e-03;
   double ec = atof(argv[10]), cutDistance, cutoff = 0.5, sigma,  waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.01;
   double strain, otherStrain, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]), prevEnergy = 0.0;
   std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample, dirSave = "strain";
@@ -184,6 +184,12 @@ int main(int argc, char **argv) {
     }
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
+    // adjust kinetic energy to preserve energy conservation
+    if(adjustTemp == true) {
+      if(abs(Tinject - sp.getParticleTemperature()) > tempTh) {
+        sp.adjustTemperature(Tinject);
+      }
+    }
     if (adjustWall == true) {
       cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       sp.adjustLocalKineticEnergy(previousEnergy, direction);
