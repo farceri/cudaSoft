@@ -28,19 +28,20 @@ int main(int argc, char **argv) {
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = saveEnergyFreq, firstDecade = 0;
   double cutDistance, cutoff = 1, waveQ, damping = 1e03, timeUnit, timeStep = atof(argv[2]);
-  double ec = 240, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
+  double ec = 240, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
   double externalForce = atof(argv[8]), p0 = atof(argv[9]), pscale, beta = 1, taup = 1e-02;
-  if(whichDynamics == "active-langevin/") {
-    dirSample = whichDynamics + "Dr" + argv[4] + "/Dr" + argv[4] + "-f0" + argv[5] + "/";
-  } else if(whichDynamics == "langevin/") {
-    dirSample = whichDynamics + "T" + argv[3] + "/";
-  } else {
-    step = maxStep;
-    cout << "Please specify the dynamics you want to run" << endl;
-  }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(whichDynamics == "langevin/") {
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  } else if(whichDynamics == "active-langevin/") {
+    dirSample = whichDynamics + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+    sp.setParticleType(simControlStruct::particleEnum::active);
+    sp.setSelfPropulsionParams(driving, tp);
+  } else {
+    cout << "please specify the correct dynamics" << endl;
+  }
   ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
@@ -66,7 +67,7 @@ int main(int argc, char **argv) {
   // initialization
   timeUnit = sp.getMeanParticleSigma()*sp.getMeanParticleSigma()*damping;//epsilon is 1
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  Dr = Dr/timeUnit;
+  Dr = 1/(tp*timeUnit);
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << " Fext: " << externalForce << endl;
   if(whichDynamics == "active-langevin/") {
     cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sp.getMeanParticleSigma() << " v0: " << driving / damping << " Dr: " << Dr << endl;
@@ -76,29 +77,21 @@ int main(int argc, char **argv) {
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  if(whichDynamics == "active-langevin/") {
-    sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
-  } else if(whichDynamics == "langevin/") {
-    sp.initSoftParticleLangevin(Tinject, damping, readState);
-  }
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   // extract external field
   waveQ = sp.getSoftWaveNumber();
   sp.makeExternalParticleForce(externalForce);
   ioSP.save1DFile(outDir + "/externalField.dat", sp.getExternalParticleForce());
   while(step != maxStep) {
     if(constantPressure == true) {
-      pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleActivePressure(driving) - p0);
+      pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticlePressure() - p0);
     }
-    if(whichDynamics == "active-langevin/") {
-      sp.softParticleActiveExtFieldLoop();
-    } else if(whichDynamics == "langevin/") {
-      sp.softParticleLangevinExtFieldLoop();
-    }
+    sp.softParticleLangevinExtFieldLoop();
     if(constantPressure == true) {
       sp.pressureScaleParticles(pscale);
     }
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleEnergy(step, timeStep, waveQ);
+      ioSP.saveEnergyISF(step, timeStep, waveQ, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "FDT: current step: " << step;
         cout << " Fmax: " << sp.getParticleMaxUnbalancedForce();

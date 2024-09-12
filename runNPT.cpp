@@ -28,13 +28,20 @@ int main(int argc, char **argv) {
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = saveEnergyFreq, firstDecade = 0;
   double cutDistance, cutoff = 2, damping = 1e03, timeUnit, timeStep = atof(argv[2]);
-  double ec = 240, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
-  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
+  double ec = 240, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
+  std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = argv[9];
   double p0 = atof(argv[8]), pscale, beta = 1, taup = 1e-02;
-  //dirSample = whichDynamics + "T" + argv[3] + "/";
-  dirSample = whichDynamics + "Dr" + argv[4] + "/Dr" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(whichDynamics == "langevin/") {
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  } else if(whichDynamics == "active-langevin/") {
+    dirSample = whichDynamics + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+    sp.setParticleType(simControlStruct::particleEnum::active);
+    sp.setSelfPropulsionParams(driving, tp);
+  } else {
+    cout << "please specify the correct dynamics" << endl;
+  }
   ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
@@ -64,22 +71,21 @@ int main(int argc, char **argv) {
     //taup = 1/Dr;
   }
   // initialize simulation
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   //sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
   while(step != maxStep) {
-    pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleTotalPressure(driving) - p0);
+    pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticlePressure() - p0);
     //pscale = 1 + (timeStep / 3 * taup) * beta * (sp.getParticleDynamicalPressure() - p0);
-    sp.softParticleActiveLangevinLoop();
-    //sp.softParticleLangevinLoop();
+    sp.softParticleLangevinLoop();
     sp.pressureScaleParticles(pscale);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep);
+      ioSP.saveSimpleEnergy(step, timeStep);
       if(step % checkPointFreq == 0) {
         cout << "NPT: current step: " << step;
-        cout << " Ptot: " << sp.getParticleTotalPressure(driving);
+        cout << " Ptot: " << sp.getParticlePressure();
         cout << " T: " << sp.getParticleTemperature();
         cout << " phi: " << sp.getParticlePhi() << endl;
       }

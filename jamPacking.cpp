@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
-    sp.setPolyRandomSoftParticles(phi0, polydispersity);
+    sp.setPolyRandomParticles(phi0, polydispersity);
   }
   sp.setEnergyCostant(ec);
   currentPhi = sp.getParticlePhi();
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
       }
       iteration += 1;
     }
-    pressure = sp.getParticleVirialPressure();
+    pressure = sp.getParticlePressure();
     cout << "FIRE: iteration: " << iteration;
     cout << " maxUnbalancedForce: " << setprecision(precision) << forceCheck;
     cout << " energy: " << energyCheck << endl;

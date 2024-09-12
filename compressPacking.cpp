@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
         sp.softParticleLangevinLoop();
       }
       if(step % saveEnergyFreq == 0) {
-        ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+        ioSP.saveSimpleEnergy(step, timeStep, numParticles);
       }
       if(step % printFreq == 0) {
         cout << "Compression: current step: " << step;

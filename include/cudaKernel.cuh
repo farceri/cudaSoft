@@ -275,6 +275,14 @@ inline __device__ void getParticlePos(const long pId, const double* pPos, double
 	}
 }
 
+inline __device__ void getPBCParticlePos(const long pId, const double* pPos, double* tPos) {
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+		tPos[dim] = pPos[pId * d_nDim + dim];
+		tPos[dim] -= floor(tPos[dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
+	}
+}
+
 inline __device__ bool extractOtherParticle(const long particleId, const long otherId, const double* pPos, const double* pRad, double* otherPos, double& otherRad) {
 	if (particleId != otherId) {
 		getParticlePos(otherId, pPos, otherPos);
@@ -1530,6 +1538,29 @@ __global__ void kernelCalcContactVectorList(const double* pPos, const long* cont
 				extractOtherParticlePos(particleId, otherId, pPos, otherPos);
 				//Calculate the contactVector and put it into contactVectorList, which is a maxContacts*nDim by numParticle array
 				calcDeltaAndDistance(thisPos, otherPos, &contactVectorList[particleId*(maxContacts*d_nDim) + cListId*d_nDim]);
+			}
+		}
+	}
+}
+
+__global__ void kernelAssignWallLabel(const double* pPos, const double* pRad, long* wallLabel, long direction_) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		wallLabel[particleId] = 0;
+		getPBCParticlePos(particleId, pPos, thisPos);
+		double distanceCheck = 4 * pRad[particleId];
+		long checkIdx = -1;
+		if(direction_ == 1) {
+			checkIdx = 0; // compression along x axis
+		} else if(direction_ == 0) {
+			checkIdx = 1; // compression along y axis
+		}
+		if(checkIdx != -1) {
+			if(thisPos[checkIdx] < distanceCheck) {
+				wallLabel[particleId] = 1;
+			} else if((d_boxSizePtr[checkIdx] - thisPos[checkIdx]) < distanceCheck) {
+				wallLabel[particleId] = 1;
 			}
 		}
 	}

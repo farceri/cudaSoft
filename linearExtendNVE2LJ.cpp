@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = false, exponential = false, equilibrate = false, saveFinal = true;
-  bool adjustEkin = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false, saveStress = false;
+  bool adjustWall = true, adjustGlobal = false, save = false, saveCurrent, saveForce = false, saveStress = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01;
@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
   if(saveStress == true) {
     dirSample += "-stress";
   }
-  if (adjustEkin == true) {
+  if (adjustWall == true) {
     dirSample += "-adjust";
     if (adjustGlobal == true) {
       dirSample += "-global";
@@ -147,7 +147,7 @@ int main(int argc, char **argv) {
     cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature() << endl;
   }
-  if (adjustEkin == true) {
+  if (adjustWall == true) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
   }
@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
   bool forward = (strain < (maxStrain + strainStep));
   bool backward = false;
   while (forward != backward) {
-    if(adjustEkin == true) {
+    if(adjustWall == true) {
       prevEnergy = sp.getParticleEnergy();
       previousEnergy = sp.getParticleEnergies();
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
@@ -214,9 +214,9 @@ int main(int argc, char **argv) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
-    if(adjustEkin == true) {
+    if(adjustWall == true) {
       cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-      sp.adjustLocalKineticEnergy(previousEnergy);
+      sp.adjustLocalKineticEnergy(previousEnergy, direction);
       cout << "Energy after local adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       if (adjustGlobal == true) {
         sp.adjustKineticEnergy(prevEnergy);
@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
           } else if(saveStress == true) {
             ioSP.saveParticleStressEnergy(step, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleStrainEnergy(step, timeStep, numParticles, strain);
+            ioSP.saveStrainSimpleEnergy(step, timeStep, numParticles, strain);
           }
         } else {
           if(saveForce == true) {
@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
           } else if(saveStress == true) {
             ioSP.saveParticleStressEnergy(step + saveStep * maxStep, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleStrainEnergy(step + saveStep * maxStep, timeStep, numParticles, strain);
+            ioSP.saveStrainSimpleEnergy(step + saveStep * maxStep, timeStep, numParticles, strain);
           }
         }
       }

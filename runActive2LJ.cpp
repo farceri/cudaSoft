@@ -158,9 +158,9 @@ int main(int argc, char **argv) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       if(savePressure == true) {
-        ioSP.saveParticlePressureEnergy(step+initialStep, timeStep, numParticles, saveWall);
+        ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles, saveWall);
       } else {
-        ioSP.saveParticleEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       }
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {

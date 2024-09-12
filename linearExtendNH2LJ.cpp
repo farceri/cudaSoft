@@ -168,13 +168,13 @@ int main(int argc, char **argv) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+            ioSP.saveStrainSimpleEnergy(step, timeStep, numParticles, strain);
           }
         } else {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step + countStep * maxStep, timeStep, numParticles, range);
           } else {
-            ioSP.saveParticleSimpleEnergy(step + countStep * maxStep, timeStep, numParticles);
+            ioSP.saveStrainSimpleEnergy(step + countStep * maxStep, timeStep, numParticles, strain);
           }
         }
       }

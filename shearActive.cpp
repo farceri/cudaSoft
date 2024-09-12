@@ -32,12 +32,12 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 240, cutDistance, cutoff = 1, sigma, damping, forceUnit, timeUnit;
   double timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), strain = atof(argv[10]);
-  double Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
+  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
-  dirSample = whichDynamics + "Dr" + argv[4] + "/";
-  //dirSample = whichDynamics + "Dr" + argv[4] + "-f0" + argv[5] + "/";
+  dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setParticleType(simControlStruct::particleEnum::active);
   sp.setGeometryType(simControlStruct::geometryEnum::leesEdwards);
   ioSPFile ioSP(&sp);
   // set input and output
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -93,8 +93,8 @@ int main(int argc, char **argv) {
   cout << "Peclet number: " << driving * forceUnit * timeUnit / (damping * Dr * sigma);
   cout << " f0: " << driving*forceUnit << ", " << driving << " Dr: " << Dr/timeUnit << ", " << Dr << endl;
   driving = driving*forceUnit;
-  Dr = Dr/timeUnit;
-  ioSP.saveActiveLangevinParams(outDir, sigma, damping, 1/Dr, driving);
+  Dr = 1/(tp/timeUnit);
+  ioSP.saveLangevinParams(outDir, damping);
   sp.setLEshift(strain);
   if(initialStep == 0) {
     sp.applyLEShear(strain);
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(currentDir);
     ioSP.saveParticlePacking(currentDir);
   }
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   //waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleActiveLangevinLoop();
+    sp.softParticleLangevinLoop();
     if(step % checkPointFreq == 0) {
       cout << "shear Active: current step: " << step + initialStep;
       cout << " U/N: " << sp.getParticleEnergy() / numParticles;
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
       if(((step - (multiple-1) * maxStep) % saveFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleState(currentDir);
         ioSP.saveParticleStressEnergy(step+initialStep, timeStep, numParticles);
       }
     }
@@ -151,15 +151,9 @@ int main(int argc, char **argv) {
       if((step % linFreq) == 0) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
-        ioSP.saveParticleActiveState(currentDir);
+        ioSP.saveParticleState(currentDir);
         ioSP.saveParticleStressEnergy(step+initialStep, timeStep, numParticles);
       }
-    }
-    maxDelta = sp.getParticleMaxDisplacement();
-    if(3*maxDelta > cutoff) {
-      sp.calcParticleNeighborList(cutDistance);
-      sp.resetLastPositions();
-      updateCount += 1;
     }
     //if(step % updateFreq == 0) {
     //  sp.calcParticleNeighborList(cutDistance);

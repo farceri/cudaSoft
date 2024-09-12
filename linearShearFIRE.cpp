@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
     cout << "FIRE: iteration: " << iteration;
     cout << " force: " << setprecision(precision) << forceCheck;
     cout << " energy: " << setprecision(precision) << energyCheck;
-    cout << " pressure: " << sp.getParticleVirialPressure();
+    cout << " pressure: " << sp.getParticlePressure();
     cout << " shear stress: " << sp.getParticleShearStress() << endl;
     // save minimized configuration
     if(save == true) {

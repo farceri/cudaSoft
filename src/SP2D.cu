@@ -1817,11 +1817,29 @@ void SP2D::adjustKineticEnergy(double prevEtot) {
   }
 }
 
-void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_) {
+void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_, long direction_) {
   thrust::device_vector<double> d_prevEnergy = prevEnergy_;
   // compute new potential energy per particle
   getParticlePotentialEnergy();
-  // locally rescale velocities
+  // label particles close to compressing walls
+  thrust::device_vector<long> d_wallLabel(numParticles);
+  thrust::fill(d_wallLabel.begin(), d_wallLabel.end(), 0);
+  long *wallLabel = thrust::raw_pointer_cast(&d_wallLabel[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  kernelAssignWallLabel<<<dimGrid,dimBlock>>>(pPos, pRad, wallLabel, direction_);
+
+  /*for (long pId=0; pId<numParticles; pId++) {
+    if(d_wallLabel[pId] == 1) {
+      if(direction_ == 1) {
+        cout << "Particle " << pId << " near vertical wall, pos: " << d_particlePos[pId * nDim] << endl;
+      } else if(direction_ == 0) {
+        cout << "Particle " << pId << " near horizontal wall, pos: " << d_particlePos[pId * nDim + 1] << endl;
+      }
+    }
+  }*/
+
+  // locally rescale velocities for particles near compressing walls
   long s_nDim(nDim);
   auto r = thrust::counting_iterator<long>(0);
   double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
@@ -1829,30 +1847,32 @@ void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_) {
   const double *prevEnergy = thrust::raw_pointer_cast(&d_prevEnergy[0]);
 
   auto adjustLocalParticleVel = [=] __device__(long pId) {
-    double deltaU = pEnergy[pId] - prevEnergy[pId];
-    double ekin = 0.0;
-    #pragma unroll(MAXDIM)
-    for (long dim = 0; dim < s_nDim; dim++) {
-      ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
-    }
-    ekin *= 0.5;
-    if(ekin > deltaU) {
-      double scale = sqrt((ekin - deltaU) / ekin);
+    if(wallLabel[pId] == 1) {
+      double deltaU = pEnergy[pId] - prevEnergy[pId];
+      double ekin = 0.0;
       #pragma unroll(MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
-        pVel[pId * s_nDim + dim] *= scale;
+        ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+      }
+      ekin *= 0.5;
+      if(ekin > deltaU) {
+        double scale = sqrt((ekin - deltaU) / ekin);
+        #pragma unroll(MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pVel[pId * s_nDim + dim] *= scale;
+        }
       }
     }
-    //double scale = 1.0;
-    //if(ekin > deltaU) {
-    //  scale = sqrt((ekin - deltaU) / ekin);
-    //} else {
-    //  scale = sqrt((deltaU - ekin) / ekin);
-    //}
-    //#pragma unroll(MAXDIM)
-    //for (long dim = 0; dim < s_nDim; dim++) {
-    //  pVel[pId * s_nDim + dim] *= scale;
-    //}
+    /*double scale = 1.0;
+    if(ekin > deltaU) {
+      scale = sqrt((ekin - deltaU) / ekin);
+    } else {
+      scale = sqrt((deltaU - ekin) / ekin);
+    }
+    #pragma unroll(MAXDIM)
+    for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
+    }*/
   };
 
   thrust::for_each(r, r + numParticles, adjustLocalParticleVel);

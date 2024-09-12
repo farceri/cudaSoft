@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveParticlePacking(currentDir);
     }
-    ioSP.saveParticleStressStrain(strain, numParticles);
+    ioSP.savePressureEnergy(strain, numParticles);
     strain += strainStep;
   }
   if(saveSame == true) {

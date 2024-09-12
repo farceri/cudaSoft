@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(fixedSides == true) {
         ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);

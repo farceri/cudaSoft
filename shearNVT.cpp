@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
   cout << "Thermal energy scale: " << Tinject << endl;
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  ioSP.saveLangevinParams(outDir, damping);
   sp.setLEshift(strain);
   if(initialStep == 0) {
     sp.applyLEShear(strain);
@@ -147,12 +147,6 @@ int main(int argc, char **argv) {
         ioSP.saveParticleState(currentDir);
         ioSP.saveParticleStressEnergy(step+initialStep, timeStep, numParticles);
       }
-    }
-    maxDelta = sp.getParticleMaxDisplacement();
-    if(3*maxDelta > cutoff) {
-      sp.calcParticleNeighborList(cutDistance);
-      sp.resetLastPositions();
-      updateCount += 1;
     }
     step += 1;
   }

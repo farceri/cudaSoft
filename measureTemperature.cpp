@@ -29,18 +29,20 @@ int main(int argc, char **argv) {
   long initialStep = 0, saveEnergyFreq = int(checkPointFreq / 10), multiple = 1, saveFreq = 1;
   long linFreq = int(saveEnergyFreq / 10), firstDecade = 0, firstIndex = 10;
   double cutDistance = 2., damping = 1e03, timeUnit, timeStep = atof(argv[2]), maxDelta, cutoff;
-  double ec = 1, sigma, Tinject = atof(argv[3]), Dr = atof(argv[4]), driving = atof(argv[5]);
+  double ec = 1, sigma, Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   std::string outDir, energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "active-langevin/";
   double mass = atof(argv[8]);
+	SP2D sp(numParticles, nDim);
   if(whichDynamics == "langevin/") {
     dirSample = whichDynamics + "T" + argv[3] + "/";
   } else if(whichDynamics == "active-langevin/") {
-    dirSample = whichDynamics + "/Dr" + argv[4] + "-f0" + argv[5] + "/T" + argv[3] + "/";
+    dirSample = whichDynamics + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+    sp.setParticleType(simControlStruct::particleEnum::active);
+    sp.setSelfPropulsionParams(driving, tp);
   } else {
     cout << "please specify the correct dynamics" << endl;
   }
   // initialize sp object
-	SP2D sp(numParticles, nDim);
   ioSPFile ioSP(&sp);
   // set input and output
   inDir = inDir + dirSample;
@@ -65,7 +67,7 @@ int main(int argc, char **argv) {
   // initialization
   timeUnit = sigma * sigma * damping;//epsilon is 1
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  Dr = Dr/timeUnit;
+  Dr = 1/(tp*timeUnit);
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << endl;
   if(whichDynamics == "active-langevin/") {
     cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sigma << " v0: " << driving / damping << " Dr: " << Dr << endl;
@@ -74,23 +76,11 @@ int main(int argc, char **argv) {
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
-  if(whichDynamics == "langevin/") {
-    sp.initSoftParticleLangevinSubSet(Tinject, damping, firstIndex, mass, readState, zeroOutMassiveVel);
-  } else if(whichDynamics == "active-langevin/") {
-    sp.initSoftParticleActiveSubSet(Tinject, Dr, driving, damping, firstIndex, mass, readState, zeroOutMassiveVel);
-  } else {
-    cout << "please specify the correct dynamics" << endl;
-  }
+  sp.initSoftParticleLangevinSubSet(Tinject, damping, firstIndex, mass, readState, zeroOutMassiveVel);
   while(step != maxStep) {
-    if(whichDynamics == "langevin/") {
-      sp.softParticleLangevinSubSetLoop();
-    } else if(whichDynamics == "active-langevin/") {
-      sp.softParticleActiveSubSetLoop();
-    } else {
-      cout << "please specify the correct dynamics" << endl;
-    }
+    sp.softParticleLangevinSubSetLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep);
+      ioSP.saveSimpleEnergy(step, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "MP: current step: " << step;
         cout << " T: " << sp.getParticleTemperature();

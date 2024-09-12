@@ -161,7 +161,7 @@ int main(int argc, char **argv) {
       if(saveWork == true) {
         ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
       }
-      ioSP.saveParticleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;

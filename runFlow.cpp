@@ -115,7 +115,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleFlowLoop();
     if(step % linFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         sp.calcSurfaceHeight();
         cout << "Flow: current step: " << step + initialStep;

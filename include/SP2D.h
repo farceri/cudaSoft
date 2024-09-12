@@ -395,7 +395,7 @@ public:
 
   void adjustKineticEnergy(double prevEtot);
 
-  void adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_);
+  void adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_, long direction_);
 
   void adjustTemperature(double targetTemp);
 

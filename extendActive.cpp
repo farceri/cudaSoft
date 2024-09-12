@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
   thrust::host_vector<double> initBoxSize(nDim);
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setParticleType(simControlStruct::particleEnum::active);
   if(compress == true) {
     sign = -1;
     if(biaxial == true) {
@@ -72,7 +73,7 @@ int main(int argc, char **argv) {
   }
   std::experimental::filesystem::create_directory(outDir);
   if(readState == true) {
-    ioSP.readParticleActiveState(inDir, numParticles, nDim);
+    ioSP.readParticleState(inDir, numParticles, nDim);
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -90,7 +91,7 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = 1/(tp * timeUnit);
-  ioSP.saveActiveLangevinParams(outDir, sigma, damping, tp, driving);
+  ioSP.saveLangevinParams(outDir, damping);
   if(initialStep == 0) {
     strainx = -strain / (1 + strain);
     boxSize = sp.getBoxSize();
@@ -118,7 +119,11 @@ int main(int argc, char **argv) {
     cout << "restarting configuration - energy.dat will be overridden" << endl;
   }
   // initialize simulation
-  sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.setSelfPropulsionParams(driving, tp);
+  ioSP.saveLangevinParams(outDir, damping);
+  // initialize simulation
+  //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
+  sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighborList(cutDistance);
   sp.calcParticleForceEnergy();
@@ -129,7 +134,7 @@ int main(int argc, char **argv) {
   range = 2.5 * LJcut * sigma;
   // run integrator
   while(step != maxStep) {
-    sp.softParticleActiveLangevinLoop();
+    sp.softParticleLangevinLoop();
     if(step % checkPointFreq == 0) {
       cout << "Extend Active: current step: " << step + initialStep;
       cout << " U/N: " << sp.getParticleEnergy() / numParticles;
@@ -143,7 +148,7 @@ int main(int argc, char **argv) {
       }
       sp.resetUpdateCount();
       if(saveFinal == true) {
-        ioSP.saveParticleActivePacking(outDir);
+        ioSP.saveParticlePacking(outDir);
       }
     }
     if(logSave == true) {
@@ -159,7 +164,7 @@ int main(int argc, char **argv) {
         if(savePacking == true) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
-          ioSP.saveParticleActiveState(currentDir);
+          ioSP.saveParticleState(currentDir);
         }
       }
     }
@@ -169,7 +174,7 @@ int main(int argc, char **argv) {
         if(savePacking == true) {
           currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
           std::experimental::filesystem::create_directory(currentDir);
-          ioSP.saveParticleActiveState(currentDir);
+          ioSP.saveParticleState(currentDir);
         }
       }
     }
@@ -177,7 +182,7 @@ int main(int argc, char **argv) {
   }
   // save final configuration
   if(saveFinal == true) {
-    ioSP.saveParticleActivePacking(outDir);
+    ioSP.saveParticlePacking(outDir);
   }
   ioSP.closeEnergyFile();
 

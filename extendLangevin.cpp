@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
   damping /= timeUnit;
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  ioSP.saveLangevinParams(outDir, damping);
   if(initialStep == 0) {
     strainx = -strain / (1 + strain);
     boxSize = sp.getBoxSize();

@@ -112,7 +112,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.testInteraction(timeStep);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveParticleSimpleEnergy(step, timeStep, numParticles);
+      ioSP.saveSimpleEnergy(step, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
         cout << " Energy: " << sp.getParticleEnergy() / numParticles;

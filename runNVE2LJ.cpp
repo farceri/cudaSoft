@@ -176,8 +176,8 @@ int main(int argc, char **argv) {
       if(doubleT == true) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles, num1);
       } else {
-        //ioSP.saveParticleSimpleEnergy(step+initialStep, timeStep, numParticles);
-        ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
+        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
       }
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
