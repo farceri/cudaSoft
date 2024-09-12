@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = false, equilibrate = false, saveFinal = true;
-  bool adjustTemp = true, adjustWall = false, adjustGlobal = false, adjustTemp = false, save = false, saveCurrent, saveForce = false;
+  bool adjustTemp = true, adjustWall = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false;
   long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, otherStrain, range = 3, prevEnergy = 0.0, tempTh = 1e-03;
@@ -220,11 +220,6 @@ int main(int argc, char **argv) {
           } else {
             ioSP.saveStrainSimpleEnergy(step + saveStep * maxStep, timeStep, numParticles, strain);
           }
-        }
-      }
-      if((step + 1) % checkPointFreq == 0) {
-        if(adjustTemp == true) {
-          sp.adjustTemperature(Tinject);
         }
       }
       step += 1;
