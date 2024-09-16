@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   long step, maxStep = atof(argv[9]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   long numParticles = atol(argv[10]), nDim = 2, updateCount = 0, direction, num1 = atol(argv[12]), initMaxStep = 1e07;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 4, damping, inertiaOverDamping = atof(argv[11]), otherStrain;
-  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.001;
+  double cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, strainFreq = 0.005;
   double strain, maxStrain = atof(argv[6]), strainStep = atof(argv[7]), initStrain = atof(argv[8]), prevEnergy = 0.0;
   double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, Dr, tp = atof(argv[4]), driving = atof(argv[5]), forceUnit;
   std::string inDir = argv[1], strainType = argv[14], potType = argv[15], outDir, currentDir, timeDir, energyFile, dirSample, dirSave = "strain";

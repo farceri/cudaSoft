@@ -83,14 +83,15 @@ int main(int argc, char **argv) {
       outDir = inDir;
       if(runDynamics == true) {
         if(readNH == true) {
-          outDir = outDir + "nve";
-        } else {
-          outDir = outDir + "dynamics";
-        }
-        if(logSave == true) {
-          outDir = outDir + "-log/";
-        } else {
-          outDir = outDir + "/";
+          outDir = outDir + "nve/";
+          if(logSave == true) {
+            inDir = outDir;
+            outDir = outDir + "dynamics-log/";
+          }
+          if(linSave == true) {
+            inDir = outDir;
+            outDir = outDir + "dynamics/";
+          }
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {
