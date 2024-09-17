@@ -66,6 +66,9 @@ int main(int argc, char **argv) {
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
+    if(readAndSaveSameDir == true) {
+      inDir = outDir;
+    }
   } else {
     if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;

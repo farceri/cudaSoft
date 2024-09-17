@@ -65,12 +65,12 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-#EXE = runNH
-#EXE = runNVT
-#EXE = runActive
 #EXE = runNVE2LJ
+#EXE = runNH
 #EXE = runNH2LJ
-#EXE = runNVT2LJ
+#EXE = runNVT
+EXE = runNVT2LJ
+#EXE = runActive
 #EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
@@ -84,7 +84,7 @@ INC_DIR = include
 #EXE = linearExtendNVT
 #EXE = linearExtendNVT2LJ
 #EXE = linearExtendActive
-EXE = linearExtendActive2LJ
+#EXE = linearExtendActive2LJ
 #EXE = extendNVT
 #EXE = extendActive
 #EXE = linearShearNVT

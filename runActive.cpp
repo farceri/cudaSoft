@@ -22,7 +22,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readNVT = true, readAndMakeNewDir = true, readAndSaveSameDir = true, runDynamics = true;
+  bool readNVT = true, readAndMakeNewDir = true, readAndSaveSameDir = true, runDynamics = true, justRun = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -63,48 +63,58 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   // set input and output
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      if(readNH == true) {
-        outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
-        if(logSave == true) {
-          inDir =	outDir;
-          outDir = outDir + "dynamics-log/";
-          readNVT = false;
-        }
-        if(linSave == true) {
-          inDir =	outDir;
-          outDir = outDir + "dynamics/";
-          readNVT = false;
-        }
-      }
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        //if(initialStep != 0) {
-        inDir = outDir;
-        //}
-      } else {
-        std::experimental::filesystem::create_directory(outDir);
-      }
+  if(justRun == true) {
+    outDir = inDir + "dynamics/";
+    if(std::experimental::filesystem::exists(outDir) == false) {
+      std::experimental::filesystem::create_directory(outDir);
     }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
+    if(readAndSaveSameDir == true) {
+      inDir = outDir;
+    }
+  } else {
+    if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
-      outDir = inDir + "../../" + dirSample;
-      //outDir = inDir + "../../../" + dirSample;
-    } else {
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
-        readNVT = true;
+      inDir = inDir + dirSample;
+      outDir = inDir;
+      if(runDynamics == true) {
+        if(readNH == true) {
+          outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+          if(logSave == true) {
+            inDir =	outDir;
+            outDir = outDir + "dynamics-log/";
+            readNVT = false;
+          }
+          if(linSave == true) {
+            inDir =	outDir;
+            outDir = outDir + "dynamics/";
+            readNVT = false;
+          }
+        }
+        if(std::experimental::filesystem::exists(outDir) == true) {
+          //if(initialStep != 0) {
+          inDir = outDir;
+          //}
+        } else {
+          std::experimental::filesystem::create_directory(outDir);
+        }
       }
-      outDir = inDir + dirSample;
-      if(readNH == true) {
-        inDir = outDir;
+    } else {//start a new dyanmics
+      if(readAndMakeNewDir == true) {
+        readState = true;
+        outDir = inDir + "../../" + dirSample;
+        //outDir = inDir + "../../../" + dirSample;
+      } else {
+        if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+          std::experimental::filesystem::create_directory(inDir + whichDynamics);
+          readNVT = true;
+        }
+        outDir = inDir + dirSample;
+        if(readNH == true) {
+          inDir = outDir;
+        }
       }
+      std::experimental::filesystem::create_directory(outDir);
     }
-    std::experimental::filesystem::create_directory(outDir);
   }
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
