@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
