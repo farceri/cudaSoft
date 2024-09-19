@@ -28,8 +28,8 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readNH = true, activeDir = false, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
   bool readNVT = true, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
@@ -94,6 +94,7 @@ int main(int argc, char **argv) {
       outDir = inDir;
       if(runDynamics == true) {
         if(readNH == true) {
+          inDir = inDir + "damping" + argv[8] + "/";
           outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
           if(logSave == true) {
             inDir =	outDir;

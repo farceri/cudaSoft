@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
       outDir = inDir;
       if(runDynamics == true) {
         if(readNH == true) {
+          inDir = inDir + "damping" + argv[8] + "/";
           outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
           if(logSave == true) {
             inDir =	outDir;
