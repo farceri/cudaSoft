@@ -21,12 +21,17 @@
 using namespace std;
 
 int main(int argc, char **argv) {
+  // read input and make new directory denoted by T: everything false
+  // read and save same directory denoted by T: readAndSaveSameDir = true
+  // read directory denoted by T and save in new directory denoted by T: readAndMakeNewDir = true
+  // read directory denoted by T and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
+  // read NH directory denoted by T for all previous options: readNH = true
+  // save in "active" directory for all the previous options: activeDir = true
+  // read input and save in "dynamics" directory: justRun = true
+  bool readNH = false, activeDir = true, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
-  bool readNVT = true, readAndMakeNewDir = true, readAndSaveSameDir = true, runDynamics = true, justRun = false;
-  // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
-  // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
-  // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = true, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
+  bool readNVT = true, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -61,10 +66,16 @@ int main(int argc, char **argv) {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
-  if(readNH == true) {
-    dirSample = whichDynamics + "T" + argv[3] + "/";
+  if(activeDir == true) {
+    readNH = false;
+    whichDynamics = "tp";
+    dirSample = whichDynamics + argv[4] + "-f0" + argv[5] + "/";
   } else {
-    dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+    if(readNH == true) {
+      dirSample = whichDynamics + "T" + argv[3] + "/";
+    } else {
+      dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+    }
   }
   ioSPFile ioSP(&sp);
   // set input and output
@@ -106,12 +117,22 @@ int main(int argc, char **argv) {
     } else {//start a new dyanmics
       if(readAndMakeNewDir == true) {
         readState = true;
-        outDir = inDir + "../../" + dirSample;
-        //outDir = inDir + "../../../" + dirSample;
+        if(activeDir == true) {
+          outDir = inDir + "../" + dirSample;
+        } else {
+          outDir = inDir + "../../" + dirSample;
+        }
       } else {
-        if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-          std::experimental::filesystem::create_directory(inDir + whichDynamics);
-          readNVT = true;
+        if(activeDir == true) {
+          if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
+            std::experimental::filesystem::create_directory(inDir + dirSample);
+            readNVT = true;
+          }
+        } else {
+          if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+            std::experimental::filesystem::create_directory(inDir + whichDynamics);
+            readNVT = true;
+          }
         }
         outDir = inDir + dirSample;
         if(readNH == true) {
@@ -121,6 +142,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
   }
+  cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     if(readNVT == true) {
