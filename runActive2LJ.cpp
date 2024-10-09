@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   bool readNH = true, activeDir = false, justRun = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool readNVT = true, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
+  bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -96,16 +96,14 @@ int main(int argc, char **argv) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
           outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
-          if(logSave == true) {
-            inDir =	outDir;
-            outDir = outDir + "dynamics-log/";
-            readNVT = false;
-          }
-          if(linSave == true) {
-            inDir =	outDir;
-            outDir = outDir + "dynamics/";
-            readNVT = false;
-          }
+        }
+        if(logSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics-log/";
+        }
+        if(linSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics/";
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {
@@ -124,15 +122,14 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
+        readNVT = true; // initialize from NVT
         if(activeDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
-            readNVT = true;
           }
         } else {
           if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
             std::experimental::filesystem::create_directory(inDir + whichDynamics);
-            readNVT = true;
           }
         }
         outDir = inDir + dirSample;

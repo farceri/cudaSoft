@@ -20,6 +20,9 @@ __constant__ double* d_boxSizePtr;
 //leesEdwards shift
 __constant__ double d_LEshift;
 
+//box radius for circular geometry
+__constant__ double d_boxRadius;
+
 __constant__ long d_nDim;
 __constant__ long d_numParticles;
 
@@ -84,6 +87,27 @@ inline __device__ double pbcDistanceLE(const double x1, const double y1, const d
 	return deltay;
 }
 
+inline __device__ void cartesianToPolar(const double* vec, double &r, double &theta) {
+    // Compute radial distance and angle wrt the origin
+    r = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
+    theta = atan2(vec[1], vec[0]);
+}
+
+inline __device__ double pbcAngle(double deltaTheta) {
+    // Ensure angular difference is within [-π, π]
+    if (abs(deltaTheta) > M_PI) {
+        deltaTheta -= 2 * M_PI * copysign(1.0, deltaTheta);
+    }
+    return deltaTheta;
+}
+
+inline __device__ double pbcDistanceRound(const double thisR, const double thisTheta, const double otherR, const double otherTheta) {
+    // Compute the angular difference with periodic boundary conditions
+    double deltaTheta = pbcAngle(thisTheta - otherTheta);
+    // Compute Euclidean distance using polar coordinates
+    return sqrt(thisR * thisR + otherR * otherR - 2 * thisR * otherR * cos(deltaTheta));
+}
+
 inline __device__ double calcNorm(const double* segment) {
   auto normSq = 0.0;
 	#pragma unroll (MAXDIM)
@@ -106,6 +130,7 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
   auto distanceSq = 0.0;
   auto delta = 0.0;
   double deltay, deltax, shifty;
+  //double r1, theta1, r2, theta2;
 	switch (d_simControl.geometryType) {
 		case simControlStruct::geometryEnum::normal:
 		#pragma unroll (MAXDIM)
@@ -149,48 +174,19 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 		distanceSq += delta * delta;
 		return sqrt(distanceSq);
 		break;
-		default:
-		return 0;
-		break;
-	}
-}
-
-inline __device__ void calcDelta(const double* thisVec, const double* otherVec, double* deltaVec) {
-	auto delta = 0.0;
-	auto shifty = 0.0;
-	switch (d_simControl.geometryType) {
-		case simControlStruct::geometryEnum::normal:
-		#pragma unroll (MAXDIM)
-	  	for (long dim = 0; dim < d_nDim; dim++) {
-	    	delta = pbcDistance(thisVec[dim], otherVec[dim], dim);
-			deltaVec[dim] = delta;
-	 	}
-		break;
-		case simControlStruct::geometryEnum::leesEdwards:
-		deltaVec[1] = thisVec[1] - otherVec[1];
-		shifty = round(deltaVec[1] / d_boxSizePtr[1]) * d_boxSizePtr[1];
-		deltaVec[0] = thisVec[0] - otherVec[0];
-		deltaVec[0] -= shifty * d_LEshift;
-		deltaVec[0] -= round(deltaVec[0] / d_boxSizePtr[0]) * d_boxSizePtr[0];
-		deltaVec[1] -= shifty;
-		break;
-		case simControlStruct::geometryEnum::fixedBox:
+		case simControlStruct::geometryEnum::roundBox:
 		#pragma unroll (MAXDIM)
 	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
-			deltaVec[dim] = delta;
+			distanceSq += delta * delta;
 		}
-		break;
-		case simControlStruct::geometryEnum::fixedSides2D:
-		deltaVec[1] = thisVec[1] - otherVec[1];
-		deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
-		break;
-		case simControlStruct::geometryEnum::fixedSides3D:
-		deltaVec[2] = thisVec[2] - otherVec[2];
-		deltaVec[1] = pbcDistance(thisVec[1], otherVec[1], 1);
-		deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
+		return sqrt(distanceSq);
+		//cartesianToPolar(thisVec, r1, theta1);
+		//cartesianToPolar(otherVec, r2, theta2);
+		//return pbcDistanceRound(r1, theta1, r2, theta2);
 		break;
 		default:
+		return 0;
 		break;
 	}
 }
@@ -199,6 +195,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 	auto distanceSq = 0.0;
 	auto delta = 0.0;
 	auto shifty = 0.0;
+  	//double r1, theta1, r2, theta2, deltaR, deltaTheta;
 	switch (d_simControl.geometryType) {
 		case simControlStruct::geometryEnum::normal:
 		#pragma unroll (MAXDIM)
@@ -243,6 +240,22 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 		deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
 		distanceSq += deltaVec[0] * deltaVec[0];
 		return sqrt(distanceSq);
+		break;
+		case simControlStruct::geometryEnum::roundBox:
+		#pragma unroll (MAXDIM)
+	  	for (long dim = 0; dim < d_nDim; dim++) {
+			delta = thisVec[dim] - otherVec[dim];
+			deltaVec[dim] = delta;
+			distanceSq += delta * delta;
+		}
+		return sqrt(distanceSq);
+		//cartesianToPolar(thisVec, r1, theta1);
+		//cartesianToPolar(otherVec, r2, theta2);
+    	//deltaTheta = pbcAngle(theta1 - theta2);
+    	//deltaR = sqrt(r1 * r1 + r2 * r2 - 2 * r1 * r2 * cos(deltaTheta));
+		//deltaVec[0] = deltaR * cos(deltaTheta);
+		//deltaVec[1] = deltaR * sin(deltaTheta);
+		//return deltaR;
 		break;
 		default:
 		return 0;
@@ -484,8 +497,6 @@ inline __device__ double calcGradMultiple(const long particleId, const long othe
 
 inline __device__ double calcContactInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
-	//calcDelta(thisPos, otherPos, delta);
-	//distance = calcNorm(delta);
 	//overlap = calcOverlap(thisPos, otherPos, radSum);
 	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
 	auto overlap = 1 - distance / radSum;
@@ -1100,7 +1111,7 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 	}
 }
 
-// particle-box contact interaction
+// particle-box contact interaction in rectangular boundary
 __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
@@ -1156,6 +1167,38 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
+			switch (d_simControl.boxType) {
+			case simControlStruct::boxEnum::harmonic:
+			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			case simControlStruct::boxEnum::WCA:
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
+			break;
+			default:
+			break;
+			}
+		}
+	}
+}
+
+// particle-box contact interaction in circular boundary - the center of the simulation box is assumed to be the origin
+__global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		auto radSum = thisRad;
+		// check if particle is far from the origin more than the box radius R minus the particle radius
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		if((d_boxRadius - thisR) < thisRad) {
+			wallPos[0] = d_boxRadius * cos(thisTheta);
+			wallPos[1] = d_boxRadius * sin(thisTheta);
 			switch (d_simControl.boxType) {
 			case simControlStruct::boxEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);

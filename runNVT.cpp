@@ -29,13 +29,14 @@ int main(int argc, char **argv) {
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, dampingDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
-  bool readState = true, saveFinal = true, logSave = true, linSave = false, fixedSides = false;
+  bool fixedbc = false, roundbc = true, fixedSides = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ew = 1e-03, ec = atof(argv[10]), LJcut = 4, cutDistance, cutoff = 0.5, waveQ, timeStep = atof(argv[2]);
+  double ec = atof(argv[10]), ew = ec, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, timeStep = atof(argv[2]);
   double Tinject = atof(argv[3]), damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[9], dirSample, whichDynamics = "langevin";
   if(nDim == 3) {
@@ -43,10 +44,15 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(fixedSides == true) {
+  if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+  } else if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxType(simControlStruct::boxEnum::WCA);
     sp.setBoxEnergyScale(ew);
+  }else {
+    cout << "Setting default rectangular geometry" << endl;
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -87,14 +93,14 @@ int main(int argc, char **argv) {
       if(runDynamics == true) {
         if(readNH == true) {
           outDir = outDir + "damping" + argv[6] + "/";
-          if(logSave == true) {
-            inDir = outDir;
-            outDir = outDir + "dynamics-log/";
-          }
-          if(linSave == true) {
-            inDir = outDir;
-            outDir = outDir + "dynamics/";
-          }
+        }
+        if(logSave == true) {
+          inDir = outDir;
+          outDir = outDir + "dynamics-log/";
+        }
+        if(linSave == true) {
+          inDir = outDir;
+          outDir = outDir + "dynamics/";
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {

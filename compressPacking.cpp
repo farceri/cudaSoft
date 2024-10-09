@@ -23,15 +23,15 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, lj = true, wca = false, gforce = false;
-  bool fixedbc = false, alltoall = false, nve = false, noseHoover = true, scaleVel = false;
+  bool read = false, readState = false, nve = false, noseHoover = true, scaleVel = false;
+  bool roundbc = true, fixedbc = false, lj = true, wca = false, gforce = false, alltoall = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 2e-02, scaleFactor, prevEnergy = 0;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
-  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.12, phiTh = 0.72;
+  double ec = 1, ew = 1e02, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.02, phiTh = 0.32;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   double gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
@@ -45,10 +45,14 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
-  if(gforce == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-  } else if(fixedbc == true) {
+  if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+  } else if(gforce == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+  } else {
+    cout << "Setting default rectangular geometry" << endl;
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
@@ -66,7 +70,11 @@ int main(int argc, char **argv) {
     }
   } else {
     // initialize polydisperse packing
-    sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly, lz);
+    if(roundbc == true) {
+      sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
+    } else {
+      sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly, lz);
+    }
     //sp.setScaledMonoRandomParticles(phi0, lx, ly, lz);
     //sp.setScaledBiRandomParticles(phi0, lx, ly, lz);
     sp.scaleParticlePacking();
@@ -96,10 +104,12 @@ int main(int argc, char **argv) {
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
+    sp.setBoxType(simControlStruct::boxEnum::WCA);
     cout << "Setting Lennard-Jones potential" << endl;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+    sp.setBoxType(simControlStruct::boxEnum::WCA);
     cout << "Setting WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;
@@ -130,6 +140,9 @@ int main(int argc, char **argv) {
   } else {
     sp.initSoftParticleLangevin(Tinject, damping, readState);
   }
+  currentDir = outDir + "initial/";
+  std::experimental::filesystem::create_directory(currentDir);
+  ioSP.saveParticlePacking(currentDir);
   // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
     currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,4) + "/";
@@ -189,11 +202,13 @@ int main(int argc, char **argv) {
     cout << "Energy before compression - E/N: " << prevEnergy / numParticles << endl;
     // save minimized configuration
     ioSP.saveParticlePacking(currentDir);
-    ioSP.saveParticleNeighbors(currentDir);
-    if(noseHoover == true) {
-      ioSP.saveNoseHooverParams(currentDir);
+    //ioSP.saveParticleNeighbors(currentDir);
+    //if(noseHoover == true) {
+    //  ioSP.saveNoseHooverParams(currentDir);
+    //}
+    if(nDim == 3) {
+      ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     }
-    ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     ioSP.closeEnergyFile();
     //ioSP.saveDumpPacking(currentDir, numParticles, nDim, 0);
     // check if target density is met
@@ -210,14 +225,18 @@ int main(int argc, char **argv) {
       }
       sp.scaleParticles(scaleFactor);
       sp.scaleParticlePacking();
-      boxSize = sp.getBoxSize();
       currentPhi = sp.getParticlePhi();
-      if(nDim == 2) {
-        cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
-      } else if(nDim == 3) {
-        cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
+      if(roundbc == true) {
+        cout << "\nNew phi: " << currentPhi << " box radius: " << sp.getBoxRadius() << " scale: " << scaleFactor << endl;
       } else {
-        cout << "BoxSize: only dimensions 2 and 3 are allowed!" << endl;
+        boxSize = sp.getBoxSize();
+        if(nDim == 2) {
+          cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
+        } else if(nDim == 3) {
+          cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
+        } else {
+          cout << "BoxSize: only dimensions 2 and 3 are allowed!" << endl;
+        }
       }
       searchStep += 1;
     }

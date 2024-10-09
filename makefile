@@ -3,7 +3,8 @@
 ## USER SPECIFIC DIRECTORIES ##
 
 # CUDA directory:
-CUDA_ROOT_DIR=/usr/local/cuda-12.2
+CUDA_ROOT_DIR=/usr/lib/x86_64-linux-gnu
+#CUDA_ROOT_DIR=/usr/local/cuda-12.2
 #CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.3.1
 
 ##########################################################
@@ -21,16 +22,16 @@ CC_LIBS= -lstdc++fs
 ## NVCC COMPILER OPTIONS ##
 
 # NVCC compiler options:
-NVCC=nvcc
+NVCC=/usr/bin/nvcc
 NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr #-g -G
 NVCC_LIBS=
 
 LFLAGS= -lm -Wno-deprecated-gpu-targets
 
 # CUDA library directory:
-CUDA_LIB_DIR= -L$(CUDA_ROOT_DIR)/lib64
+#CUDA_LIB_DIR= -L$(CUDA_ROOT_DIR)/lib64
 # CUDA include directory:
-CUDA_INC_DIR= -I$(CUDA_ROOT_DIR)/include
+#CUDA_INC_DIR= -I$(CUDA_ROOT_DIR)/include
 # CUDA linking libraries:
 CUDA_LINK_LIBS= -lcudart
 
@@ -70,8 +71,8 @@ INC_DIR = include
 #EXE = runNH2LJ
 #EXE = runNVT
 #EXE = runNVT2LJ
-#EXE = runActive
-EXE = runActive2LJ
+EXE = runActive
+#EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
@@ -107,7 +108,8 @@ GENCODE = $(GENCODE_SM60)
 
 # Link c++ and CUDA compiled object files to target executable:
 $(EXE) : $(OBJS)
-	$(NVCC) $(GENCODE) $(OBJS) -o $@ $(CUDA_INC_DIR) $(CUDA_LIB_DIR) $(CUDA_LINK_LIBS) $(CC_LIBS)
+	$(NVCC) $(GENCODE) $(OBJS) -o $@ $(CUDA_INC_DIR) $(CC_LIBS)
+#	$(NVCC) $(GENCODE) $(OBJS) -o $@ $(CUDA_INC_DIR) $(CUDA_LIB_DIR) $(CUDA_LINK_LIBS) $(CC_LIBS)
 
 # Compile main .cpp file to object files:
 $(OBJ_DIR)/$(EXE).o : $(EXE).cpp

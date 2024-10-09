@@ -28,24 +28,35 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = true, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = true, readAndSaveSameDir = true, runDynamics = true;
+  bool readNH = false, activeDir = true, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool readNVT = true, readState = true, saveFinal = true, logSave = false, linSave = false, saveWork = false;
+  bool fixedbc = false, roundbc = true, fixedSides = false;
+  bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[12]), LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
+  double ec = atof(argv[12]), ew = ec, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
   std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "active";
-  thrust::host_vector<double> boxSize(nDim);
+  //thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
     LJcut = 2.5;
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
+  if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+  } else if(fixedSides == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+    sp.setBoxEnergyScale(ew);
+  } else {
+    cout << "Setting default rectangular geometry" << endl;
+  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -90,16 +101,14 @@ int main(int argc, char **argv) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
           outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
-          if(logSave == true) {
-            inDir =	outDir;
-            outDir = outDir + "dynamics-log/";
-            readNVT = false;
-          }
-          if(linSave == true) {
-            inDir =	outDir;
-            outDir = outDir + "dynamics/";
-            readNVT = false;
-          }
+        }
+        if(logSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics-log/";
+        }
+        if(linSave == true) {
+          inDir =	outDir;
+          outDir = outDir + "dynamics/";
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {
@@ -118,15 +127,15 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
+        readNVT = true; // initializing from NVT
         if(activeDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
-            readNVT = true;
           }
         } else {
           if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-          std::experimental::filesystem::create_directory(inDir + whichDynamics);
-          readNVT = true;
+            std::experimental::filesystem::create_directory(inDir + whichDynamics);
+          }
         }
         outDir = inDir + dirSample;
         if(readNH == true) {
@@ -136,6 +145,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
   }
+  cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     if(readNVT == true) {
@@ -162,10 +172,10 @@ int main(int argc, char **argv) {
   damping /= timeUnit;
   driving = driving*forceUnit;
   Dr = 1/(tp*timeUnit);
-  if(saveWork == true) {
-    width = boxSize[0] * atof(argv[12]);
-    cout << "Measuring work and active work, fluid width: " << width << " centered in Lx / 2" << endl;
-  }
+  //if(saveWork == true) {
+  //  width = boxSize[0] * atof(argv[12]);
+  //  cout << "Measuring work and active work, fluid width: " << width << " centered in Lx / 2" << endl;
+  //}
   sp.setSelfPropulsionParams(driving, tp);
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
@@ -188,9 +198,9 @@ int main(int argc, char **argv) {
     //sp.softParticleActiveLangevinLoop();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      if(saveWork == true) {
-        ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
-      }
+      //if(saveWork == true) {
+      //  ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
+      //}
       ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
@@ -208,7 +218,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -246,7 +256,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

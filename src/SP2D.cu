@@ -191,8 +191,10 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
     cout << "SP2D:;setGeometryType: geometryType: fixedSides2D" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides3D) {
     cout << "SP2D::setGeometryType: geometryType: fixedSides3D" << endl;
+  } else if(simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    cout << "SP2D::setGeometryType: geometryType: roundBox" << endl;
   } else {
-    cout << "SP2D::setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox, fixedSides2D or fixedSides3D" << endl;
+    cout << "SP2D::setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D or roundBox" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -224,18 +226,24 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
   if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
     cout << "SP2D::setPotentialType: potentialType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
     cout << "SP2D::setPotentialType: potentialType: adhesive" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJWCA" << endl;
   } else {
     cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
@@ -546,6 +554,30 @@ thrust::host_vector<double> SP2D::getBoxSize() {
   return boxSizeFromDevice;
 }
 
+void SP2D::setBoxRadius(double boxRadius_) {
+	syncSimControlFromDevice();
+	if(simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+		boxRadius = boxRadius_;
+		cudaError err = cudaMemcpyToSymbol(d_boxRadius, &boxRadius, sizeof(boxRadius));
+		if(err != cudaSuccess) {
+			cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+		}
+	}
+	else {
+		cout << "SP2D::setBoxRadius: attempting to set boxRadius without using round boundary conditions" << endl;
+	}
+  cout << "SP2D::setBoxRadius: boxRadius: " << boxRadius << endl;
+}
+
+double SP2D::getBoxRadius() {
+  double boxRadiusFromDevice;
+	cudaError err = cudaMemcpyFromSymbol(&boxRadiusFromDevice, d_boxRadius, sizeof(d_boxRadius));
+	if(err != cudaSuccess) {
+		cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+	}
+	return boxRadiusFromDevice;
+}
+
 void SP2D::setParticleRadii(thrust::host_vector<double> &particleRad_) {
   d_particleRad = particleRad_;
 }
@@ -661,7 +693,23 @@ void SP2D::setParticleAngles(thrust::host_vector<double> &particleAngle_) {
   d_particleAngle = particleAngle_;
 }
 
+void SP2D::checkParticleAngles() {
+  auto r = thrust::counting_iterator<long>(0);
+  double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
+	if(nDim == 2) {
+    auto moduloParticleAngle = [=] __device__ (long pId) {
+      pAngle[pId] = fmod(pAngle[pId], 2.0 * M_PI);
+      if (pAngle[pId] < 0) {
+          pAngle[pId] += 2.0 * M_PI;
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, moduloParticleAngle);
+  }
+}
+
 thrust::host_vector<double> SP2D::getParticleAngles() {
+  //checkParticleAngles();
   thrust::host_vector<double> particleAngleFromDevice;
   particleAngleFromDevice = d_particleAngle;
   return particleAngleFromDevice;
@@ -684,17 +732,28 @@ void SP2D::printContacts() {
 }
 
 double SP2D::getParticlePhi() {
-  if(nDim == 2) {
-    thrust::device_vector<double> d_radSquared(numParticles);
-    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
-    return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
-  } else if(nDim == 3) {
-    thrust::device_vector<double> d_radCubed(numParticles);
-    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
-    return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 4 * PI / (3 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  if(simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    if(nDim == 2) {
+      thrust::device_vector<double> d_radSquared(numParticles);
+      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
+      return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) / (boxRadius * boxRadius);
+    } else {
+      cout << "SP2D::getParticlePhi: only dimensions 2 in roundBox geometry is allowed!" << endl;
+      return 0;
+    }
   } else {
-    cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
-    return 0;
+    if(nDim == 2) {
+      thrust::device_vector<double> d_radSquared(numParticles);
+      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
+      return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
+    } else if(nDim == 3) {
+      thrust::device_vector<double> d_radCubed(numParticles);
+      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
+      return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 4 * PI / (3 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+    } else {
+      cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
+      return 0;
+    }
   }
 }
 
@@ -854,13 +913,22 @@ void SP2D::checkParticleNeighbors() {
 }
 
 double SP2D::getSoftWaveNumber() {
-  if(nDim == 2) {
-    return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * getParticlePhi() / (PI * numParticles)));
-  } else if (nDim == 3) {
-    return PI / (2. * cbrt(d_boxSize[0] * d_boxSize[1] * d_boxSize[2] * getParticlePhi() / (PI * numParticles)));
+  if(simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    if(nDim == 2) {
+      return PI / (2. * sqrt(boxRadius * getParticlePhi() / numParticles));
+    } else {
+      cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundBox geometry is allowed!" << endl;
+      return 0;
+    }
   } else {
-    cout << "SP2D::getSoftWaveNumber: only dimensions 2 and 3 are allowed!" << endl;
-    return 0;
+    if(nDim == 2) {
+      return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * getParticlePhi() / (PI * numParticles)));
+    } else if (nDim == 3) {
+      return PI / (2. * cbrt(d_boxSize[0] * d_boxSize[1] * d_boxSize[2] * getParticlePhi() / (PI * numParticles)));
+    } else {
+      cout << "SP2D::getSoftWaveNumber: only dimensions 2 and 3 are allowed!" << endl;
+      return 0;
+    }
   }
 }
 
@@ -942,8 +1010,38 @@ void SP2D::setScaledPolyRandomParticles(double phi0, double polyDispersity, doub
       d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
     }
   }
-  // need to set this otherwise forces are zeros
-  //setParticleLengthScale();
+  setLengthScaleToOne();
+}
+
+// this only works in 2D
+void SP2D::setRoundScaledPolyRandomParticles(double phi0, double polyDispersity, double boxRadius_) {
+  thrust::host_vector<double> boxSize(nDim);
+  double r1, r2, randNum, mean = 0, sigma, scale;
+  double thisR, thisTheta;
+  sigma = sqrt(log(polyDispersity*polyDispersity + 1.));
+  // generate polydisperse particle size
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    r1 = drand48();
+    r2 = drand48();
+    randNum = sqrt(-2. * log(r1)) * cos(2. * PI * r2);
+    d_particleRad[particleId] = 0.5 * exp(mean + randNum * sigma);
+  }
+  boxRadius = boxRadius_;
+  setBoxRadius(boxRadius);
+  if(nDim == 2) {
+  scale = sqrt(getParticlePhi() / phi0);
+  } else {
+    cout << "SP2D::setRoundScaledPolyRandomSoftParticles: only dimesions 2 is allowed!" << endl;
+  }
+  boxRadius = boxRadius_ * scale;
+  setBoxRadius(boxRadius);
+  // extract random positions
+  for (long particleId = 0; particleId < numParticles; particleId++) {
+    thisR = boxRadius * sqrt(drand48());
+    thisTheta = 2 * PI  * drand48();
+    d_particlePos[particleId * nDim] = thisR * cos(thisTheta);
+    d_particlePos[particleId * nDim + 1] = thisR * sin(thisTheta);
+  }
   setLengthScaleToOne();
 }
 
@@ -974,8 +1072,6 @@ void SP2D::setScaledMonoRandomParticles(double phi0, double lx, double ly, doubl
       d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
     }
   }
-  // need to set this otherwise forces are zeros
-  //setParticleLengthScale();
   setLengthScaleToOne();
 }
 
@@ -1008,8 +1104,6 @@ void SP2D::setScaledBiRandomParticles(double phi0, double lx, double ly, double 
       d_particlePos[particleId * nDim + dim] = d_boxSize[dim] * drand48();
     }
   }
-  // need to set this otherwise forces are zeros
-  //setParticleLengthScale();
   setLengthScaleToOne();
 }
 
@@ -1026,15 +1120,22 @@ void SP2D::scaleParticlePacking() {
   double sigma = 2 * getMeanParticleSigma();
   thrust::transform(d_particleRad.begin(), d_particleRad.end(), thrust::make_constant_iterator(sigma), d_particleRad.begin(), thrust::divides<double>());
   thrust::transform(d_particlePos.begin(), d_particlePos.end(), thrust::make_constant_iterator(sigma), d_particlePos.begin(), thrust::divides<double>());
-  thrust::host_vector<double> boxSize_(nDim);
-  boxSize_ = getBoxSize();
-  for (long dim = 0; dim < nDim; dim++) {
-    boxSize_[dim] /= sigma;
+  if(simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    double boxRadius_ = getBoxRadius();
+    boxRadius_ /= sigma;
+    boxRadius = boxRadius_;
+    cudaMemcpyToSymbol(d_boxRadius, &boxRadius, sizeof(boxRadius));
+  } else {
+    thrust::host_vector<double> boxSize_(nDim);
+    boxSize_ = getBoxSize();
+    for (long dim = 0; dim < nDim; dim++) {
+      boxSize_[dim] /= sigma;
+    }
+    d_boxSize = boxSize_;
+    double* boxSize = thrust::raw_pointer_cast(&(d_boxSize[0]));
+    cudaMemcpyToSymbol(d_boxSizePtr, &boxSize, sizeof(boxSize));
+    //setParticleLengthScale();
   }
-  d_boxSize = boxSize_;
-  double* boxSize = thrust::raw_pointer_cast(&(d_boxSize[0]));
-  cudaMemcpyToSymbol(d_boxSizePtr, &boxSize, sizeof(boxSize));
-  //setParticleLengthScale();
 }
 
 void SP2D::scaleParticleVelocity(double scale) {
@@ -1271,6 +1372,10 @@ void SP2D::addSelfPropulsion() {
 
     auto langevinUpdateActiveNoise2D = [=] __device__ (long pId) {
       pAngle[pId] += amplitude * activeAngle[pId];
+      pAngle[pId] = fmod(pAngle[pId], 2.0 * M_PI);
+      if (pAngle[pId] < 0) {
+          pAngle[pId] += 2.0 * M_PI;
+      }
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1327,6 +1432,9 @@ void SP2D::addParticleWallInteraction() {
     break;
     case simControlStruct::geometryEnum::fixedSides3D:
     kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
+    case simControlStruct::geometryEnum::roundBox:
+    kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
     default:
     break;

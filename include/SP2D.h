@@ -23,7 +23,7 @@ using std::tuple;
 
 struct simControlStruct {
   enum class particleEnum {passive, active} particleType;
-  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D} geometryType;
+  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
   enum class boxEnum {harmonic, WCA} boxType;
@@ -60,6 +60,7 @@ public:
   long numParticles;
 
   thrust::device_vector<double> d_boxSize;
+  double boxRadius;
 
   // time step
   double dt;
@@ -196,6 +197,9 @@ public:
   void setBoxSize(thrust::host_vector<double> &boxSize_);
   thrust::host_vector<double> getBoxSize();
 
+  void setBoxRadius(double boxRadius_);
+  double getBoxRadius();
+
   void setParticleRadii(thrust::host_vector<double> &particleRad_);
   thrust::host_vector<double> getParticleRadii();
 
@@ -231,6 +235,7 @@ public:
   thrust::host_vector<double> getParticleEnergies();
 
   void setParticleAngles(thrust::host_vector<double> &particleAngle_);
+  void checkParticleAngles();
   thrust::host_vector<double> getParticleAngles();
 
   thrust::host_vector<long> getContacts();
@@ -265,6 +270,8 @@ public:
   void setPolyRandomParticles(double phi0, double polyDispersity);
 
   void setScaledPolyRandomParticles(double phi0, double polyDispersity, double lx, double ly, double lz);
+
+  void setRoundScaledPolyRandomParticles(double phi0, double polyDispersity, double boxRadius_);
 
   void setScaledMonoRandomParticles(double phi0, double lx, double ly, double lz);
 

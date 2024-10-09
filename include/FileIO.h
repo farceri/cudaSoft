@@ -337,6 +337,21 @@ public:
     outputFile.close();
   }
 
+  double read0DFile(string fileName) {
+    double data;
+    this->openInputFile(fileName);
+    string inputString;
+    getline(inputFile, inputString);
+    sscanf(inputString.c_str(), "%lf", &data);
+    inputFile.close();
+    return data;
+  }
+
+  void save0DFile(string fileName, double data) {
+    this->openOutputFile(fileName);
+    outputFile << setprecision(precision) << data << endl;
+    outputFile.close();
+  }
 
   thrust::host_vector<double> read1DFile(string fileName, long numRows) {
     thrust::host_vector<double> data;
@@ -361,7 +376,6 @@ public:
     }
     outputFile.close();
   }
-
 
 //////////////////////////// write this function in array form ////////////////////////////
   thrust::host_vector<double> read2DFile(string fileName, long numRows) {
@@ -430,12 +444,9 @@ public:
     sp_->initParticleVariables(numParticles_);
     sp_->initParticleNeighbors(numParticles_);
     sp_->syncParticleNeighborsToDevice();
-    thrust::host_vector<double> boxSize_(nDim_);
     thrust::host_vector<double> pPos_(numParticles_ * nDim_);
     thrust::host_vector<double> pRad_(numParticles_);
 
-    boxSize_ = read1DFile(dirName + "boxSize.dat", nDim_);
-    sp_->setBoxSize(boxSize_);
     if(nDim_ == 2) {
       pPos_ = read2DFile(dirName + "particlePos.dat", numParticles_);
     } else if(nDim_ == 3) {
@@ -446,14 +457,28 @@ public:
     sp_->setParticlePositions(pPos_);
     pRad_ = read1DFile(dirName + "particleRad.dat", numParticles_);
     sp_->setParticleRadii(pRad_);
+    
+    // set box dimensions
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+      double boxRadius_ = read0DFile(dirName + "boxSize.dat");
+      sp_->setBoxRadius(boxRadius_);
+      boxRadius_ = sp_->getBoxRadius();
+      if(nDim_ == 2) {
+        cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-R: " << boxRadius_ << endl;
+      }
+    } else {
+      thrust::host_vector<double> boxSize_(nDim_);
+      boxSize_ = read1DFile(dirName + "boxSize.dat", nDim_);
+      sp_->setBoxSize(boxSize_);
+      boxSize_ = sp_->getBoxSize();
+      if(nDim_ == 2) {
+        cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << endl;
+      } else if(nDim_ == 3) {
+        cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << ", Lz: " << boxSize_[2] << endl;
+      }
+    }
     // set length scales
     sp_->setLengthScaleToOne();
-    boxSize_ = sp_->getBoxSize();
-    if(nDim_ == 2) {
-      cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << endl;
-    } else if(nDim_ == 3) {
-      cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << ", Lz: " << boxSize_[2] << endl;
-    }
   }
 
   void readPBCParticlePackingFromDirectory(string dirName, long numParticles_, long nDim_) {
@@ -528,7 +553,12 @@ public:
     savePackingParams(dirName);
     // save vectors
     long nDim = sp_->getNDim();
-    save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+      double boxRadius_ = sp_->getBoxRadius();
+      save0DFile(dirName + "boxSize.dat", boxRadius_);
+    } else {
+      save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+    }
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
