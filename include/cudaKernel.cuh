@@ -35,6 +35,8 @@ __constant__ double d_ec;
 // activity constants
 __constant__ double d_driving;
 __constant__ double d_taup;
+// Vicsek interaction constant
+__constant__ double d_Jvicsek;
 // adhesive constants
 __constant__ double d_l1;
 __constant__ double d_l2;
@@ -68,6 +70,13 @@ __constant__ long* d_partMaxNeighborListPtr;
 __constant__ long d_partNeighborListSize;
 // make the neighborLoops only go up to neighborMax
 __constant__ long d_partMaxNeighbors;
+
+// vicsek interaction neighborList
+__constant__ long* d_vicsekNeighborListPtr;
+__constant__ long* d_vicsekMaxNeighborListPtr;
+__constant__ long d_vicsekNeighborListSize;
+// make the neighborLoops only go up to neighborMax
+__constant__ long d_vicsekMaxNeighbors;
 
 
 inline __device__ double pbcDistance(const double x1, const double x2, const long dim) {
@@ -263,17 +272,6 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 	}
 }
 
-inline __device__ double calcFixedBoundaryDistance(const double* thisVec, const double* otherVec) {
-  	auto distanceSq = 0.0;
-  	auto delta = 0.0;
-	#pragma unroll (MAXDIM)
-  	for (long dim = 0; dim < d_nDim; dim++) {
-    	delta = thisVec[dim] - otherVec[dim];
-    	distanceSq += delta * delta;
-  	}
-  	return sqrt(distanceSq);
-}
-
 inline __device__ void getSegment(const double* thisVec, const double* otherVec, double* segment) {
 	#pragma unroll (MAXDIM)
   	for (long dim = 0; dim < d_nDim; dim++) {
@@ -333,7 +331,16 @@ inline __device__ bool extractParticleNeighborPos(const long particleId, const l
     	for (long dim = 0; dim < d_nDim; dim++) {
       		otherPos[dim] = pPos[otherId * d_nDim + dim];
     	}
-    return true;
+    	return true;
+  	}
+  	return false;
+}
+
+inline __device__ bool extractParticleNeighborAngle(const long particleId, const long nListId, const double* pAngle, double& otherAngle) {
+	auto otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+  	if ((particleId != otherId) && (otherId != -1)) {
+		otherAngle = pAngle[otherId];
+    	return true;
   	}
   	return false;
 }
@@ -341,10 +348,6 @@ inline __device__ bool extractParticleNeighborPos(const long particleId, const l
 //***************************** force and energy *****************************//
 inline __device__ double calcOverlap(const double* thisVec, const double* otherVec, const double radSum) {
 	return (1 - calcDistance(thisVec, otherVec) / radSum);
-}
-
-inline __device__ double calcFixedBoundaryOverlap(const double* thisVec, const double* otherVec, const double radSum) {
-  return (1 - calcFixedBoundaryDistance(thisVec, otherVec) / radSum);
 }
 
 inline __device__ void getNormalVector(const double* thisVec, double* normalVec) {
@@ -800,6 +803,23 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
 				}
 				//if(pEnergy[particleId] != 0) printf("particleId %ld otherId %ld pForce[particleId] %e %e\n", particleId, otherId, pForce[particleId * d_nDim], pForce[particleId * d_nDim + 1]);
 				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+		}
+  	}
+}
+
+// particle-particle interaction
+__global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisAngle, otherAngle;
+		// zero out the angular acceleration and get particle positions
+		pAlpha[particleId] = 0;
+		thisAngle = pAngle[particleId];
+		// interaction between vertices of neighbor particles
+		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
+				pAlpha[particleId] -= d_Jvicsek * sin(thisAngle - otherAngle);
 			}
 		}
   	}
@@ -1512,10 +1532,10 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
   	}
 }
 
-__global__ void kernelCalcParticleBoxNeighborList(const double* pPos, const double* pRad, const double cutDistance) {
+__global__ void kernelCalcVicsekNeighborList(const double* pPos, const double* pRad, const double Rvicsek) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-		long addedNeighbor = 0;
+		auto addedNeighbor = 0;
 		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
@@ -1524,17 +1544,16 @@ __global__ void kernelCalcParticleBoxNeighborList(const double* pPos, const doub
 			if(extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				bool isNeighbor = false;
 				auto radSum = thisRad + otherRad;
-				//isNeighbor = (-calcFixedBoundaryOverlap(thisPos, otherPos, radSum) < cutDistance);
-				isNeighbor = (calcFixedBoundaryDistance(thisPos, otherPos) < (cutDistance * radSum));
-				if (addedNeighbor < d_partNeighborListSize) {
-					d_partNeighborListPtr[particleId * d_partNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
-					//if(isNeighbor==true) printf("particleId %ld \t otherId: %ld \t overlap: %lf \n", particleId, otherId, calcOverlap(thisPos, otherPos, radSum));
+				isNeighbor = (calcDistance(thisPos, otherPos) < (Rvicsek * radSum));
+				if (addedNeighbor < d_vicsekNeighborListSize) {
+					d_vicsekNeighborListPtr[particleId * d_vicsekNeighborListSize + addedNeighbor] = otherId*isNeighbor -1*(!isNeighbor);
+					//if(isNeighbor == true) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
 				}
 				addedNeighbor += isNeighbor;
 			}
 		}
-		d_partMaxNeighborListPtr[particleId] = addedNeighbor;
-	}
+		d_vicsekMaxNeighborListPtr[particleId] = addedNeighbor;
+  	}
 }
 
 __global__ void kernelCalcParticleContacts(const double* pPos, const double* pRad, const double gapSize, const long contactLimit, long* contactList, long* numContacts) {
@@ -1690,6 +1709,24 @@ __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, cons
     	for (long dim = 0; dim < d_nDim; dim++) {
 			pVel[particleId * d_nDim + dim] += timeStep * pForce[particleId * d_nDim + dim];
 		}
+  	}
+}
+
+__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		pAngle[particleId * d_nDim] += timeStep * pOmega[particleId];
+  	}
+	pAngle[particleId] = fmod(pAngle[particleId], 2.0 * PI);
+    if (pAngle[particleId] < 0) {
+        pAngle[particleId] += 2.0 * PI;
+    }
+}
+
+__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		pOmega[particleId] += timeStep * pAlpha[particleId];
   	}
 }
 

@@ -145,7 +145,7 @@ int main(int argc, char **argv) {
   if(readState == true) {
     if(readNVT == true) {
       ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.computeParticleAngleFromVel();
+      sp.initializeParticleAngles();
     } else {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }

@@ -457,7 +457,7 @@ public:
     sp_->setParticlePositions(pPos_);
     pRad_ = read1DFile(dirName + "particleRad.dat", numParticles_);
     sp_->setParticleRadii(pRad_);
-    
+
     // set box dimensions
     if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
       double boxRadius_ = read0DFile(dirName + "boxSize.dat");
@@ -651,6 +651,12 @@ public:
       sp_->getSelfPropulsionParams(driving, taup);
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      double driving, Jvicsek, Rvicsek;
+      sp_->getVicsekParams(driving, Jvicsek, Rvicsek);
+      saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
+      saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
+      saveParams << "f0" << "\t" << driving << endl;
     }
     saveParams.close();
   }
@@ -667,6 +673,12 @@ public:
       double driving, taup;
       sp_->getSelfPropulsionParams(driving, taup);
       saveParams << "taup" << "\t" << taup << endl;
+      saveParams << "f0" << "\t" << driving << endl;
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      double driving, Jvicsek, Rvicsek;
+      sp_->getVicsekParams(driving, Jvicsek, Rvicsek);
+      saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
+      saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
       saveParams << "f0" << "\t" << driving << endl;
     }
     saveParams.close();

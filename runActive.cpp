@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, roundbc = true, fixedSides = false;
   bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
   if(readState == true) {
     if(readNVT == true) {
       ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.computeParticleAngleFromVel();
+      sp.initializeParticleAngles();
     } else {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }

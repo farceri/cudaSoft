@@ -150,6 +150,15 @@ void SP2D::initParticleNeighbors(long numParticles_) {
   thrust::fill(d_partMaxNeighborList.begin(), d_partMaxNeighborList.end(), partMaxNeighbors);
 }
 
+void SP2D::initVicsekNeighbors(long numParticles_) {
+  vicsekNeighborListSize = 0;
+  vicsekMaxNeighbors = 0;
+  d_vicsekNeighborList.resize(numParticles_);
+  d_vicsekMaxNeighborList.resize(numParticles_);
+  thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
+  thrust::fill(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), vicsekMaxNeighbors);
+}
+
 //**************************** setters and getters ***************************//
 //send simControl information to the gpu
 void SP2D::syncSimControlToDevice() {
@@ -173,8 +182,17 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     }
     thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
+  } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    d_particleOmega.resize(numParticles);
+    d_particleAlpha.resize(numParticles);
+    thrust::fill(d_particleOmega.begin(), d_particleOmega.end(), double(0));
+    thrust::fill(d_particleAlpha.begin(), d_particleAlpha.end(), double(0));
+    initVicsekNeighbors(numParticles);
+    d_vicsekLastPos.resize(numParticles * nDim);
+    thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
+    cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
-    cout << "SP2D::setParticleType: please specify valid particleType: passive or active" << endl;
+    cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -647,6 +665,11 @@ void SP2D::resetLastPositions() {
   d_particleLastPos = d_particlePos;
 }
 
+void SP2D::resetVicsekLastPositions() {
+  cudaDeviceSynchronize();
+  d_vicsekLastPos = d_particlePos;
+}
+
 void SP2D::setInitialPositions() {
   cudaDeviceSynchronize();
   d_particleInitPos = d_particlePos;
@@ -698,9 +721,9 @@ void SP2D::checkParticleAngles() {
   double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
 	if(nDim == 2) {
     auto moduloParticleAngle = [=] __device__ (long pId) {
-      pAngle[pId] = fmod(pAngle[pId], 2.0 * M_PI);
+      pAngle[pId] = fmod(pAngle[pId], 2.0 * PI);
       if (pAngle[pId] < 0) {
-          pAngle[pId] += 2.0 * M_PI;
+          pAngle[pId] += 2.0 * PI;
       }
     };
 
@@ -909,6 +932,21 @@ void SP2D::checkParticleNeighbors() {
     break;
     default:
     break;
+  }
+}
+
+void SP2D::checkVicsekNeighbors() {
+  //const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *vLastPos = thrust::raw_pointer_cast(&d_vicsekLastPos[0]);
+  thrust::device_vector<int> recalcFlag(d_particleRad.size());
+  int *flag = thrust::raw_pointer_cast(&recalcFlag[0]);
+  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, vLastPos, flag, Rvicsek);
+  int sumFlag = thrust::reduce(recalcFlag.begin(), recalcFlag.end(), int(0), thrust::plus<int>());
+  if(sumFlag != 0) {
+    calcVicsekNeighborList();
+    resetVicsekLastPositions();
+    updateCount += 1;
   }
 }
 
@@ -1143,20 +1181,15 @@ void SP2D::scaleParticleVelocity(double scale) {
 }
 
 // compute particle angles from velocity
-void SP2D::computeParticleAngleFromVel() {
+void SP2D::initializeParticleAngles() {
   long p_nDim(nDim);
   auto r = thrust::counting_iterator<long>(0);
-  double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleAngle.begin(), randNum(0.f,2.f*PI));
+  if(nDim == 3) {
+      double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+      const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
 
-  if(nDim == 2) {
-    auto computeParticleAngle2D = [=] __device__ (long particleId) {
-      pAngle[particleId] = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
-    };
-
-    thrust::for_each(r, r + numParticles, computeParticleAngle2D);
-    
-  } else if(nDim == 3) {
       auto computeParticleAngle3D = [=] __device__ (long particleId) {
       auto theta = acos(pVel[particleId * p_nDim + 2]);
       auto phi = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
@@ -1202,6 +1235,21 @@ void SP2D::getSelfPropulsionParams(double &driving_, double &taup_) {
   driving_ = driving;
   taup_ = taup;
   //cout << "SP2D::getSelfPropulsionParams:: driving: " << driving_ << " taup: " << taup_ << endl;
+}
+
+void SP2D::setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_) {
+  driving = driving_;
+  Jvicsek = Jvicsek_;
+  Rvicsek = Rvicsek_;
+  cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
+  cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
+  //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
+}
+
+void SP2D::getVicsekParams(double &driving_, double &Jvicsek_, double &Rvicsek_) {
+  driving_ = driving;
+  Jvicsek_ = Jvicsek;
+  //cout << "SP2D::getVicsekParams:: driving: " << driving_ << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
 void SP2D::setAdhesionParams(double l1_, double l2_) {
@@ -1370,11 +1418,11 @@ void SP2D::addSelfPropulsion() {
     thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,1.f));
     const double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
 
-    auto langevinUpdateActiveNoise2D = [=] __device__ (long pId) {
+    auto updateActiveNoise2D = [=] __device__ (long pId) {
       pAngle[pId] += amplitude * activeAngle[pId];
-      pAngle[pId] = fmod(pAngle[pId], 2.0 * M_PI);
+      pAngle[pId] = fmod(pAngle[pId], 2.0 * PI);
       if (pAngle[pId] < 0) {
-          pAngle[pId] += 2.0 * M_PI;
+          pAngle[pId] += 2.0 * PI;
       }
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
@@ -1382,7 +1430,7 @@ void SP2D::addSelfPropulsion() {
       }
     };
 
-    thrust::for_each(r, r + numParticles, langevinUpdateActiveNoise2D);
+    thrust::for_each(r, r + numParticles, updateActiveNoise2D);
 
   } else if(nDim == 3) {
     auto s = thrust::counting_iterator<long>(0);
@@ -1404,7 +1452,7 @@ void SP2D::addSelfPropulsion() {
 
     thrust::for_each(s, s + numParticles, normalizeVector);
 
-    auto langevinUpdateActiveNoise3D = [=] __device__ (long particleId) {
+    auto updateActiveNoise3D = [=] __device__ (long particleId) {
       pAngle[particleId * s_nDim] += amplitude * (pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim + 2] - pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim + 1]);
       pAngle[particleId * s_nDim + 1] += amplitude * (pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim] - pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 2]);
       pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim]);
@@ -1414,8 +1462,34 @@ void SP2D::addSelfPropulsion() {
       }
     };
 
-    thrust::for_each(r, r + numParticles, langevinUpdateActiveNoise3D);
+    thrust::for_each(r, r + numParticles, updateActiveNoise3D);
   }
+}
+
+void SP2D::addVicsekAlignment() {
+  int s_nDim(nDim);
+  double s_driving(driving);
+  auto r = thrust::counting_iterator<long>(0);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  const double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
+  double* pForce = thrust::raw_pointer_cast(&(d_particleForce[0]));
+	if(nDim == 2) {
+    auto updateVicsekAlignment2D = [=] __device__ (long pId) {
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, updateVicsekAlignment2D);
+  }
+}
+
+void SP2D::calcVicsekAlignment() {
+  checkVicsekNeighbors();
+  const double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
+  double* pAlpha = thrust::raw_pointer_cast(&(d_particleAlpha[0]));
+  kernelCalcVicsekAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
 }
 
 void SP2D::addParticleWallInteraction() {
@@ -1452,6 +1526,9 @@ void SP2D::calcParticleForceEnergy() {
   calcParticleInteraction();
   if(simControl.particleType == simControlStruct::particleEnum::active) {
     addSelfPropulsion();
+  } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    addVicsekAlignment();
+    calcVicsekAlignment();
   }
   if(simControl.geometryType != simControlStruct::geometryEnum::normal) {
     addParticleWallInteraction();
@@ -2018,6 +2095,12 @@ thrust::host_vector<long> SP2D::getParticleNeighbors() {
   return partNeighborListFromDevice;
 }
 
+thrust::host_vector<long> SP2D::getVicsekNeighbors() {
+  thrust::host_vector<long> vicsekNeighborListFromDevice;
+  vicsekNeighborListFromDevice = d_vicsekNeighborList;
+  return vicsekNeighborListFromDevice;
+}
+
 void SP2D::calcParticleNeighbors(double cutDistance) {
   switch (simControl.neighborType) {
     case simControlStruct::neighborEnum::neighbor:
@@ -2071,30 +2154,45 @@ void SP2D::syncParticleNeighborsToDevice() {
   if(cudaGetLastError()) cout << "SP2D::syncParticleNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
-void SP2D::calcParticleBoxNeighborList(double cutDistance) {
-  thrust::fill(d_partMaxNeighborList.begin(), d_partMaxNeighborList.end(), 0);
-	thrust::fill(d_partNeighborList.begin(), d_partNeighborList.end(), -1L);
-  syncParticleNeighborsToDevice();
+void SP2D::calcVicsekNeighborList() {
+  thrust::fill(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), 0);
+	thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
+  syncVicsekNeighborsToDevice();
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 
-  kernelCalcParticleBoxNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, cutDistance);
+  kernelCalcVicsekNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rvicsek);
   // compute maximum number of neighbors per particle
-  partMaxNeighbors = thrust::reduce(d_partMaxNeighborList.begin(), d_partMaxNeighborList.end(), -1L, thrust::maximum<long>());
-  syncParticleNeighborsToDevice();
-  //cout << "SP2D::calcParticleNeighborList: maxNeighbors: " << partMaxNeighbors << endl;
+  if(cudaGetLastError()) cout << "SP2D::calcVicsekNeighborList():: cudaGetLastError(): " << cudaGetLastError() << endl;
+  vicsekMaxNeighbors = thrust::reduce(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), -1L, thrust::maximum<long>());
+  syncVicsekNeighborsToDevice();
+  //cout << "SP2D::calcVicsekNeighborList: vicsekMaxNeighbors: " << vicsekMaxNeighbors << endl;
 
   // if the neighbors don't fit, resize the neighbor list
-  if ( partMaxNeighbors > partNeighborListSize ) {
-		partNeighborListSize = pow(2, ceil(std::log2(partMaxNeighbors)));
-    //cout << "SP2D::calcParticleNeighborList: neighborListSize: " << neighborListSize << endl;
+  if ( vicsekMaxNeighbors > vicsekNeighborListSize ) {
+		vicsekNeighborListSize = pow(2, ceil(std::log2(vicsekMaxNeighbors)));
+    //cout << "SP2D::calcVicsekNeighborList: vicsekNeighborListSize: " << vicsekNeighborListSize << endl;
 		//Now create the actual storage and then put the neighbors in it.
-		d_partNeighborList.resize(numParticles * partNeighborListSize);
+		d_vicsekNeighborList.resize(numParticles * vicsekNeighborListSize);
 		//Pre-fill the neighborList with -1
-		thrust::fill(d_partNeighborList.begin(), d_partNeighborList.end(), -1L);
-		syncParticleNeighborsToDevice();
-		kernelCalcParticleNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, cutDistance);
+		thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
+		syncVicsekNeighborsToDevice();
+		kernelCalcVicsekNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rvicsek);
 	}
+}
+
+void SP2D::syncVicsekNeighborsToDevice() {
+  cudaDeviceSynchronize();
+	//Copy the pointers and information about neighbors to the gpu
+	cudaMemcpyToSymbol(d_vicsekNeighborListSize, &vicsekNeighborListSize, sizeof(vicsekNeighborListSize));
+	cudaMemcpyToSymbol(d_vicsekMaxNeighbors, &vicsekMaxNeighbors, sizeof(vicsekMaxNeighbors));
+
+	long* vicsekMaxNeighborList = thrust::raw_pointer_cast(&d_vicsekMaxNeighborList[0]);
+	cudaMemcpyToSymbol(d_vicsekMaxNeighborListPtr, &vicsekMaxNeighborList, sizeof(vicsekMaxNeighborList));
+
+	long* vicsekNeighborList = thrust::raw_pointer_cast(&d_vicsekNeighborList[0]);
+	cudaMemcpyToSymbol(d_vicsekNeighborListPtr, &vicsekNeighborList, sizeof(vicsekNeighborList));
+  if(cudaGetLastError()) cout << "SP2D::syncVicsekNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
 void SP2D::calcParticleContacts(double gapSize) {

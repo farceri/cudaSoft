@@ -22,7 +22,7 @@ using std::string;
 using std::tuple;
 
 struct simControlStruct {
-  enum class particleEnum {passive, active} particleType;
+  enum class particleEnum {passive, active, vicsek} particleType;
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -70,6 +70,8 @@ public:
   double ec;
   // self-propulsion parameters
   double driving, taup;
+  // Vicsek velocity interaction parameters
+  double Jvicsek, Rvicsek;
   // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
@@ -101,6 +103,8 @@ public:
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
   thrust::device_vector<double> d_particleAngle;
+  thrust::device_vector<double> d_particleOmega;
+  thrust::device_vector<double> d_particleAlpha;
   thrust::device_vector<double> d_activeAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
@@ -112,6 +116,7 @@ public:
   // correlation variables
   thrust::device_vector<double> d_particleInitPos;
   thrust::device_vector<double> d_particleLastPos;
+  thrust::device_vector<double> d_vicsekLastPos;
 	thrust::device_vector<double> d_particleDelta;
   thrust::device_vector<double> d_particleDisp;
 
@@ -129,6 +134,13 @@ public:
 	long partNeighborListSize;
   long neighborLimit;
 
+  // Vicsek interaction list
+  thrust::device_vector<long> d_vicsekNeighborList;
+  thrust::device_vector<long> d_vicsekMaxNeighborList;
+  long vicsekMaxNeighbors;
+	long vicsekNeighborListSize;
+  long vicsekNeighborLimit;
+
   double checkGPUMemory();
 
   void initParticleVariables(long numParticles_);
@@ -138,6 +150,8 @@ public:
   void initContacts(long numParticles_);
 
   void initParticleNeighbors(long numParticles_);
+
+  void initVicsekNeighbors(long numParticles_);
 
   //setters and getters
   void syncSimControlToDevice();
@@ -220,6 +234,8 @@ public:
 
   void resetLastPositions();
 
+  void resetVicsekLastPositions();
+
   void setInitialPositions();
 
   thrust::host_vector<double> getLastPositions();
@@ -254,6 +270,8 @@ public:
 
   void checkParticleNeighbors();
 
+  void checkVicsekNeighbors();
+
   double getParticleMaxDisplacement();
 
   void checkParticleDisplacement();
@@ -285,7 +303,7 @@ public:
 
   void scaleParticleVelocity(double scale);
 
-  void computeParticleAngleFromVel();
+  void initializeParticleAngles();
 
   // force and energy
   void setEnergyCostant(double ec_);
@@ -295,6 +313,9 @@ public:
 
   void setSelfPropulsionParams(double driving_, double taup_);
   void getSelfPropulsionParams(double &driving_, double &taup_);
+
+  void setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_);
+  void getVicsekParams(double &driving_, double &Jvicsek_, double &Rvicsek_);
 
   void setAdhesionParams(double l1_, double l2_);
 
@@ -324,6 +345,10 @@ public:
   void calcParticleInteraction();
 
   void addSelfPropulsion();
+
+  void addVicsekAlignment();
+
+  void calcVicsekAlignment();
 
   void addParticleWallInteraction();
 
@@ -417,13 +442,17 @@ public:
   // contacts and neighbors
   thrust::host_vector<long> getParticleNeighbors();
 
+  thrust::host_vector<long> getVicsekNeighbors();
+
   void calcParticleNeighbors(double cutDistance);
 
   void calcParticleNeighborList(double cutDistance);
 
   void syncParticleNeighborsToDevice();
 
-  void calcParticleBoxNeighborList(double cutDistance);
+  void calcVicsekNeighborList();
+
+  void syncVicsekNeighborsToDevice();
 
   void calcParticleContacts(double gapSize);
 

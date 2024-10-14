@@ -12,9 +12,12 @@
 #include <random>
 
 using namespace std;
-// particle updates
+// position updates
 __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const double timeStep);
 __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, const double timeStep);
+// angle updates
+__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep);
+__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep);
 // momentum conservation
 __global__ void kernelConserveParticleMomentum(double* pVel);
 __global__ void kernelConserveSubSetMomentum(double* pVel, const long firstIndex);
@@ -138,6 +141,11 @@ void SoftParticleLangevin2::updateVelocity(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleVel);
+  if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));
+    const double* pAlpha = thrust::raw_pointer_cast(&(sp_->d_particleAlpha[0]));
+    kernelUpdateParticleOmega<<<sp_->dimGrid, sp_->dimBlock>>>(pOmega, pAlpha, timeStep);
+  }
 }
 
 void SoftParticleLangevin2::updatePosition(double timeStep) {
@@ -156,6 +164,11 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticlePos);
+  if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    double* pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
+    const double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));
+    kernelUpdateParticleAngle<<<sp_->dimGrid, sp_->dimBlock>>>(pAngle, pOmega, timeStep);
+  }
 }
 
 //************** soft particle langevin with massive particles ***************//
