@@ -97,9 +97,9 @@ int main(int argc, char **argv) {
           }
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
-          //if(initialStep != 0) {
-          inDir = outDir;
-          //}
+          if(initialStep != 0) {
+            inDir = outDir;
+          }
         } else {
           std::experimental::filesystem::create_directory(outDir);
         }
