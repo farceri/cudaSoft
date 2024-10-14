@@ -100,6 +100,9 @@ inline __device__ void cartesianToPolar(const double* vec, double &r, double &th
     // Compute radial distance and angle wrt the origin
     r = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
     theta = atan2(vec[1], vec[0]);
+	if (theta < 0) {
+		theta += 2 * PI;
+	}
 }
 
 inline __device__ double pbcAngle(double deltaTheta) {
@@ -1229,6 +1232,63 @@ __global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const 
 			default:
 			break;
 			}
+		}
+	}
+}
+
+__global__ void kernelReflectParticleRoundBox(const double* pRad, const double* pPos, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		// check if particle is far from the origin more than the box radius R minus the particle radius
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		if((d_boxRadius - thisR) < thisRad) {
+			wallPos[0] = d_boxRadius * cos(thisTheta);
+			wallPos[1] = d_boxRadius * sin(thisTheta);
+			auto wallAngle = atan2(wallPos[1], wallPos[0]);
+			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			auto reflectAngle = velAngle - wallAngle;
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			//if(particleId < 10) printf("particleId %ld velocity before collision: %lf %lf\n", particleId, pVel[particleId * d_nDim], pVel[particleId * d_nDim + 1]);
+			//if(particleId < 10) printf("particleId %ld collision angle %lf velocity dot n: %lf\n", particleId, reflectAngle, vDotn);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+			//if(particleId < 10) printf("particleId %ld velocity after collision: %lf %lf\n", particleId, pVel[particleId * d_nDim], pVel[particleId * d_nDim + 1]);
+		}
+	}
+}
+
+__global__ void kernelReflectParticleRoundBoxWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		// check if particle is far from the origin more than the box radius R minus the particle radius
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		if((d_boxRadius - thisR) < thisRad) {
+			wallPos[0] = d_boxRadius * cos(thisTheta);
+			wallPos[1] = d_boxRadius * sin(thisTheta);
+			auto wallAngle = atan2(wallPos[1], wallPos[0]);
+			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			auto reflectAngle = velAngle - wallAngle;
+			// add Gaussian noise to the angle of reflection
+			reflectAngle += randAngle[particleId];
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
 	}
 }

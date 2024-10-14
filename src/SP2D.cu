@@ -51,7 +51,7 @@ SP2D::SP2D(long nParticles, long dim) {
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
-	simControl.boxType = simControlStruct::boxEnum::harmonic;
+	simControl.boxType = simControlStruct::boxEnum::WCA;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
 	syncSimControlToDevice();
   // default parameters
@@ -244,24 +244,18 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
   if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
     cout << "SP2D::setPotentialType: potentialType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
     cout << "SP2D::setPotentialType: potentialType: adhesive" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
-    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJWCA" << endl;
   } else {
     cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
@@ -280,8 +274,14 @@ void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
     cout << "SP2D::setBoxType: boxType: harmonic" << endl;
   } else if(simControl.boxType == simControlStruct::boxEnum::WCA) {
     cout << "SP2D::setBoxType: boxType: WCA" << endl;
+  } else if(simControl.boxType == simControlStruct::boxEnum::reflect) {
+    cout << "SP2D::setBoxType: boxType: reflect" << endl;
+  } else if(simControl.boxType == simControlStruct::boxEnum::reflectnoise) {
+    d_activeAngle.resize(numParticles);
+    thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
+    cout << "SP2D::setBoxType: boxType: reflectnoise" << endl;
   } else {
-    cout << "SP2D::setBoxType: please specify valid boxType: on or off" << endl;
+    cout << "SP2D::setBoxType: please specify valid boxType: harmonic, WCA, reflect and reflectnoise" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -940,6 +940,7 @@ void SP2D::checkVicsekNeighbors() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *vLastPos = thrust::raw_pointer_cast(&d_vicsekLastPos[0]);
   thrust::device_vector<int> recalcFlag(d_particleRad.size());
+  thrust::fill(recalcFlag.begin(), recalcFlag.end(), int(0));
   int *flag = thrust::raw_pointer_cast(&recalcFlag[0]);
   kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, vLastPos, flag, Rvicsek);
   int sumFlag = thrust::reduce(recalcFlag.begin(), recalcFlag.end(), int(0), thrust::plus<int>());
@@ -947,6 +948,7 @@ void SP2D::checkVicsekNeighbors() {
     calcVicsekNeighborList();
     resetVicsekLastPositions();
     updateCount += 1;
+    //cout << "UPDATE VICSEK NEIGHBORS" << endl;
   }
 }
 
@@ -1497,6 +1499,7 @@ void SP2D::addParticleWallInteraction() {
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
@@ -1508,8 +1511,23 @@ void SP2D::addParticleWallInteraction() {
     kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
     case simControlStruct::geometryEnum::roundBox:
-    kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-    break;
+    switch (simControl.boxType) {
+      case simControlStruct::boxEnum::harmonic:
+      kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+      break;
+      case simControlStruct::boxEnum::WCA:
+      kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+      break;
+      case simControlStruct::boxEnum::reflect:
+      kernelReflectParticleRoundBox<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+      break;
+      case simControlStruct::boxEnum::reflectnoise:
+      thrust::counting_iterator<long> index_sequence_begin(lrand48());
+      thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,2.f * PI));
+	    const double *randAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
+      kernelReflectParticleRoundBoxWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
+      break;
+    }
     default:
     break;
 	}
@@ -1527,8 +1545,8 @@ void SP2D::calcParticleForceEnergy() {
   if(simControl.particleType == simControlStruct::particleEnum::active) {
     addSelfPropulsion();
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
-    addVicsekAlignment();
     calcVicsekAlignment();
+    addVicsekAlignment();
   }
   if(simControl.geometryType != simControlStruct::geometryEnum::normal) {
     addParticleWallInteraction();

@@ -26,7 +26,7 @@ struct simControlStruct {
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
-  enum class boxEnum {harmonic, WCA} boxType;
+  enum class boxEnum {harmonic, WCA, reflect, reflectnoise} boxType;
   enum class gravityEnum {on, off} gravityType;
 };
 

@@ -31,15 +31,15 @@ int main(int argc, char **argv) {
   bool readNH = false, activeDir = true, justRun = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
-  bool fixedbc = false, roundbc = true, fixedSides = false;
+  bool fixedbc = false, roundbc = true, reflect = false, fixedSides = false;
   bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[12]), ew = ec, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
+  double ec = atof(argv[12]), ew = 1e02, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
-  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 2*LJcut, range = 3;
-  std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "active";
+  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 4*LJcut, range = 3;
+  std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "vicsek";
   //thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
     LJcut = 2.5;
@@ -67,19 +67,26 @@ int main(int argc, char **argv) {
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    whichDynamics = "active-wca/";
+    whichDynamics = "vicsek-wca/";
   } else {
-    whichDynamics = "active/";
+    whichDynamics = "vicsek/";
     cout << "Setting default harmonic potential" << endl;
   }
+  if(reflect == true) {
+    sp.setBoxType(simControlStruct::boxEnum::reflect);
+  }
   if(activeDir == true) {
-    whichDynamics = "tp";
+    if(reflect == true) {
+      whichDynamics = "reflect-jvicsek";
+    } else {
+      whichDynamics = "jvicsek";
+    }
     dirSample = whichDynamics + argv[4] + "-f0" + argv[5] + "/";
   } else {
     if(readNH == true) {
       dirSample = whichDynamics + "T" + argv[3] + "/";
     } else {
-      dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+      dirSample = whichDynamics + "jvicsek" + argv[4] + "-f0" + argv[5] + "/";
     }
   }
   ioSPFile ioSP(&sp);
@@ -100,7 +107,7 @@ int main(int argc, char **argv) {
       if(runDynamics == true) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
-          outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+          outDir = outDir + "damping" + argv[8] + "/jvicsek" + argv[4] + "-f0" + argv[5] + "/";
         }
         if(logSave == true) {
           inDir =	outDir;
@@ -168,7 +175,7 @@ int main(int argc, char **argv) {
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
-  cout << "Vicsek - driving: " << driving << " alignement: " << Jvicsek << endl;
+  cout << "Vicsek - alignement: " << Jvicsek << " driving: " << driving << endl;
   damping /= timeUnit;
   driving *= forceUnit;
   Jvicsek *= timeUnit;
