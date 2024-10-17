@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, nve = false, noseHoover = false, scaleVel = false;
-  bool roundbc = true, fixedbc = false, lj = true, wca = false, gforce = false, alltoall = false;
+  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
+  bool fixedbc = false, roundbc = true, lj = true, wca = false, gforce = false, alltoall = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
@@ -47,12 +47,15 @@ int main(int argc, char **argv) {
   sp.setEnergyCostant(ec);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
   } else if(roundbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setBoxEnergyScale(ew);
   } else if(gforce == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+    sp.setBoxEnergyScale(ew);
   } else {
-    cout << "Setting default rectangular geometry" << endl;
+    cout << "Setting default rectangular geometry with periodic boundary conditions" << endl;
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
@@ -69,6 +72,8 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
+    // use harmonic potential for FIRE minimization
+    sp.setBoxType(simControlStruct::boxEnum::harmonic);
     // initialize polydisperse packing
     if(roundbc == true) {
       sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
@@ -113,6 +118,7 @@ int main(int argc, char **argv) {
     cout << "Setting WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;
+    sp.setBoxType(simControlStruct::boxEnum::harmonic);
   }
   if(gforce == true) {
     sp.setGravityType(simControlStruct::gravityEnum::on);
@@ -178,6 +184,11 @@ int main(int argc, char **argv) {
       }
       if(step % saveEnergyFreq == 0) {
         ioSP.saveSimpleEnergy(step, timeStep, numParticles);
+        if(nve == true) {
+          if(abs(sp.getParticleTemperature() - Tinject) > 1e-02) {
+            sp.rescaleParticleVelocity(Tinject);
+          }
+        }
       }
       if(step % printFreq == 0) {
         cout << "Compression: current step: " << step;

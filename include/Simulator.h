@@ -40,6 +40,7 @@ public:
   thrust::device_vector<double> d_rando;
   thrust::device_vector<double> d_pActiveAngle; // for decoupled rotation and activity angles
   thrust::device_vector<double> d_thermalVel; // for brownian noise of soft particles
+  thrust::device_vector<double> d_velSum; // for computing velocity drift
 
   SimInterface() = default;
   SimInterface(SP2D * spPtr, SimConfig config):sp_(spPtr),config(config){}

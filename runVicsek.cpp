@@ -49,8 +49,10 @@ int main(int argc, char **argv) {
   sp.setParticleType(simControlStruct::particleEnum::vicsek);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
   } else if(roundbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setBoxEnergyScale(ew);
   } else if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setBoxEnergyScale(ew);

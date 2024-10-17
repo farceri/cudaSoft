@@ -540,12 +540,12 @@ inline __device__ double calcWallWCAInteraction(const double* thisPos, const dou
 	auto ratio6 = pow(ratio, 6);
 	auto ratio12 = ratio6 * ratio6;
 	if (distance < (WCAcut * radSum)) {
-		auto gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
+		auto gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance;
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 	    	currentForce[dim] += gradMultiple * delta[dim] / distance;
 	  	}
-	  	return 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
+	  	return 0.5 * d_ew * (4 * (ratio12 - ratio6) + 1);
 	}
 	return 0.0;
 }
@@ -1236,6 +1236,65 @@ __global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const 
 	}
 }
 
+__global__ void kernelReflectParticleFixedBox(const double* pRad, const double* pPos, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		if(thisPos[0] < thisRad) {
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		}
+		if(thisPos[1] < thisRad) {
+			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
+		}
+	}
+}
+
+__global__ void kernelReflectParticleFixedSides2D(const double* pRad, const double* pPos, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		if(thisPos[1] < thisRad) {
+			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
+		}
+	}
+}
+
+__global__ void kernelReflectParticleFixedSides3D(const double* pRad, const double* pPos, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		if(thisPos[2] < thisRad) {
+			pVel[particleId * d_nDim + 2] = -pVel[particleId * d_nDim + 2];
+		} else if((d_boxSizePtr[2] - thisPos[2]) < thisRad) {
+			pVel[particleId * d_nDim + 2] = -pVel[particleId * d_nDim + 2];
+		}
+	}
+}
+
 __global__ void kernelReflectParticleRoundBox(const double* pRad, const double* pPos, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
@@ -1261,6 +1320,45 @@ __global__ void kernelReflectParticleRoundBox(const double* pRad, const double* 
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 			//if(particleId < 10) printf("particleId %ld velocity after collision: %lf %lf\n", particleId, pVel[particleId * d_nDim], pVel[particleId * d_nDim + 1]);
+		}
+	}
+}
+
+__global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		if(thisPos[0] < thisRad) {
+			// add Gaussian noise to the angle of reflection
+			auto reflectAngle = randAngle[particleId];
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
+			// add Gaussian noise to the angle of reflection
+			auto reflectAngle = PI + randAngle[particleId];
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+		}
+		if(thisPos[1] < thisRad) {
+			// add Gaussian noise to the angle of reflection
+			auto reflectAngle = 1.5 * PI + randAngle[particleId];
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			// add Gaussian noise to the angle of reflection
+			auto reflectAngle = 0.5 * PI + randAngle[particleId];
+			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
 	}
 }
@@ -1790,82 +1888,38 @@ __global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, 
   	}
 }
 
-__global__ void kernelConserveParticleMomentum(double* pVel) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	__shared__ double COMP[MAXDIM];
-  	if (threadIdx.x == 0) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			COMP[dim] = 0.0;
-		}
-  	}
-  	__syncthreads();
-
-  	if (particleId < d_numParticles) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&COMP[dim], pVel[particleId * d_nDim + dim]);
-    	}
-	}
-  	__syncthreads();
-
-  	if (threadIdx.x == 0) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			COMP[dim] /= d_numParticles;
-		}
-  	}
-  	__syncthreads();
-
-  	if (particleId < d_numParticles) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			pVel[particleId * d_nDim + dim] -= COMP[dim];
-		}
-  	}
-}
-
-__global__ void kernelConserveSubSetMomentum(double* pVel, const long firstId) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	__shared__ double COMP[MAXDIM];
-  	if (threadIdx.x == 0) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			COMP[dim] = 0.0;
-		}
-	}
-  	__syncthreads();
-
-  	if (particleId < d_numParticles && particleId > firstId) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&COMP[dim], pVel[particleId * d_nDim + dim]);
-    	}
-  	}
-  	__syncthreads();
-
-  	if (threadIdx.x == 0) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			COMP[dim] /= (d_numParticles - firstId);
-		}
-  	}
-  	__syncthreads();
-
-  	if (particleId < d_numParticles && particleId > firstId) {
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			pVel[particleId * d_nDim + dim] -= COMP[dim];
-		}
-  	}
-}
-
-__global__ void kernelSumParticleVelocity(const double* pVel, double* velSum) {
+__global__ void kernelSumParticleVelocity(double* pVel, double* velSum) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&velSum[dim], pVel[particleId * d_nDim + dim]);
+			velSum[dim] += pVel[particleId * d_nDim + dim];
 		}
 	}
 }
 
-__global__ void kernelSubtractParticleDrift(double* pVel, const double* velSum) {
+__global__ void kernelSubtractParticleDrift(double* pVel, double* velSum) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&pVel[particleId * d_nDim + dim], -velSum[dim]/d_numParticles);
+			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
+		}
+	}
+}
+
+__global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, long firstId) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles && particleId > firstId) {
+		for (long dim = 0; dim < d_nDim; dim++) {
+			velSum[dim] += pVel[particleId * d_nDim + dim];
+		}
+	}
+}
+
+__global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, long firstId) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles && particleId > firstId) {
+		for (long dim = 0; dim < d_nDim; dim++) {
+			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
 		}
 	}
 }

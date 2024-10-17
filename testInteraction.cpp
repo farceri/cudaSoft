@@ -23,7 +23,8 @@ using std::cout;
 
 int main(int argc, char **argv) {
   bool read = true, readState = true, saveFinal = false, linSave = true;
-  bool doublelj = true, lj = false, wca = false, alltoall = true, fixedbc = false;
+  bool doublelj = false, lj = false, wca = false, alltoall = true;
+  bool fixedbc = false, roundbc = true, reflect = false, reflectnoise = false;
   long step = 0, numParticles = atol(argv[4]), nDim = 2, maxStep = atof(argv[3]), updateCount = 0, num1 = 1;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   double ec = 1, LJcut = 4, cutoff = 0.2, cutDistance, timeStep = atof(argv[2]), sigma, timeUnit, size;
@@ -34,6 +35,19 @@ int main(int argc, char **argv) {
   SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+  } else {
+    cout << "Setting periodic boundary conditins" << endl;
+  }
+  if(fixedbc == true || roundbc == true) {
+    if(reflect == true) {
+      sp.setBoxType(simControlStruct::boxEnum::reflect);
+    } else if(reflectnoise == true) {
+      sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
+    } else {
+      cout << "Setting WCA repulsive walls" << endl;
+    }
   }
   sp.setEnergyCostant(ec);
   if(lj == true) {
@@ -51,8 +65,9 @@ int main(int argc, char **argv) {
     cout << "Setting double Lennard-Jones potential" << endl;
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
-    cout << "Setting Harmonic potential" << endl;
     dirSample = "harmonic/";
+    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    cout << "Setting Harmonic potential between particles and walls" << endl;
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);

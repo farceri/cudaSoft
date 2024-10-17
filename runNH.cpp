@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ec = 2, Tinject = atof(argv[3]), mass = 10, damping = 1;
+  double ec = 2, ew = ec, Tinject = atof(argv[3]), mass = 10, damping = 1;
   std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nh2/";
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(nDim == 3) {
@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {

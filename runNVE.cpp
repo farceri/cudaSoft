@@ -31,13 +31,14 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[9]), LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  double ec = atof(argv[9]), ew = ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nve";
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
   }
   if(readNH == true) {
     whichDynamics = "nh";

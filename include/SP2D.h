@@ -106,6 +106,7 @@ public:
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
   thrust::device_vector<double> d_activeAngle;
+  thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
   thrust::device_vector<long> d_wallCount;
@@ -352,6 +353,12 @@ public:
 
   void addParticleWallInteraction();
 
+  void calcParticleWallInteraction();
+
+  void reflectParticleOnWall();
+
+  void reflectParticleOnWallWithNoise();
+
   void addParticleGravity();
 
   void calcParticleForceEnergy();
@@ -467,10 +474,6 @@ public:
 
   void particleFIRELoop();
 
-  void computeParticleDrift();
-
-  void conserveParticleMomentum();
-
   // NVT integrators
   void initSoftParticleLangevin(double Temp, double gamma, bool readState);
 
@@ -500,6 +503,8 @@ public:
   void initSoftParticleNVE(double Temp, bool readState);
 
   void softParticleNVELoop();
+
+  void rescaleParticleVelocity(double Temp);
 
   void initSoftParticleNVERescale(double Temp);
 

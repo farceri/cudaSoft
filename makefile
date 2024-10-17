@@ -23,6 +23,7 @@ CC_LIBS= -lstdc++fs
 
 # NVCC compiler options:
 NVCC=/usr/bin/nvcc
+#NVCC=nvcc
 NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr #-g -G
 NVCC_LIBS=
 
@@ -54,7 +55,7 @@ INC_DIR = include
 
 # Target executable name:
 
-#EXE = testSP
+#EXE = testDynamics
 #EXE = testInteraction
 
 # make packings

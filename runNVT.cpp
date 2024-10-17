@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   bool readNH = false, dampingDir = true, justRun = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
-  bool fixedbc = false, roundbc = true, fixedSides = false;
+  bool fixedbc = false, roundbc = true, fixedSides = false, reflect = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -44,16 +44,6 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-  } else if(fixedSides == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxEnergyScale(ew);
-  }else {
-    cout << "Setting default rectangular geometry" << endl;
-  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -68,6 +58,22 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = "langevin/";
     cout << "Setting default harmonic potential" << endl;
+    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+  }
+  if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setBoxEnergyScale(ew);
+  } else if(fixedSides == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+    sp.setBoxEnergyScale(ew);
+  }else {
+    cout << "Setting default rectangular geometry" << endl;
+  }
+  if(reflect == true) {
+    sp.setBoxType(simControlStruct::boxEnum::reflect);
   }
   if(dampingDir == true) {
     whichDynamics = "damping";

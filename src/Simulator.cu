@@ -19,8 +19,10 @@ __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, cons
 __global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep);
 __global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep);
 // momentum conservation
-__global__ void kernelConserveParticleMomentum(double* pVel);
-__global__ void kernelConserveSubSetMomentum(double* pVel, const long firstIndex);
+__global__ void kernelSumParticleVelocity(double* pVel, double* velSum);
+__global__ void kernelSubtractParticleDrift(double* pVel, double* velSum);
+__global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, long firstId);
+__global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, long firstId);
 
 
 //************************* soft particle langevin ***************************//
@@ -40,8 +42,7 @@ void SoftParticleLangevin::injectKineticEnergy() {
   // generate random numbers between 0 and noiseVar for thermal noise
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude));
-  double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+  conserveMomentum();
 }
 
 void SoftParticleLangevin::updatePosition(double timeStep) {
@@ -79,8 +80,12 @@ void SoftParticleLangevin::updateThermalVel() {
 }
 
 void SoftParticleLangevin::conserveMomentum() {
+  d_velSum.resize(sp_->nDim);
+  thrust::fill(d_velSum.begin(), d_velSum.end(), double(0));
+  double *velSum = thrust::raw_pointer_cast(&d_velSum[0]);
   double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+  kernelSumParticleVelocity<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, velSum);
+  kernelSubtractParticleDrift<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, velSum);
 }
 
 //************************* soft particle langevin ***************************//
@@ -272,9 +277,12 @@ void SoftParticleLangevinSubSet::updatePosition(double timeStep) {
 }
 
 void SoftParticleLangevinSubSet::conserveMomentum() {
+  d_velSum.resize(sp_->nDim);
+  thrust::fill(d_velSum.begin(), d_velSum.end(), double(0));
+  double *velSum = thrust::raw_pointer_cast(&d_velSum[0]);
   double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelConserveSubSetMomentum<<<1, sp_->dimBlock>>>(pVel, firstIndex);
-  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+  kernelSubsetSumParticleVelocity<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, velSum, firstIndex);
+  kernelSubsetSubtractParticleDrift<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, velSum, firstIndex);
 }
 
 //*************** soft particle langevin with external field *****************//
@@ -421,7 +429,6 @@ void SoftParticleNVERescale::injectKineticEnergy() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, scaleParticleVel);
-  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
 //**************** soft particle nve with velocity rescaling *****************//
@@ -456,7 +463,6 @@ void SoftParticleNVEDoubleRescale::injectKineticEnergy() {
   };
 
   thrust::for_each(r, r + sp_->num1, doubleScaleParticleVel);
-  //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
 }
 
 //************************ soft particle Nose Hoover **************************//
@@ -525,8 +531,7 @@ void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->num1 * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude1));
   thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + (sp_->numParticles - sp_->num1) * sp_->nDim, sp_->d_particleVel.begin() + sp_->num1 * sp_->nDim, gaussNum(0.f,amplitude2));
-  double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
+  conserveMomentum();
 }
 
 void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {

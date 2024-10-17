@@ -47,16 +47,6 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
-  if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-  } else if(fixedSides == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxEnergyScale(ew);
-  } else {
-    cout << "Setting default rectangular geometry" << endl;
-  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -71,6 +61,19 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = "active/";
     cout << "Setting default harmonic potential" << endl;
+    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+  }
+  if(fixedbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setBoxEnergyScale(ew);
+  } else if(fixedSides == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
+    sp.setBoxEnergyScale(ew);
+  } else {
+    cout << "Setting default rectangular geometry" << endl;
   }
   if(reflect == true) {
     sp.setBoxType(simControlStruct::boxEnum::reflect);

@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]), updateCount = 0;
   long step, maxStep = atof(argv[4]), initialStep = atol(argv[5]), checkPointFreq = int(maxStep / 10);
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
-  double ec = 1, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
+  double ec = 1, ew = ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
   double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]), range = 3;
   std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve";
   std::tuple<double, double, double> Temps;
@@ -43,6 +43,7 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setBoxEnergyScale(ew);
   }
   if(readNH == true) {
     whichDynamics = "nh";

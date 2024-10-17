@@ -62,7 +62,7 @@ SP2D::SP2D(long nParticles, long dim) {
 	l2 = 0;
   LEshift = 0;
   gravity = 0;
-  ew = 100;
+  ew = 1;
   flowSpeed = 0;
   flowDecay = 1;
   flowViscosity = 1;
@@ -277,8 +277,8 @@ void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
   } else if(simControl.boxType == simControlStruct::boxEnum::reflect) {
     cout << "SP2D::setBoxType: boxType: reflect" << endl;
   } else if(simControl.boxType == simControlStruct::boxEnum::reflectnoise) {
-    d_activeAngle.resize(numParticles);
-    thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
+    d_randomAngle.resize(numParticles);
+    thrust::fill(d_randomAngle.begin(), d_randomAngle.end(), double(0));
     cout << "SP2D::setBoxType: boxType: reflectnoise" << endl;
   } else {
     cout << "SP2D::setBoxType: please specify valid boxType: harmonic, WCA, reflect and reflectnoise" << endl;
@@ -1495,11 +1495,27 @@ void SP2D::calcVicsekAlignment() {
 }
 
 void SP2D::addParticleWallInteraction() {
+  switch (simControl.boxType) {
+    case simControlStruct::boxEnum::harmonic:
+    calcParticleWallInteraction();
+    break;
+    case simControlStruct::boxEnum::WCA:
+    calcParticleWallInteraction();
+    break;
+    case simControlStruct::boxEnum::reflect:
+    reflectParticleOnWall();
+    break;
+    case simControlStruct::boxEnum::reflectnoise:
+    reflectParticleOnWallWithNoise();
+    break;
+  }
+}
+
+void SP2D::calcParticleWallInteraction() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
-  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::fixedBox:
     kernelCalcParticleBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
@@ -1511,23 +1527,49 @@ void SP2D::addParticleWallInteraction() {
     kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
     break;
     case simControlStruct::geometryEnum::roundBox:
-    switch (simControl.boxType) {
-      case simControlStruct::boxEnum::harmonic:
-      kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-      break;
-      case simControlStruct::boxEnum::WCA:
-      kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
-      break;
-      case simControlStruct::boxEnum::reflect:
-      kernelReflectParticleRoundBox<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
-      break;
-      case simControlStruct::boxEnum::reflectnoise:
-      thrust::counting_iterator<long> index_sequence_begin(lrand48());
-      thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,2.f * PI));
-	    const double *randAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
-      kernelReflectParticleRoundBoxWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
-      break;
-    }
+    kernelCalcParticleRoundBoxInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    break;
+    default:
+    break;
+  }
+}
+
+void SP2D::reflectParticleOnWall() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  switch (simControl.geometryType) {
+    case simControlStruct::geometryEnum::fixedBox:
+    kernelReflectParticleFixedBox<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    break;
+    case simControlStruct::geometryEnum::fixedSides2D:
+    kernelReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    break;
+    case simControlStruct::geometryEnum::fixedSides3D:
+    kernelReflectParticleFixedSides3D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    break;
+		case simControlStruct::geometryEnum::roundBox:
+    kernelReflectParticleRoundBox<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    break;
+    default:
+    break;
+	}
+}
+
+void SP2D::reflectParticleOnWallWithNoise() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randomAngle.begin(), randNum(0.f,2.f * PI));
+  const double *randAngle = thrust::raw_pointer_cast(&d_randomAngle[0]);
+  switch (simControl.geometryType) {
+		case simControlStruct::geometryEnum::fixedBox:
+    kernelReflectParticleFixedBoxWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
+    break;
+		case simControlStruct::geometryEnum::roundBox:
+    kernelReflectParticleRoundBoxWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
+    break;
     default:
     break;
 	}
@@ -2289,19 +2331,6 @@ void SP2D::particleFIRELoop() {
   this->fire_->minimizerParticleLoop();
 }
 
-void SP2D::computeParticleDrift() {
-  thrust::fill(d_particleDelta.begin(), d_particleDelta.end(), double(0));
-  double *velSum = thrust::raw_pointer_cast(&d_particleDelta[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  kernelSumParticleVelocity<<<dimGrid, dimBlock>>>(pVel, velSum);
-}
-
-void SP2D::conserveParticleMomentum() {
-  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  const double *velSum = thrust::raw_pointer_cast(&d_particleDelta[0]);
-  kernelSubtractParticleDrift<<<dimGrid, dimBlock>>>(pVel, velSum);
-}
-
 //***************************** NVT integrators ******************************//
 void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
@@ -2324,10 +2353,6 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
 
 void SP2D::softParticleLangevinLoop() {
   this->sim_->integrate();
-  //computeParticleDrift();
-  //conserveParticleMomentum();
-  //computeParticleDrift();
-  //cout << "velSum: " << thrust::reduce(d_particleVel.begin(), d_particleVel.end(), double(0), thrust::plus<double>()) << endl;
 }
 
 void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
@@ -2462,6 +2487,22 @@ void SP2D::initSoftParticleNVE(double Temp, bool readState) {
 
 void SP2D::softParticleNVELoop() {
   this->sim_->integrate();
+}
+
+void SP2D::rescaleParticleVelocity(double Temp) {
+  double scale = sqrt(Temp / getParticleTemperature());
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+	double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+  auto rescaleParticleVel = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, rescaleParticleVel);
 }
 
 //******************* NVE integrator with velocity rescale *******************//
