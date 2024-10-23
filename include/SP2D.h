@@ -99,12 +99,15 @@ public:
   thrust::device_vector<double> d_particlePos;
   thrust::device_vector<double> d_particleRad;
   thrust::device_vector<double> d_particleVel;
+  thrust::device_vector<double> d_squaredVel;
   thrust::device_vector<double> d_particleLastVel;
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
+  thrust::device_vector<double> d_particleEnergyAB;
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
+  thrust::device_vector<double> d_velAlign;
   thrust::device_vector<double> d_activeAngle;
   thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
@@ -355,6 +358,8 @@ public:
 
   void calcParticleWallInteraction();
 
+  void checkParticleInsideRoundBox();
+
   void reflectParticleOnWall();
 
   void reflectParticleOnWallWithNoise();
@@ -362,6 +367,22 @@ public:
   void addParticleGravity();
 
   void calcParticleForceEnergy();
+
+  void calcVicsekVelocityAlignment();
+
+  double getVicsekVelocityAlignment();
+
+  void calcNeighborVelocityAlignment();
+
+  double getNeighborVelocityAlignment();
+
+  void calcParticleEnergyAB();
+  
+  std::tuple<double, double> getParticleEnergyAB();
+
+  void calcParticleWorkAB();
+
+  std::tuple<double, double> getParticleWorkAB();
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 

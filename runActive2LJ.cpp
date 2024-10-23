@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
       if(savePressure == true) {
         ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles, saveWall);
       } else {
-        ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       }
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {

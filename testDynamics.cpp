@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   // variables
   bool readState = true, saveFinal = true, linSave = true;
   bool lj = true, wca = false, alltoall = false, testNVT = false;
-  bool fixedbc = false, roundbc = true, reflect = false, reflectnoise = false;
+  bool fixedbc = false, roundbc = true, reflect = false, reflectnoise = true;
   long step = 0, maxStep = atof(argv[4]), checkPointFreq = int(maxStep / 10);
   long numParticles = atol(argv[5]), nDim = 2, linFreq = int(checkPointFreq / 10);
   long saveEnergyFreq = int(checkPointFreq / 10), updateCount = 0, totUpdate = 0;

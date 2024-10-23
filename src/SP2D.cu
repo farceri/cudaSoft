@@ -105,6 +105,7 @@ void SP2D::initParticleVariables(long numParticles_) {
   d_particleVel.resize(numParticles_ * nDim);
   d_particleForce.resize(numParticles_ * nDim);
   d_particleEnergy.resize(numParticles_);
+  d_squaredVel.resize(numParticles_ * nDim);
   if(nDim == 2) {
     d_particleAngle.resize(numParticles_);
   } else if(nDim == 3) {
@@ -115,6 +116,7 @@ void SP2D::initParticleVariables(long numParticles_) {
   thrust::fill(d_particleVel.begin(), d_particleVel.end(), double(0));
   thrust::fill(d_particleForce.begin(), d_particleForce.end(), double(0));
   thrust::fill(d_particleEnergy.begin(), d_particleEnergy.end(), double(0));
+  thrust::fill(d_squaredVel.begin(), d_squaredVel.end(), double(0));
   thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
 }
 
@@ -181,6 +183,8 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
       d_activeAngle.resize(numParticles * nDim);
     }
     thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
+    d_velAlign.resize(numParticles);
+    thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
     d_particleOmega.resize(numParticles);
@@ -190,6 +194,8 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     initVicsekNeighbors(numParticles);
     d_vicsekLastPos.resize(numParticles * nDim);
     thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
+    d_velAlign.resize(numParticles);
+    thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
@@ -716,23 +722,7 @@ void SP2D::setParticleAngles(thrust::host_vector<double> &particleAngle_) {
   d_particleAngle = particleAngle_;
 }
 
-void SP2D::checkParticleAngles() {
-  auto r = thrust::counting_iterator<long>(0);
-  double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
-	if(nDim == 2) {
-    auto moduloParticleAngle = [=] __device__ (long pId) {
-      pAngle[pId] = fmod(pAngle[pId], 2.0 * PI);
-      if (pAngle[pId] < 0) {
-          pAngle[pId] += 2.0 * PI;
-      }
-    };
-
-    thrust::for_each(r, r + numParticles, moduloParticleAngle);
-  }
-}
-
 thrust::host_vector<double> SP2D::getParticleAngles() {
-  //checkParticleAngles();
   thrust::host_vector<double> particleAngleFromDevice;
   particleAngleFromDevice = d_particleAngle;
   return particleAngleFromDevice;
@@ -1078,7 +1068,7 @@ void SP2D::setRoundScaledPolyRandomParticles(double phi0, double polyDispersity,
   // extract random positions
   for (long particleId = 0; particleId < numParticles; particleId++) {
     thisR = boxRadius * sqrt(drand48());
-    thisTheta = 2 * PI  * drand48();
+    thisTheta = 2 * PI  * drand48() - PI;
     d_particlePos[particleId * nDim] = thisR * cos(thisTheta);
     d_particlePos[particleId * nDim + 1] = thisR * sin(thisTheta);
   }
@@ -1187,7 +1177,7 @@ void SP2D::initializeParticleAngles() {
   long p_nDim(nDim);
   auto r = thrust::counting_iterator<long>(0);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleAngle.begin(), randNum(0.f,2.f*PI));
+  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleAngle.begin(), randNum(-PI, PI));
   if(nDim == 3) {
       double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
       const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
@@ -1273,6 +1263,8 @@ void SP2D::setLJcutoff(double LJcutoff_) {
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
+  d_squaredVel.resize(numParticles * nDim);
+  d_particleEnergyAB.resize(numParticles);
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   eAA = eAA_;
@@ -1422,9 +1414,11 @@ void SP2D::addSelfPropulsion() {
 
     auto updateActiveNoise2D = [=] __device__ (long pId) {
       pAngle[pId] += amplitude * activeAngle[pId];
-      pAngle[pId] = fmod(pAngle[pId], 2.0 * PI);
-      if (pAngle[pId] < 0) {
-          pAngle[pId] += 2.0 * PI;
+      while (pAngle[pId] > PI) {
+        pAngle[pId] -= 2 * PI;
+      }
+      while (pAngle[pId] < -PI) {
+          pAngle[pId] += 2 * PI;
       }
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
@@ -1503,9 +1497,11 @@ void SP2D::addParticleWallInteraction() {
     calcParticleWallInteraction();
     break;
     case simControlStruct::boxEnum::reflect:
+    checkParticleInsideRoundBox();
     reflectParticleOnWall();
     break;
     case simControlStruct::boxEnum::reflectnoise:
+    checkParticleInsideRoundBox();
     reflectParticleOnWallWithNoise();
     break;
   }
@@ -1532,6 +1528,12 @@ void SP2D::calcParticleWallInteraction() {
     default:
     break;
   }
+}
+
+void SP2D::checkParticleInsideRoundBox() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  kernelCheckParticleInsideRoundBox<<<dimGrid, dimBlock>>>(pRad, pPos);
 }
 
 void SP2D::reflectParticleOnWall() {
@@ -1561,7 +1563,7 @@ void SP2D::reflectParticleOnWallWithNoise() {
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randomAngle.begin(), randNum(0.f,2.f * PI));
+  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randomAngle.begin(), randNum(-PI,PI));
   const double *randAngle = thrust::raw_pointer_cast(&d_randomAngle[0]);
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::fixedBox:
@@ -1600,6 +1602,102 @@ void SP2D::calcParticleForceEnergy() {
     default:
     break;
   }
+}
+
+void SP2D::calcParticleEnergyAB() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
+	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    kernelCalcParticleEnergyAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB);
+    break;
+    default:
+    break;
+  }
+}
+
+std::tuple<double, double> SP2D::getParticleEnergyAB() {
+  calcParticleEnergyAB();
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
+  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
+  return std::make_tuple(ekin, epot);
+}
+
+void SP2D::calcParticleWorkAB() {
+  thrust::device_vector<long> d_flagAB(numParticles);
+  thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
+	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
+  if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+    kernelCalcParticleWorkAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB, flagAB);
+    // add work done by damping forces
+    double s_dt(dt);
+    long s_nDim(nDim);
+    double s_gamma(this->sim_->gamma);
+    auto r = thrust::counting_iterator<long>(0);
+
+    auto addDampingWork = [=] __device__ (long pId) {
+      if(flagAB[pId] == 1) {
+        #pragma unroll (MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pEnergyAB[pId] -= s_dt * s_gamma * pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+        }
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, addDampingWork);
+    // add work done by self-propulsion if particles are active
+    if(simControl.particleType == simControlStruct::particleEnum::active) {
+      double s_driving(driving);
+      auto s = thrust::counting_iterator<long>(0);
+      const double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+
+      auto addActiveWork = [=] __device__ (long pId) {
+        #pragma unroll (MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pEnergyAB[pId] += s_dt * s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId])) * pVel[pId * s_nDim + dim];
+        }
+      };
+
+      thrust::for_each(r, r + numParticles, addActiveWork);
+    }
+  }
+}
+
+std::tuple<double, double> SP2D::getParticleWorkAB() {
+  calcParticleWorkAB();
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
+  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
+  return std::make_tuple(ekin, work);
+}
+
+void SP2D::calcVicsekVelocityAlignment() {
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
+  kernelCalcVicsekVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, velAlign);
+}
+
+double SP2D::getVicsekVelocityAlignment() {
+  calcVicsekVelocityAlignment();
+  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0)) / numParticles;
+}
+
+void SP2D::calcNeighborVelocityAlignment() {
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
+  kernelCalcNeighborVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, velAlign);
+}
+
+double SP2D::getNeighborVelocityAlignment() {
+  calcNeighborVelocityAlignment();
+  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0)) / numParticles;
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
@@ -1947,9 +2045,8 @@ double SP2D::getParticlePotentialEnergy() {
 }
 
 double SP2D::getParticleKineticEnergy() {
-  thrust::device_vector<double> velSquared(d_particleVel.size());
-  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
-  return 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), d_squaredVel.begin(), square());
+  return 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
 }
 
 double SP2D::getDampingWork() {
@@ -2004,7 +2101,7 @@ double SP2D::getParticleTemperature() {
 }
 
 double SP2D::getParticleEnergy() {
-  return getParticlePotentialEnergy() + getParticleKineticEnergy();
+  return (getParticlePotentialEnergy() + getParticleKineticEnergy());
 }
 
 double SP2D::getParticleWork() {
@@ -2016,15 +2113,14 @@ double SP2D::getParticleWork() {
 }
 
 std::tuple<double, double, double> SP2D::getParticleKineticEnergy12() {
-  thrust::device_vector<double> velSquared(d_particleVel.size());
-  thrust::transform(d_particleVel.begin(), d_particleVel.end(), velSquared.begin(), square());
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), d_squaredVel.begin(), square());
   thrust::device_vector<double> velSq1(num1 * nDim);
   thrust::device_vector<double> velSq2((numParticles-num1) * nDim);
-  thrust::copy(velSquared.begin(), velSquared.begin() + num1 * nDim, velSq1.begin());
-  thrust::copy(velSquared.begin() + num1 * nDim, velSquared.end(), velSq2.begin());
+  thrust::copy(d_squaredVel.begin(), d_squaredVel.begin() + num1 * nDim, velSq1.begin());
+  thrust::copy(d_squaredVel.begin() + num1 * nDim, d_squaredVel.end(), velSq2.begin());
   double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>());
   double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>());
-  double ekin = 0.5 * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>());
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
   return std::make_tuple(ekin1, ekin2, ekin);
 }
 
@@ -2143,9 +2239,8 @@ void SP2D::adjustTemperature(double targetTemp) {
 
 double SP2D::getMassiveTemperature(long firstIndex, double mass) {
   // temperature computed from the massive particles which are set to be the first
-  thrust::device_vector<double> velSquared(firstIndex * nDim);
-  thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, velSquared.begin(), square());
-  return mass * thrust::reduce(velSquared.begin(), velSquared.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
+  thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, d_squaredVel.begin(), square());
+  return mass * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
 }
 
 //************************* contacts and neighbors ***************************//

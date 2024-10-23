@@ -96,26 +96,46 @@ inline __device__ double pbcDistanceLE(const double x1, const double y1, const d
 	return deltay;
 }
 
+inline __device__ void checkAngleMinusPIPlusPI(double &angle) {
+    while (angle > PI) {
+        angle -= 2 * PI;
+    }
+    while (angle < -PI) {
+        angle += 2 * PI;
+    }
+}
+
+inline __device__ void checkAngle02PI(double &angle) {
+    while (angle > 2 * PI) {
+        angle -= 2 * PI;
+    }
+    while (angle < 0) {
+        angle += 2 * PI;
+    }
+}
+
 inline __device__ void cartesianToPolar(const double* vec, double &r, double &theta) {
     // Compute radial distance and angle wrt the origin
     r = sqrt(vec[0] * vec[0] + vec[1] * vec[1]);
     theta = atan2(vec[1], vec[0]);
-	if (theta < 0) {
-		theta += 2 * PI;
-	}
 }
 
-inline __device__ double pbcAngle(double deltaTheta) {
+inline __device__ void polarToCartesian(double* vec, const double r, const double theta) {
+    // Compute cartesian coordinates from radial distance and angle
+	vec[0] = r * cos(theta);
+	vec[1] = r * sin(theta);
+}
+
+inline __device__ double calcDeltaAngle(double thisTheta, double otherTheta) {
     // Ensure angular difference is within [-π, π]
-    if (abs(deltaTheta) > M_PI) {
-        deltaTheta -= 2 * M_PI * copysign(1.0, deltaTheta);
-    }
+	auto deltaTheta = thisTheta - otherTheta;
+    checkAngleMinusPIPlusPI(deltaTheta);
     return deltaTheta;
 }
 
 inline __device__ double pbcDistanceRound(const double thisR, const double thisTheta, const double otherR, const double otherTheta) {
     // Compute the angular difference with periodic boundary conditions
-    double deltaTheta = pbcAngle(thisTheta - otherTheta);
+    double deltaTheta = calcDeltaAngle(thisTheta, otherTheta);
     // Compute Euclidean distance using polar coordinates
     return sqrt(thisR * thisR + otherR * otherR - 2 * thisR * otherR * cos(deltaTheta));
 }
@@ -263,7 +283,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 		return sqrt(distanceSq);
 		//cartesianToPolar(thisVec, r1, theta1);
 		//cartesianToPolar(otherVec, r2, theta2);
-    	//deltaTheta = pbcAngle(theta1 - theta2);
+    	//deltaTheta = calcDeltaAngle(theta1, theta2);
     	//deltaR = sqrt(r1 * r1 + r2 * r2 - 2 * r1 * r2 * cos(deltaTheta));
 		//deltaVec[0] = deltaR * cos(deltaTheta);
 		//deltaVec[1] = deltaR * sin(deltaTheta);
@@ -339,10 +359,34 @@ inline __device__ bool extractParticleNeighborPos(const long particleId, const l
   	return false;
 }
 
-inline __device__ bool extractParticleNeighborAngle(const long particleId, const long nListId, const double* pAngle, double& otherAngle) {
+inline __device__ bool extractParticleNeighborVel(const long particleId, const long nListId, const double* pVel, double* otherVel) {
 	auto otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
   	if ((particleId != otherId) && (otherId != -1)) {
+		#pragma unroll (MAXDIM)
+    	for (long dim = 0; dim < d_nDim; dim++) {
+      		otherVel[dim] = pVel[otherId * d_nDim + dim];
+    	}
+    	return true;
+  	}
+  	return false;
+}
+
+inline __device__ bool extractVicsekNeighborAngle(const long particleId, const long nListId, const double* pAngle, double& otherAngle) {
+	auto otherId = d_vicsekNeighborListPtr[particleId*d_vicsekNeighborListSize + nListId];
+  	if ((particleId != otherId) && (otherId != -1)) {
 		otherAngle = pAngle[otherId];
+    	return true;
+  	}
+  	return false;
+}
+
+inline __device__ bool extractVicsekNeighborVel(const long particleId, const long nListId, const double* pVel, double* otherVel) {
+	auto otherId = d_vicsekNeighborListPtr[particleId*d_vicsekNeighborListSize + nListId];
+  	if ((particleId != otherId) && (otherId != -1)) {
+		#pragma unroll (MAXDIM)
+    	for (long dim = 0; dim < d_nDim; dim++) {
+      		otherVel[dim] = pVel[otherId * d_nDim + dim];
+    	}
     	return true;
   	}
   	return false;
@@ -717,7 +761,7 @@ __global__ void kernelCalcParticleInteraction(const double* pRad, const double* 
 		}
 		auto thisRad = pRad[particleId];
 		pEnergy[particleId] = 0;
-		// interaction between vertices of neighbor particles
+		// interaction with neighbor particles
 		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
 				auto radSum = thisRad + otherRad;
@@ -771,7 +815,7 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
 		}
 		auto thisRad = pRad[particleId];
 		pEnergy[particleId] = 0;
-		// interaction between vertices of neighbor particles
+		// interaction with neighbor particles
 		for (long otherId = 0; otherId < d_numParticles; otherId++) {
 			if (extractOtherParticle(particleId, otherId, pPos, pRad, otherPos, otherRad)) {
 				auto radSum = thisRad + otherRad;
@@ -811,7 +855,202 @@ __global__ void kernelCalcAllToAllParticleInteraction(const double* pRad, const 
   	}
 }
 
-// particle-particle interaction
+inline __device__ double calcLJEnergy(const double* thisPos, const double* otherPos, const double radSum) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
+		return 0.5 * (4 * d_ec * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+	} else {
+		return 0.0;
+	}
+}
+
+inline __device__ double calcWCAEnergy(const double* thisPos, const double* otherPos, const double radSum) {
+	double delta[MAXDIM];
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (WCAcut * radSum)) {
+	  	return 0.5 * d_ec * (4 * (ratio12 - ratio6) + 1);
+	} else {
+		return 0.0;
+	}
+}
+
+inline __device__ double calcDoubleLJEnergy(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto forceShift = d_LJfshift / radSum;//calcDoubleLJForceShift(epsilon, radSum);
+		auto epot = 0.5 * (4 * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+		// set energy scale based on particle indices
+		if(particleId < d_num1) {
+			if(otherId < d_num1) {
+				epot *= d_eAA;
+			} else {
+				epot *= d_eAB;
+			}
+		} else {
+			if(otherId >= d_num1) {
+				epot *= d_eBB;
+			} else {
+				epot *= d_eAB;
+			}
+		}
+		return epot;
+	} else {
+		return 0.0;
+	}
+}
+
+inline __device__ double calcLJMinusPlusEnergy(const double* thisPos, const double* otherPos, const double radSum, const long particleId, const long otherId) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto sign = -1.0;
+		auto forceShift = d_LJfshift / radSum;
+		auto ecut = d_LJecut;
+		if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+			//printf("particleId %ld otherId %ld d_num1: %ld\n", particleId, otherId, d_num1);
+			sign = 1.0;
+			forceShift = d_LJfshiftPlus / radSum;
+			ecut = d_LJecutPlus;
+		}
+		auto epot = 0.5 * (4 * d_ec * (ratio12 + sign * ratio6) - ecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+		return epot;
+	} else {
+		return 0.0;
+	}
+}
+
+// AB particle-particle interaction energy
+__global__ void kernelCalcParticleEnergyAB(const double* pRad, const double* pPos, const double* pVel, double* sqVel, double* pEnergyAB) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		auto otherId = -1;
+    	double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the squared velocity and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+			sqVel[particleId * d_nDim + dim] = 0;
+		}
+		auto thisRad = pRad[particleId];
+		pEnergyAB[particleId] = 0;
+		auto isAB = false;
+		// interaction with neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+				auto radSum = thisRad + otherRad;
+				switch (d_simControl.potentialType) {
+					case simControlStruct::potentialEnum::doubleLJ:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						isAB = true;
+						pEnergyAB[particleId] += calcDoubleLJEnergy(thisPos, otherPos, radSum, particleId, otherId);
+					}
+					break;
+					case simControlStruct::potentialEnum::LJMinusPlus:
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						isAB = true;
+						pEnergyAB[particleId] += calcLJMinusPlusEnergy(thisPos, otherPos, radSum, particleId, otherId);
+					}
+					break;
+					case simControlStruct::potentialEnum::LJWCA:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						isAB = true;
+						pEnergyAB[particleId] += calcWCAEnergy(thisPos, otherPos, radSum);
+					} else {
+						pEnergyAB[particleId] += calcLJEnergy(thisPos, otherPos, radSum);
+					}
+					break;
+					default:
+					break;
+				}
+				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+		}
+		if(isAB == true) {
+			for (long dim = 0; dim < d_nDim; dim++) {
+				sqVel[particleId * d_nDim + dim] = pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+			}
+		}
+  	}
+}
+
+//AB particle-particle interaction work
+__global__ void kernelCalcParticleWorkAB(const double* pRad, const double* pPos, const double* pVel, double* sqVel, double* pEnergyAB, long* flagAB) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		auto otherId = -1;
+    	double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
+		// zero out the squared velocity and get particle positions
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+			sqVel[particleId * d_nDim + dim] = 0;
+		}
+		auto thisRad = pRad[particleId];
+		pEnergyAB[particleId] = 0;
+		flagAB[particleId] = 0;
+		// interaction with neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+				auto radSum = thisRad + otherRad;
+				switch (d_simControl.potentialType) {
+					case simControlStruct::potentialEnum::doubleLJ:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						flagAB[particleId] = 1;
+						pEnergyAB[particleId] += calcDoubleLJEnergy(thisPos, otherPos, radSum, particleId, otherId);
+					}
+					break;
+					case simControlStruct::potentialEnum::LJMinusPlus:
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						flagAB[particleId] = 1;
+						pEnergyAB[particleId] += calcLJMinusPlusEnergy(thisPos, otherPos, radSum, particleId, otherId);
+					}
+					break;
+					case simControlStruct::potentialEnum::LJWCA:
+					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
+						flagAB[particleId] = 1;
+						pEnergyAB[particleId] += calcWCAEnergy(thisPos, otherPos, radSum);
+					} else {
+						pEnergyAB[particleId] += calcLJEnergy(thisPos, otherPos, radSum);
+					}
+					break;
+					default:
+					break;
+				}
+				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
+			}
+		}
+		if(flagAB[particleId] == 1) {
+			for (long dim = 0; dim < d_nDim; dim++) {
+				sqVel[particleId * d_nDim + dim] = pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+			}
+		}
+  	}
+}
+
+// particle-particle vicsek interaction
 __global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
@@ -819,11 +1058,63 @@ __global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) 
 		// zero out the angular acceleration and get particle positions
 		pAlpha[particleId] = 0;
 		thisAngle = pAngle[particleId];
-		// interaction between vertices of neighbor particles
+		// interaction with neighbor particles
 		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractParticleNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
+			if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
 				pAlpha[particleId] -= d_Jvicsek * sin(thisAngle - otherAngle);
 			}
+		}
+  	}
+}
+
+// vicsek velocity alignment
+__global__ void kernelCalcVicsekVelocityAlignment(const double* pVel, double* velAlign) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisVel[MAXDIM], otherVel[MAXDIM];
+		auto thisVelSquared =  0.;
+		// zero out squared velocity components
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisVel[dim] = pVel[particleId * d_nDim + dim];
+			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+		}
+		velAlign[particleId] = 0.;
+		// alignment with vicsek neighbor particles
+		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
+				for (long dim = 0; dim < d_nDim; dim++) {
+					velAlign[particleId] += thisVel[dim] * otherVel[dim];
+				}
+			}
+		}
+		if(d_vicsekMaxNeighborListPtr[particleId] != 0) {
+			velAlign[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
+		}
+  	}
+}
+
+// neighbor velocity alignment
+__global__ void kernelCalcNeighborVelocityAlignment(const double* pVel, double* velAlign) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisVel[MAXDIM], otherVel[MAXDIM];
+		auto thisVelSquared =  0.;
+		// zero out squared velocity components
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisVel[dim] = pVel[particleId * d_nDim + dim];
+			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+		}
+		velAlign[particleId] = 0.;
+		// alignment with vicsek neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighborVel(particleId, nListId, pVel, otherVel)) {
+				for (long dim = 0; dim < d_nDim; dim++) {
+					velAlign[particleId] += thisVel[dim] * otherVel[dim];
+				}
+			}
+		}
+		if(d_partMaxNeighborListPtr[particleId] != 0) {
+			velAlign[particleId] /= (thisVelSquared * d_partMaxNeighborListPtr[particleId]);
 		}
   	}
 }
@@ -1236,12 +1527,33 @@ __global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const 
 	}
 }
 
+__global__ void kernelCheckParticleInsideRoundBox(const double* pRad, double* pPos) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		auto thisRad = pRad[particleId];
+		// check if particle is outside round box
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		if((d_boxRadius - thisR) < 0) {
+			auto radialDistance = thisR - d_boxRadius;
+			printf("particle %ld is outside of the box at distance %lf\n", particleId, radialDistance);
+			thisR = d_boxRadius - thisRad;
+			polarToCartesian(thisPos, thisR, thisTheta);
+			for (long dim = 0; dim < d_nDim; dim++) {
+				pPos[particleId * d_nDim + dim] = thisPos[dim];
+			}
+		}
+	}
+}
+
 __global__ void kernelReflectParticleFixedBox(const double* pRad, const double* pPos, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1263,8 +1575,6 @@ __global__ void kernelReflectParticleFixedSides2D(const double* pRad, const doub
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1281,8 +1591,6 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1298,9 +1606,7 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 __global__ void kernelReflectParticleRoundBox(const double* pRad, const double* pPos, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], wallPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
+		double thisPos[MAXDIM];
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1308,18 +1614,18 @@ __global__ void kernelReflectParticleRoundBox(const double* pRad, const double* 
 		// check if particle is far from the origin more than the box radius R minus the particle radius
 		double thisR, thisTheta;
 		cartesianToPolar(thisPos, thisR, thisTheta);
+		if(thisR > d_boxRadius) {
+			auto radialDistance = thisR - d_boxRadius;
+			printf("particle %ld is outside of the box at distance %lf\n", particleId, radialDistance);
+		}
 		if((d_boxRadius - thisR) < thisRad) {
-			wallPos[0] = d_boxRadius * cos(thisTheta);
-			wallPos[1] = d_boxRadius * sin(thisTheta);
-			auto wallAngle = atan2(wallPos[1], wallPos[0]);
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			auto reflectAngle = velAngle - wallAngle;
+			//auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			//auto reflectAngle = velAngle - thisTheta; // angle of reflection
+			//auto reflectAngle = 2 * thisTheta - velAngle; // angle of reflection in the global frame
+			auto reflectAngle = thisTheta;
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
-			//if(particleId < 10) printf("particleId %ld velocity before collision: %lf %lf\n", particleId, pVel[particleId * d_nDim], pVel[particleId * d_nDim + 1]);
-			//if(particleId < 10) printf("particleId %ld collision angle %lf velocity dot n: %lf\n", particleId, reflectAngle, vDotn);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
-			//if(particleId < 10) printf("particleId %ld velocity after collision: %lf %lf\n", particleId, pVel[particleId * d_nDim], pVel[particleId * d_nDim + 1]);
 		}
 	}
 }
@@ -1328,8 +1634,6 @@ __global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1337,25 +1641,29 @@ __global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const
 		if(thisPos[0] < thisRad) {
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = randAngle[particleId];
+			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = PI + randAngle[particleId];
+			auto reflectAngle = -PI + randAngle[particleId];
+			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
 		if(thisPos[1] < thisRad) {
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = 1.5 * PI + randAngle[particleId];
+			auto reflectAngle = -0.5 * PI + randAngle[particleId];
+			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = 0.5 * PI + randAngle[particleId];
+			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
@@ -1366,9 +1674,7 @@ __global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const
 __global__ void kernelReflectParticleRoundBoxWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], wallPos[MAXDIM];
-		// we don't zero out the force and the energy because this function always
-		// gets called after the particle-particle interaction is computed
+		double thisPos[MAXDIM];
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisPos[dim] = pPos[particleId * d_nDim + dim];
 		}
@@ -1377,12 +1683,9 @@ __global__ void kernelReflectParticleRoundBoxWithNoise(const double* pRad, const
 		double thisR, thisTheta;
 		cartesianToPolar(thisPos, thisR, thisTheta);
 		if((d_boxRadius - thisR) < thisRad) {
-			wallPos[0] = d_boxRadius * cos(thisTheta);
-			wallPos[1] = d_boxRadius * sin(thisTheta);
-			auto wallAngle = atan2(wallPos[1], wallPos[0]);
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			auto reflectAngle = velAngle - wallAngle;
 			// add Gaussian noise to the angle of reflection
+			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			auto reflectAngle = 2 * thisTheta - velAngle; // angle of reflection in the global frame
 			reflectAngle += randAngle[particleId];
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
@@ -1875,10 +2178,7 @@ __global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, 
   	if (particleId < d_numParticles) {
 		pAngle[particleId * d_nDim] += timeStep * pOmega[particleId];
   	}
-	pAngle[particleId] = fmod(pAngle[particleId], 2.0 * PI);
-    if (pAngle[particleId] < 0) {
-        pAngle[particleId] += 2.0 * PI;
-    }
+	checkAngleMinusPIPlusPI(pAngle[particleId]);
 }
 
 __global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep) {

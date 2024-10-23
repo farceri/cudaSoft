@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, dampingDir = true, justRun = false;
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // variables
   bool readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {

@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false, justRun = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "dynamics/";
+    outDir = inDir + "dynamics1/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -122,6 +122,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
   }
+  cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
@@ -181,7 +182,7 @@ int main(int argc, char **argv) {
       if(doubleT == true) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles, num1);
       } else {
-        ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveSimpleEnergyAB(step+initialStep, timeStep, numParticles);
         //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
       }
       if(step % checkPointFreq == 0) {

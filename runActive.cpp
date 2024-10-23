@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool fixedbc = false, roundbc = true, reflect = false, fixedSides = false;
+  bool fixedbc = false, fixedSides = false, roundbc = true, reflect = false, reflectnoise = false;
   bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -204,6 +204,9 @@ int main(int argc, char **argv) {
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
   // run integrator
+  if(sp.getBoxType() == simControlStruct::boxEnum::reflect) {
+    cout << "BOX TYPE: reflective" << endl;
+  }
   while(step != maxStep) {
     //sp.softParticleActiveLangevinLoop();
     sp.softParticleLangevinLoop();
@@ -211,7 +214,7 @@ int main(int argc, char **argv) {
       //if(saveWork == true) {
       //  ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
       //}
-      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveActiveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
