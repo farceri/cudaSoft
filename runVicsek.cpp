@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
   // read directory denoted by T and save in new directory denoted by T: readAndMakeNewDir = true
   // read directory denoted by T and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   // read NH directory denoted by T for all previous options: readNH = true
-  // save in "active" directory for all the previous options: activeDir = true
+  // save in "active" directory for all the previous options: vicsekDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readNH = false, vicsekDir = true, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, fixedSides = false, roundbc = true, reflect = false, reflectnoise = false;
   bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
   if(reflect == true) {
     sp.setBoxType(simControlStruct::boxEnum::reflect);
   }
-  if(activeDir == true) {
+  if(vicsekDir == true) {
     if(reflect == true) {
       whichDynamics = "reflect-jvic";
     } else {
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     if(readNH == true) {
       dirSample = whichDynamics + "T" + argv[3] + "/";
     } else {
-      dirSample = whichDynamics + "jvicsek" + argv[4] + "-f0" + argv[5] + "/";
+      dirSample = whichDynamics + "jvic" + argv[4] + "-f0" + argv[5] + "/";
     }
   }
   ioSPFile ioSP(&sp);
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
       if(runDynamics == true) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
-          outDir = outDir + "damping" + argv[8] + "/jvicsek" + argv[4] + "-f0" + argv[5] + "/";
+          outDir = outDir + "damping" + argv[8] + "/jvic" + argv[4] + "-f0" + argv[5] + "/";
         }
         if(logSave == true) {
           inDir =	outDir;
@@ -130,14 +130,14 @@ int main(int argc, char **argv) {
     } else {//start a new dyanmics
       if(readAndMakeNewDir == true) {
         readState = true;
-        if(activeDir == true) {
+        if(vicsekDir == true) {
           outDir = inDir + "../" + dirSample;
         } else {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
         readNVT = true; // initializing from NVT
-        if(activeDir == true) {
+        if(vicsekDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
           }
