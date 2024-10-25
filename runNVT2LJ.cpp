@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, dampingDir = false, justRun = true;
+  bool readNH = false, dampingDir = true, justRun = false;
   bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
