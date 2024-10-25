@@ -122,11 +122,13 @@ public:
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
     double edamp = sp_->getDampingWork();
-    double etot = epot + ekin + edamp;
+    double enoise = sp_->getNoiseWork();
+    double etot = epot + ekin + edamp + enoise;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles;
+    energyFile << setprecision(precision) << edamp / numParticles << "\t";
+    energyFile << setprecision(precision) << enoise / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double eactive = sp_->getSelfPropulsionWork();
       energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
@@ -137,43 +139,17 @@ public:
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
-  void saveActiveEnergy(long step, double timeStep, long numParticles) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double edamp = sp_->getDampingWork();
-    double etot = epot + ekin + edamp;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    double velAlign = sp_->getNeighborVelocityAlignment();
-    energyFile << setprecision(precision) << velAlign << endl;
-  }
-
-  void saveVicsekEnergy(long step, double timeStep, long numParticles) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double edamp = sp_->getDampingWork();
-    double etot = epot + ekin + edamp;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    double velAlign = sp_->getVicsekVelocityAlignment();
-    energyFile << setprecision(precision) << velAlign << endl;
-  }
-
   void saveEnergyAB(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
     double edamp = sp_->getDampingWork();
-    double etot = epot + ekin + edamp;
+    double enoise = sp_->getNoiseWork();
+    double etot = epot + ekin + edamp + enoise;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles;
+    energyFile << setprecision(precision) << edamp / numParticles << "\t";
+    energyFile << setprecision(precision) << enoise / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double eactive = sp_->getSelfPropulsionWork();
       energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
@@ -185,6 +161,29 @@ public:
     energyFile << setprecision(precision) << get<0>(eab) / numParticles << "\t";
     energyFile << setprecision(precision) << get<1>(eab) / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles << endl;
+  }
+
+  void saveAlignEnergy(long step, double timeStep, long numParticles) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double edamp = sp_->getDampingWork();
+    double enoise = sp_->getNoiseWork();
+    double etot = epot + ekin + edamp + enoise;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << edamp / numParticles << "\t";
+    energyFile << setprecision(precision) << enoise / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double velAlign = sp_->getNeighborVelocityAlignment();
+      energyFile << "\t" << setprecision(precision) << velAlign << endl;
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      double velAlign = sp_->getVicsekVelocityAlignment();
+      energyFile << "\t" << setprecision(precision) << velAlign << endl;
+    } else {
+      cout << endl;
+    }
   }
 
   void saveStrainEnergy(long step, double timeStep, long numParticles, double strain) {
@@ -701,6 +700,10 @@ public:
   void saveParticleNeighbors(string dirName) {
     if(sp_->simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
       save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+      if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+        save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
+        save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+      }
     }
   }
 

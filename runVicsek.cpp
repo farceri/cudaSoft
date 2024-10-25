@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = atof(argv[12]), ew = 1e02, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
-  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 2*LJcut, range = 3;
+  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 50, range = 3;
   std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "vicsek";
   //thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
@@ -214,7 +214,7 @@ int main(int argc, char **argv) {
       //if(saveWork == true) {
       //  ioSP.saveColumnWorkEnergy(step+initialStep, timeStep, numParticles, width);
       //}
-      ioSP.saveVicsekEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(step % checkPointFreq == 0) {
         cout << "Vicsek: current step: " << step + initialStep;
@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          //ioSP.saveParticleNeighbors(outDir);
+          ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -269,7 +269,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    //ioSP.saveParticleNeighbors(outDir);
+    ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

@@ -27,19 +27,18 @@ __global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, 
 
 //************************* soft particle langevin ***************************//
 void SoftParticleLangevin::integrate() {
-  updateVelocity(0.5*sp_->dt);
-  updatePosition(0.5*sp_->dt);
-  updateThermalVel();
-  updatePosition(0.5*sp_->dt);
+  updateVelocity(0.5 * sp_->dt);
+  updatePosition(sp_->dt);
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
+  updateThermalVel();
   updateVelocity(0.5 * sp_->dt);
-  conserveMomentum();
+  //conserveMomentum();
 }
 
 void SoftParticleLangevin::injectKineticEnergy() {
   double amplitude(sqrt(config.Tinject));
-  // generate random numbers between 0 and noiseVar for thermal noise
+  // generate random numbers between 0 and noise for thermal noise
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude));
   conserveMomentum();
@@ -63,20 +62,21 @@ void SoftParticleLangevin::updateThermalVel() {
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_thermalVel.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
-  double s_lcoeff1(lcoeff1);
-  double s_lcoeff2(lcoeff2);
+  double s_gamma(gamma);
+  double s_noise(noise);
   auto r = thrust::counting_iterator<long>(0);
-  double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  const double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 
-  auto langevinUpdateThermalVel = [=] __device__ (long particleId) {
+  auto langevinAddThermostatForces = [=] __device__ (long particleId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[particleId * s_nDim + dim] = s_lcoeff1 * pVel[particleId * s_nDim + dim] + s_lcoeff2 * thermalVel[particleId * s_nDim + dim];
+      pForce[particleId * s_nDim + dim] += s_noise * thermalVel[particleId * s_nDim + dim] - s_gamma * pVel[particleId * s_nDim + dim];
     }
   };
 
-  thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalVel);
+  thrust::for_each(r, r + sp_->numParticles, langevinAddThermostatForces);
 }
 
 void SoftParticleLangevin::conserveMomentum() {
@@ -526,7 +526,7 @@ void SoftParticleDoubleNoseHoover::integrate() {
 void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
   double amplitude1(sqrt(config.Tinject));
   double amplitude2(sqrt(config.driving));
-  // generate random numbers between 0 and noiseVar for thermal noise
+  // generate random numbers between 0 and noise for thermal noise
   thrust::counting_iterator<long> index_sequence_begin1(lrand48());
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->num1 * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude1));
   thrust::counting_iterator<long> index_sequence_begin2(lrand48());

@@ -48,6 +48,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNDim(nDim);
   setNumParticles(numParticles);
 	simControl.particleType = simControlStruct::particleEnum::passive;
+	simControl.langevinType = simControlStruct::langevinEnum::langevin2;
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
@@ -199,6 +200,18 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
+  }
+	syncSimControlToDevice();
+}
+
+void SP2D::setLangevinType(simControlStruct::langevinEnum langevinType_) {
+	simControl.langevinType = langevinType_;
+  if(simControl.langevinType == simControlStruct::langevinEnum::langevin1) {
+    cout << "SP2D::setLangevinType: langevinType: langevin1" << endl;
+  } else if(simControl.langevinType == simControlStruct::langevinEnum::langevin2) {
+    cout << "SP2D::setLangevinType: langevinType: langevin2" << endl;
+  } else {
+    cout << "SP2D::setLangevinType: please specify valid particleType: langevin1 or langevin2" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1604,80 +1617,6 @@ void SP2D::calcParticleForceEnergy() {
   }
 }
 
-void SP2D::calcParticleEnergyAB() {
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
-	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
-  switch (simControl.neighborType) {
-    case simControlStruct::neighborEnum::neighbor:
-    kernelCalcParticleEnergyAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB);
-    break;
-    default:
-    break;
-  }
-}
-
-std::tuple<double, double> SP2D::getParticleEnergyAB() {
-  calcParticleEnergyAB();
-  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
-  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
-  return std::make_tuple(ekin, epot);
-}
-
-void SP2D::calcParticleWorkAB() {
-  thrust::device_vector<long> d_flagAB(numParticles);
-  thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
-	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
-	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
-  if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
-    kernelCalcParticleWorkAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB, flagAB);
-    // add work done by damping forces
-    double s_dt(dt);
-    long s_nDim(nDim);
-    double s_gamma(this->sim_->gamma);
-    auto r = thrust::counting_iterator<long>(0);
-
-    auto addDampingWork = [=] __device__ (long pId) {
-      if(flagAB[pId] == 1) {
-        #pragma unroll (MAXDIM)
-        for (long dim = 0; dim < s_nDim; dim++) {
-          pEnergyAB[pId] -= s_dt * s_gamma * pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
-        }
-      }
-    };
-
-    thrust::for_each(r, r + numParticles, addDampingWork);
-    // add work done by self-propulsion if particles are active
-    if(simControl.particleType == simControlStruct::particleEnum::active) {
-      double s_driving(driving);
-      auto s = thrust::counting_iterator<long>(0);
-      const double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-
-      auto addActiveWork = [=] __device__ (long pId) {
-        #pragma unroll (MAXDIM)
-        for (long dim = 0; dim < s_nDim; dim++) {
-          pEnergyAB[pId] += s_dt * s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId])) * pVel[pId * s_nDim + dim];
-        }
-      };
-
-      thrust::for_each(r, r + numParticles, addActiveWork);
-    }
-  }
-}
-
-std::tuple<double, double> SP2D::getParticleWorkAB() {
-  calcParticleWorkAB();
-  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
-  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
-  return std::make_tuple(ekin, work);
-}
-
 void SP2D::calcVicsekVelocityAlignment() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
@@ -2072,6 +2011,30 @@ double SP2D::getDampingWork() {
   return thrust::reduce(d_dampingWork.begin(), d_dampingWork.end(), double(0), thrust::plus<double>());
 }
 
+double SP2D::getNoiseWork() {
+  thrust::device_vector<double> d_noiseWork(d_particleEnergy.size());
+  thrust::fill(d_noiseWork.begin(), d_noiseWork.end(), double(0));
+
+  double s_dt(dt);
+  long s_nDim(nDim);
+  double s_noise(this->sim_->noise);
+  auto r = thrust::counting_iterator<long>(0);
+	const double* thermalVel = thrust::raw_pointer_cast(&(this->sim_->d_thermalVel[0]));
+	const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double* nWork = thrust::raw_pointer_cast(&d_noiseWork[0]);
+
+  auto computeNoiseWork = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      nWork[pId] += s_dt * s_noise * thermalVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, computeNoiseWork);
+
+  return thrust::reduce(d_noiseWork.begin(), d_noiseWork.end(), double(0), thrust::plus<double>());
+}
+
 double SP2D::getSelfPropulsionWork() {
   thrust::device_vector<double> d_activeWork(d_particleEnergy.size());
   thrust::fill(d_activeWork.begin(), d_activeWork.end(), double(0));
@@ -2105,7 +2068,7 @@ double SP2D::getParticleEnergy() {
 }
 
 double SP2D::getParticleWork() {
-  double work = getDampingWork();
+  double work = getDampingWork() + getNoiseWork();
   if(simControl.particleType == simControlStruct::particleEnum::active) {
     work += getSelfPropulsionWork();
   }
@@ -2241,6 +2204,95 @@ double SP2D::getMassiveTemperature(long firstIndex, double mass) {
   // temperature computed from the massive particles which are set to be the first
   thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, d_squaredVel.begin(), square());
   return mass * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>()) / (firstIndex * nDim);
+}
+
+void SP2D::calcParticleEnergyAB() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
+	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    kernelCalcParticleEnergyAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB);
+    break;
+    default:
+    break;
+  }
+}
+
+std::tuple<double, double> SP2D::getParticleEnergyAB() {
+  calcParticleEnergyAB();
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
+  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
+  return std::make_tuple(ekin, epot);
+}
+
+void SP2D::calcParticleWorkAB() {
+  thrust::device_vector<long> d_flagAB(numParticles);
+  thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
+	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
+  if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+    kernelCalcParticleWorkAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB, flagAB);
+    // add work done by damping forces
+    double s_dt(dt);
+    long s_nDim(nDim);
+    double s_gamma(this->sim_->gamma);
+    auto r = thrust::counting_iterator<long>(0);
+
+    auto addDampingWorkAB = [=] __device__ (long pId) {
+      if(flagAB[pId] == 1) {
+        #pragma unroll (MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pEnergyAB[pId] -= s_dt * s_gamma * pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+        }
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, addDampingWorkAB);
+    // add work done by white noise
+    double s_noise(this->sim_->noise);
+    auto t = thrust::counting_iterator<long>(0);
+	  const double *thermalVel = thrust::raw_pointer_cast(&(this->sim_->d_thermalVel[0]));
+
+    auto addNoiseWorkAB = [=] __device__ (long pId) {
+      if(flagAB[pId] == 1) {
+        #pragma unroll (MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pEnergyAB[pId] += s_dt * s_noise * thermalVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+        }
+      }
+    };
+
+    thrust::for_each(t, t + numParticles, addNoiseWorkAB);
+    // add work done by self-propulsion if particles are active
+    if(simControl.particleType == simControlStruct::particleEnum::active) {
+      double s_driving(driving);
+      auto s = thrust::counting_iterator<long>(0);
+      const double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+
+      auto addActiveWorkAB = [=] __device__ (long pId) {
+        #pragma unroll (MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pEnergyAB[pId] += s_dt * s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId])) * pVel[pId * s_nDim + dim];
+        }
+      };
+
+      thrust::for_each(r, r + numParticles, addActiveWorkAB);
+    }
+  }
+}
+
+std::tuple<double, double> SP2D::getParticleWorkAB() {
+  calcParticleWorkAB();
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
+  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
+  return std::make_tuple(ekin, work);
 }
 
 //************************* contacts and neighbors ***************************//
@@ -2428,22 +2480,34 @@ void SP2D::particleFIRELoop() {
 
 //***************************** NVT integrators ******************************//
 void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
-  this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
+  switch (simControl.langevinType) {
+    case simControlStruct::langevinEnum::langevin1:
+    this->sim_ = new SoftParticleLangevin(this, SimConfig(Temp, 0, 0));
+    this->sim_->noise = sqrt(2. * Temp * gamma / dt);
+    cout << "SP2D::initSoftParticleLangevin:: langevinType 1";
+    break;
+    case simControlStruct::langevinEnum::langevin2:
+    this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
+    this->sim_->noise = sqrt(2. * Temp * gamma);
+    this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
+    this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
+    this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
+    this->sim_->d_rand.resize(numParticles * nDim);
+    this->sim_->d_rando.resize(numParticles * nDim);
+    thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
+    thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
+    cout << "SP2D::initSoftParticleLangevin:: langevinType 2";
+    break;
+  }
   this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
-  this->sim_->d_rand.resize(numParticles * nDim);
-  this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
+  this->sim_->d_thermalVel.resize(numParticles * nDim);
   thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
   setInitialPositions();
   if(readState == false) {
     this->sim_->injectKineticEnergy();
   }
-  cout << "SP2D::initSoftParticleLangevin:: current temperature: " << setprecision(12) << getParticleTemperature() << endl;
+  cout << " current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
 void SP2D::softParticleLangevinLoop() {
@@ -2453,10 +2517,10 @@ void SP2D::softParticleLangevinLoop() {
 void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
   this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->noise = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
   this->sim_->d_thermalVel.resize(d_particleVel.size());
@@ -2482,10 +2546,10 @@ void SP2D::softParticleLangevinSubSetLoop() {
 void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevinExtField(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->noise = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
   this->sim_->d_thermalVel.resize(d_particleVel.size());
@@ -2505,10 +2569,10 @@ void SP2D::softParticleLangevinExtFieldLoop() {
 void SP2D::initSoftParticleLangevinPerturb(double Temp, double gamma, double extForce, long firstIndex, bool readState) {
   this->sim_ = new SoftParticleLangevinPerturb(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->noise = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
   this->sim_->d_thermalVel.resize(d_particleVel.size());
@@ -2531,10 +2595,10 @@ void SP2D::softParticleLangevinPerturbLoop() {
 void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevinFlow(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noiseVar = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noiseVar;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noiseVar;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noiseVar;
+  this->sim_->noise = sqrt(2. * Temp * gamma);
+  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
+  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
+  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
   this->sim_->d_thermalVel.resize(d_particleVel.size());

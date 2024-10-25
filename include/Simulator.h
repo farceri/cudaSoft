@@ -31,7 +31,7 @@ public:
   double lcoeff1;
   double lcoeff2;
   double lcoeff3;
-  double noiseVar;
+  double noise;
   double gamma = 1; // this is just a choice
   long firstIndex = 10;
   long extForce = 0;

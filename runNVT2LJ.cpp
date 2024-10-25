@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, dampingDir = true, justRun = false;
+  bool readNH = false, dampingDir = false, justRun = true;
   bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
@@ -38,12 +38,16 @@ int main(int argc, char **argv) {
   double damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
   double ew = 1e-03, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, Tinject = atof(argv[3]);
   double ec = 1, ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]);
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "langevin";
+  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1];
+  std::string dynType = argv[12], dirSample, whichDynamics = "langevin";
   if(nDim == 3) {
     LJcut = 2.5;
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(dynType == "l1") {
+    sp.setLangevinType(simControlStruct::langevinEnum::langevin1);
+  }
   if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setBoxType(simControlStruct::boxEnum::WCA);
@@ -80,7 +84,11 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "dynamics/";
+    if(dynType == "l1") {
+      outDir = inDir + "dynamics1/";
+    } else {
+      outDir = inDir + "dynamics2/";
+    }
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -175,7 +183,7 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {

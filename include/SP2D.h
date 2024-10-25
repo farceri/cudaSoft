@@ -23,6 +23,7 @@ using std::tuple;
 
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
+  enum class langevinEnum {langevin1, langevin2} langevinType;
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -163,7 +164,8 @@ public:
   bool testSimControlSync();
 
   void setParticleType(simControlStruct::particleEnum particleType_);
-	simControlStruct::particleEnum getParticleType();
+
+  void setLangevinType(simControlStruct::langevinEnum langevinType_);
 
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
@@ -376,14 +378,6 @@ public:
 
   double getNeighborVelocityAlignment();
 
-  void calcParticleEnergyAB();
-  
-  std::tuple<double, double> getParticleEnergyAB();
-
-  void calcParticleWorkAB();
-
-  std::tuple<double, double> getParticleWorkAB();
-
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 
   void setThreeParticleTestPacking(double sigma01, double sigma2, double lx, double ly, double y01, double y2, double vel2);
@@ -445,6 +439,8 @@ public:
 
   double getDampingWork();
 
+  double getNoiseWork();
+
   double getSelfPropulsionWork();
 
   double getParticleEnergy();
@@ -464,6 +460,14 @@ public:
   std::tuple<double, double, double> getParticleKineticEnergy12();
 
   double getMassiveTemperature(long firstIndex, double mass);
+
+  void calcParticleEnergyAB();
+  
+  std::tuple<double, double> getParticleEnergyAB();
+
+  void calcParticleWorkAB();
+
+  std::tuple<double, double> getParticleWorkAB();
 
   void removeCOMDrift();
 
