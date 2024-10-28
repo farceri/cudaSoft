@@ -22,16 +22,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false, justRun = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readNH = false, alltoall = false, fixedbc = false, roundbc = true, scaleVel = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[9]), ew = ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  double ec = atof(argv[9]), ew = 1e02*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nve";
   // initialize sp object
@@ -39,6 +39,11 @@ int main(int argc, char **argv) {
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
     sp.setBoxEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setBoxEnergyScale(ew);
+  } else {
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -49,7 +54,11 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
-    whichDynamics = whichDynamics + "-wca/";
+    if(fixedbc == true || roundbc == true) {
+      whichDynamics = whichDynamics + "-fixed/";
+    } else {
+      whichDynamics = whichDynamics + "-wca/";
+    }
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
   } else {
     whichDynamics = whichDynamics + "/";

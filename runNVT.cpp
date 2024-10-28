@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, roundbc = true, fixedSides = false, reflect = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -44,6 +44,9 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(numParticles < 256) {
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  }
   if(readNH == true) {
     whichDynamics = "nh";
   }

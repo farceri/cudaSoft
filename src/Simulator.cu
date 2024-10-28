@@ -128,6 +128,7 @@ void SoftParticleLangevin2::updateVelocity(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleVel);
+
   if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
     double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));
     const double* pAlpha = thrust::raw_pointer_cast(&(sp_->d_particleAlpha[0]));
@@ -151,6 +152,7 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticlePos);
+  
   if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
     double* pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
     const double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));

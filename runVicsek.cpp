@@ -32,13 +32,13 @@ int main(int argc, char **argv) {
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, fixedSides = false, roundbc = true, reflect = false, reflectnoise = false;
-  bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = atof(argv[12]), ew = 1e02, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
-  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 50, range = 3;
+  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 5, range = 3;
   std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "vicsek";
   //thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
@@ -46,6 +46,9 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(numParticles < 256) {
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  }
   sp.setParticleType(simControlStruct::particleEnum::vicsek);
   if(fixedbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
@@ -57,7 +60,7 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setBoxEnergyScale(ew);
   } else {
-    cout << "Setting default rectangular geometry" << endl;
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -136,7 +139,7 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
-        readNVT = true; // initializing from NVT
+        initAngles = true; // initializing from NVT
         if(vicsekDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
@@ -157,7 +160,7 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(readNVT == true) {
+    if(initAngles == true) {
       ioSP.readParticleVelocity(inDir, numParticles, nDim);
       sp.initializeParticleAngles();
     } else {
@@ -168,8 +171,6 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setLJcutoff(LJcut);
-  sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
@@ -182,18 +183,14 @@ int main(int argc, char **argv) {
   driving *= forceUnit;
   Jvicsek *= timeUnit;
   Rvicsek *= sigma;
-  //if(saveWork == true) {
-  //  width = boxSize[0] * atof(argv[12]);
-  //  cout << "Measuring work and active work, fluid width: " << width << " centered in Lx / 2" << endl;
-  //}
   sp.setVicsekParams(driving, Jvicsek, Rvicsek);
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
-  //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
+  ioSP.saveParticlePacking(outDir);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
-  sp.calcParticleForceEnergy();
+  //sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
   range *= LJcut * sigma;

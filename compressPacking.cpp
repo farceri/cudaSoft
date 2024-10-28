@@ -24,14 +24,14 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
-  bool fixedbc = false, roundbc = true, lj = true, wca = false, gforce = false, alltoall = false;
+  bool fixedbc = false, roundbc = true, lj = false, wca = true, gforce = false, alltoall = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-03, scaleFactor, prevEnergy = 0;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
-  double ec = 1, ew = 1, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.002, phiTh = 0.1;
+  double ec = 1, ew = 1e02*ec, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.002, phiTh = 0.02;
   double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   double gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
@@ -109,12 +109,10 @@ int main(int argc, char **argv) {
   }
   if(lj == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    sp.setBoxType(simControlStruct::boxEnum::WCA);
     cout << "Setting Lennard-Jones potential" << endl;
     sp.setLJcutoff(LJcut);
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    sp.setBoxType(simControlStruct::boxEnum::WCA);
     cout << "Setting WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;
@@ -184,11 +182,6 @@ int main(int argc, char **argv) {
       }
       if(step % saveEnergyFreq == 0) {
         ioSP.saveSimpleEnergy(step, timeStep, numParticles);
-        if(nve == true) {
-          if(abs(sp.getParticleTemperature() - Tinject) > 1e-02) {
-            sp.rescaleParticleVelocity(Tinject);
-          }
-        }
       }
       if(step % printFreq == 0) {
         cout << "Compression: current step: " << step;
@@ -205,6 +198,11 @@ int main(int argc, char **argv) {
           sp.resetUpdateCount();
         } else {
           cout << endl;
+        }
+      }
+      if(nve == true) {
+        if(abs(sp.getParticleTemperature() - Tinject) > 1e-02) {
+          sp.rescaleParticleVelocity(Tinject);
         }
       }
       step += 1;

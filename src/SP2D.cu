@@ -107,18 +107,12 @@ void SP2D::initParticleVariables(long numParticles_) {
   d_particleForce.resize(numParticles_ * nDim);
   d_particleEnergy.resize(numParticles_);
   d_squaredVel.resize(numParticles_ * nDim);
-  if(nDim == 2) {
-    d_particleAngle.resize(numParticles_);
-  } else if(nDim == 3) {
-    d_particleAngle.resize(numParticles_ * nDim);
-  }
   thrust::fill(d_particleRad.begin(), d_particleRad.end(), double(0));
   thrust::fill(d_particlePos.begin(), d_particlePos.end(), double(0));
   thrust::fill(d_particleVel.begin(), d_particleVel.end(), double(0));
   thrust::fill(d_particleForce.begin(), d_particleForce.end(), double(0));
   thrust::fill(d_particleEnergy.begin(), d_particleEnergy.end(), double(0));
   thrust::fill(d_squaredVel.begin(), d_squaredVel.end(), double(0));
-  thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
 }
 
 void SP2D::initParticleDeltaVariables(long numParticles_) {
@@ -179,17 +173,22 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     cout << "SP2D::setParticleType: particleType: passive" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::active) {
     if(nDim == 2) {
+      d_particleAngle.resize(numParticles);
       d_activeAngle.resize(numParticles);
     } else if(nDim == 3) {
+      d_particleAngle.resize(numParticles * nDim);
       d_activeAngle.resize(numParticles * nDim);
     }
+    thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
     d_velAlign.resize(numParticles);
     thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    d_particleAngle.resize(numParticles);
     d_particleOmega.resize(numParticles);
     d_particleAlpha.resize(numParticles);
+    thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_particleOmega.begin(), d_particleOmega.end(), double(0));
     thrust::fill(d_particleAlpha.begin(), d_particleAlpha.end(), double(0));
     initVicsekNeighbors(numParticles);
@@ -261,21 +260,28 @@ simControlStruct::neighborEnum SP2D::getNeighborType() {
 void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
 	simControl.potentialType = potentialType_;
   if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
-    cout << "SP2D::setPotentialType: potentialType: harmonic" << endl;
+    setBoxType(simControlStruct::boxEnum::harmonic);
+    cout << "SP2D::setPotentialType: potentialType: harmonic" << " boxType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    cout << "SP2D::setPotentialType: potentialType: lennardJones" << endl;
+    setBoxType(simControlStruct::boxEnum::lennardJones);
+    cout << "SP2D::setPotentialType: potentialType: lennardJones" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
-    cout << "SP2D::setPotentialType: potentialType: WCA" << endl;
+    setBoxType(simControlStruct::boxEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: WCA" << " default boxType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
-    cout << "SP2D::setPotentialType: potentialType: adhesive" << endl;
+    setBoxType(simControlStruct::boxEnum::harmonic);
+    cout << "SP2D::setPotentialType: potentialType: adhesive" << " boxType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    cout << "SP2D::setPotentialType: potentialType: doubleLJ" << endl;
+    setBoxType(simControlStruct::boxEnum::lennardJones);
+    cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
-    cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << endl;
+    setBoxType(simControlStruct::boxEnum::lennardJones);
+    cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
-    cout << "SP2D::setPotentialType: potentialType: LJWCA" << endl;
+    setBoxType(simControlStruct::boxEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: LJWCA" << " boxType: lennardJones" << endl;
   } else {
     cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
   }
@@ -291,6 +297,8 @@ void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
 	simControl.boxType = boxType_;
   if(simControl.boxType == simControlStruct::boxEnum::harmonic) {
     cout << "SP2D::setBoxType: boxType: harmonic" << endl;
+  } else if(simControl.boxType == simControlStruct::boxEnum::lennardJones) {
+    cout << "SP2D::setBoxType: boxType: lennardJones" << endl;
   } else if(simControl.boxType == simControlStruct::boxEnum::WCA) {
     cout << "SP2D::setBoxType: boxType: WCA" << endl;
   } else if(simControl.boxType == simControlStruct::boxEnum::reflect) {
@@ -300,7 +308,7 @@ void SP2D::setBoxType(simControlStruct::boxEnum boxType_) {
     thrust::fill(d_randomAngle.begin(), d_randomAngle.end(), double(0));
     cout << "SP2D::setBoxType: boxType: reflectnoise" << endl;
   } else {
-    cout << "SP2D::setBoxType: please specify valid boxType: harmonic, WCA, reflect and reflectnoise" << endl;
+    cout << "SP2D::setBoxType: please specify valid boxType: harmonic, lennardJones, WCA, reflect and reflectnoise" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1246,6 +1254,11 @@ void SP2D::setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_) {
   driving = driving_;
   Jvicsek = Jvicsek_;
   Rvicsek = Rvicsek_;
+  double boxRadius = getBoxRadius();
+  if(Rvicsek > 0.5 * boxRadius) {
+    Rvicsek = 0.5 * boxRadius;
+    cout << "SP2D::setVicsekParams:: Rvicsek cannot be grater than half the boxRadius, setting Rvicsek equal to half the boxRadius" << endl;
+  }
   cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
   cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
   //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
@@ -1419,8 +1432,8 @@ void SP2D::addSelfPropulsion() {
   double amplitude = sqrt(2.0 * dt / taup);
   auto r = thrust::counting_iterator<long>(0);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
-  double* pForce = thrust::raw_pointer_cast(&(d_particleForce[0]));
+  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	if(nDim == 2) {
     thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,1.f));
     const double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
@@ -1467,7 +1480,7 @@ void SP2D::addSelfPropulsion() {
       pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim]);
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
-        pForce[particleId * s_nDim + dim] += driving * pAngle[particleId * s_nDim + dim];
+        pForce[particleId * s_nDim + dim] += s_driving * pAngle[particleId * s_nDim + dim];
       }
     };
 
@@ -1479,11 +1492,16 @@ void SP2D::addVicsekAlignment() {
   int s_nDim(nDim);
   double s_driving(driving);
   auto r = thrust::counting_iterator<long>(0);
-  thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  const double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
-  double* pForce = thrust::raw_pointer_cast(&(d_particleForce[0]));
+  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	if(nDim == 2) {
     auto updateVicsekAlignment2D = [=] __device__ (long pId) {
+      while (pAngle[pId] > PI) {
+        pAngle[pId] -= 2 * PI;
+      }
+      while (pAngle[pId] < -PI) {
+          pAngle[pId] += 2 * PI;
+      }
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1496,8 +1514,8 @@ void SP2D::addVicsekAlignment() {
 
 void SP2D::calcVicsekAlignment() {
   checkVicsekNeighbors();
-  const double *pAngle = thrust::raw_pointer_cast(&(d_particleAngle[0]));
-  double* pAlpha = thrust::raw_pointer_cast(&(d_particleAlpha[0]));
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  double *pAlpha = thrust::raw_pointer_cast(&d_particleAlpha[0]);
   kernelCalcVicsekAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
 }
 

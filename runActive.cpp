@@ -29,10 +29,10 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, activeDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, fixedSides = false, roundbc = true, reflect = false, reflectnoise = false;
-  bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;//, saveWork = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -46,6 +46,9 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(numParticles < 256) {
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  }
   sp.setParticleType(simControlStruct::particleEnum::active);
   if(readNH == true) {
     whichDynamics = "nh";
@@ -73,7 +76,7 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setBoxEnergyScale(ew);
   } else {
-    cout << "Setting default rectangular geometry" << endl;
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
   if(reflect == true) {
     sp.setBoxType(simControlStruct::boxEnum::reflect);
@@ -137,7 +140,7 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
-        readNVT = true; // initializing from NVT
+        initAngles = true; // initializing from NVT
         if(activeDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
@@ -158,7 +161,7 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(readNVT == true) {
+    if(initAngles == true) {
       ioSP.readParticleVelocity(inDir, numParticles, nDim);
       sp.initializeParticleAngles();
     } else {
@@ -169,8 +172,6 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sp.setLJcutoff(LJcut);
-  sp.setEnergyCostant(ec);
   sigma = 2 * sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);

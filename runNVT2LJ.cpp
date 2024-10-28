@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
