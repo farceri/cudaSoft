@@ -28,23 +28,20 @@ class SimInterface // integration functions
 public:
   SP2D * sp_;
   SimConfig config;
-  double lcoeff1;
-  double lcoeff2;
-  double lcoeff3;
-  double noise;
+  double noise = 0; // this is just a choice
   double gamma = 1; // this is just a choice
+  double gamma1;
+  double gamma2;
   long firstIndex = 10;
   long extForce = 0;
   double mass = 1;
   thrust::device_vector<double> d_rand;
   thrust::device_vector<double> d_rando;
-  thrust::device_vector<double> d_pActiveAngle; // for decoupled rotation and activity angles
-  thrust::device_vector<double> d_thermalVel; // for brownian noise of soft particles
   thrust::device_vector<double> d_velSum; // for computing velocity drift
 
   SimInterface() = default;
   SimInterface(SP2D * spPtr, SimConfig config):sp_(spPtr),config(config){}
-  ~SimInterface();
+  virtual ~SimInterface() = default;
 
   virtual void injectKineticEnergy() = 0;
   virtual void updatePosition(double timeStep) = 0;

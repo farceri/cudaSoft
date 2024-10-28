@@ -59,20 +59,20 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
 void SoftParticleLangevin::updateThermalVel() {
   // generate random numbers between 0 and 1 for thermal noise
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_thermalVel.begin(), gaussNum(0.f,1.f));
+  thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
   // update thermal velocity
   long s_nDim(sp_->nDim);
   double s_gamma(gamma);
   double s_noise(noise);
   auto r = thrust::counting_iterator<long>(0);
+  const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
   const double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
   double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 
   auto langevinAddThermostatForces = [=] __device__ (long particleId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pForce[particleId * s_nDim + dim] += s_noise * thermalVel[particleId * s_nDim + dim] - s_gamma * pVel[particleId * s_nDim + dim];
+      pForce[particleId * s_nDim + dim] += s_noise * rand[particleId * s_nDim + dim] - s_gamma * pVel[particleId * s_nDim + dim];
     }
   };
 
@@ -105,43 +105,25 @@ void SoftParticleLangevin2::updateThermalVel() {
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
   thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
-  // update thermal velocity
-  long s_nDim(sp_->nDim);
-  double s_lcoeff1(lcoeff1);
-  double s_lcoeff2(lcoeff2);
-  double s_lcoeff3(lcoeff3);
-  auto r = thrust::counting_iterator<long>(0);
-  double *rand = thrust::raw_pointer_cast(&d_rand[0]);
-  double *rando = thrust::raw_pointer_cast(&d_rando[0]);
-  double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
-
-  auto langevinUpdateThermalNoise = [=] __device__ (long particleId) {
-    #pragma unroll (MAXDIM)
-		for (long dim = 0; dim < s_nDim; dim++) {
-      thermalVel[particleId * s_nDim + dim] = s_lcoeff1 * (0.5 * rand[particleId * s_nDim + dim] + rando[particleId * s_nDim + dim] / sqrt(3));
-      rand[particleId * s_nDim + dim] *= s_lcoeff2;
-      rando[particleId * s_nDim + dim] *= s_lcoeff3;
-    }
-  };
-
-  thrust::for_each(r, r + sp_->numParticles, langevinUpdateThermalNoise);
 }
 
 void SoftParticleLangevin2::updateVelocity(double timeStep) {
   long s_nDim(sp_->nDim);
   double s_dt(timeStep);
+  double s_noise(noise);
   double s_gamma(gamma);
   auto r = thrust::counting_iterator<long>(0);
   const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
-  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  const double *rando = thrust::raw_pointer_cast(&d_rando[0]);
 	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 
   auto langevinUpdateParticleVel = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) + rand[pId * s_nDim + dim] -
-      0.5 * s_dt * s_dt * s_gamma * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) - thermalVel[pId * s_nDim + dim];
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - s_gamma * pVel[pId * s_nDim + dim] + s_noise * rand[pId * s_nDim + dim]) -
+      s_dt * s_dt * s_gamma * 0.5 * (pForce[pId * s_nDim + dim] - s_gamma * pVel[pId * s_nDim + dim]) -
+      s_dt * s_dt * s_gamma * s_noise * (0.5 * rand[pId * s_nDim + dim] + rando[pId * s_nDim + dim] / sqrt(3));
     }
   };
 
@@ -164,7 +146,7 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   auto langevinUpdateParticlePos = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim] + rando[pId * s_nDim + dim];
+      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim] + 0.5 * s_dt * s_dt * rando[pId * s_nDim + dim] / sqrt(3);
     }
   };
 
@@ -193,44 +175,25 @@ void SoftParticleLangevinSubSet::updateThermalVel() {
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
   thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + sp_->numParticles * sp_->nDim, d_rando.begin(), gaussNum(0.f,1.f));
-  // update thermal velocity
-  long s_nDim(sp_->nDim);
-  double s_lcoeff1(lcoeff1);
-  double s_lcoeff2(lcoeff2);
-  double s_lcoeff3(lcoeff3);
-  auto r = thrust::counting_iterator<long>();
-  double *rand = thrust::raw_pointer_cast(&d_rand[0]);
-  double *rando = thrust::raw_pointer_cast(&d_rando[0]);
-  double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
-
-  auto langevinUpdateThermalNoise = [=] __device__ (long particleId) {
-    #pragma unroll (MAXDIM)
-		for (long dim = 0; dim < s_nDim; dim++) {
-      thermalVel[particleId * s_nDim + dim] = s_lcoeff1 * (0.5 * rand[particleId * s_nDim + dim] + rando[particleId * s_nDim + dim] / sqrt(3));
-      rand[particleId * s_nDim + dim] *= s_lcoeff2;
-      rando[particleId * s_nDim + dim] *= s_lcoeff3;
-    }
-  };
-
-  thrust::for_each(r + firstIndex, r + sp_->numParticles, langevinUpdateThermalNoise);
 }
 
 void SoftParticleLangevinSubSet::updateVelocity(double timeStep) {
   long s_nDim(sp_->nDim);
   double s_dt(timeStep);
   double s_gamma(gamma);
+  double s_noise(noise);
   auto r = thrust::counting_iterator<long>(0);
   const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
-  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  const double *rando = thrust::raw_pointer_cast(&d_rando[0]);
 	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 
   auto langevinUpdateParticleVel = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma);
-      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] - pVel[pId * s_nDim + dim] * s_gamma) * s_gamma;
-      pVel[pId * s_nDim + dim] += rand[pId * s_nDim + dim] - thermalVel[pId * s_nDim + dim];
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] - s_gamma * pVel[pId * s_nDim + dim] + s_noise * rand[pId * s_nDim + dim]) -
+      s_dt * s_dt * s_gamma * 0.5 * (pForce[pId * s_nDim + dim] - s_gamma * pVel[pId * s_nDim + dim]) -
+      s_dt * s_dt * s_gamma * s_noise * (0.5 * rand[pId * s_nDim + dim] + rando[pId * s_nDim + dim] / sqrt(3));
     }
   };
 
@@ -259,7 +222,7 @@ void SoftParticleLangevinSubSet::updatePosition(double timeStep) {
   auto langevinUpdateParticlePos = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim] + rando[pId * s_nDim + dim];
+      pPos[pId * s_nDim + dim] += s_dt * pVel[pId * s_nDim + dim] + 0.5 * s_dt * s_dt * rando[pId * s_nDim + dim] / sqrt(3);
     }
   };
 
@@ -325,9 +288,10 @@ void SoftParticleLangevinFlow::updateVelocity(double timeStep) {
   long s_nDim(sp_->nDim);
   double s_dt(timeStep);
   double s_gamma(gamma);
+  double s_noise(noise);
   auto r = thrust::counting_iterator<long>(0);
   const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
-  const double *thermalVel = thrust::raw_pointer_cast(&d_thermalVel[0]);
+  const double *rando = thrust::raw_pointer_cast(&d_rando[0]);
   const double *flowVel = thrust::raw_pointer_cast(&(sp_->d_flowVel[0]));
 	double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
@@ -335,11 +299,12 @@ void SoftParticleLangevinFlow::updateVelocity(double timeStep) {
   auto langevinUpdateParticleFlowVel = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma);
-      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma) * s_gamma;
-      pVel[pId * s_nDim + dim] += rand[pId * s_nDim + dim] - thermalVel[pId * s_nDim + dim];
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + s_gamma * (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) + s_noise * rand[pId * s_nDim + dim]) -
+      s_dt * s_dt * s_gamma * 0.5 * (pForce[pId * s_nDim + dim] + s_gamma * (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim])) -
+      s_dt * s_dt * s_gamma * s_noise * (0.5 * rand[pId * s_nDim + dim] + rando[pId * s_nDim + dim] / sqrt(3));
     }
   };
+
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleFlowVel);
   //kernelConserveParticleMomentum<<<1, sp_->dimBlock>>>(pVel);
@@ -368,8 +333,8 @@ void SoftParticleFlow::updateVelocity(double timeStep) {
   auto updateParticleFlowVel = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma);
-      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * (pForce[pId * s_nDim + dim] + (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]) * s_gamma) * s_gamma;
+      pVel[pId * s_nDim + dim] += s_dt * (pForce[pId * s_nDim + dim] + s_gamma * (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]));
+      pVel[pId * s_nDim + dim] -= 0.5 * s_dt * s_dt * s_gamma * (pForce[pId * s_nDim + dim] + s_gamma * (flowVel[pId * s_nDim + dim] - pVel[pId * s_nDim + dim]));
     }
   };
 
@@ -537,10 +502,10 @@ void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
 void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {
   // update nose hoover damping
   std::tuple<double, double, double> ekins = sp_->getParticleKineticEnergy12();
-  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
-  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
-  double s_gamma1(lcoeff1);
-  double s_gamma2(lcoeff2);
+  gamma1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
+  gamma2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
+  double s_gamma1(gamma1);
+  double s_gamma2(gamma2);
   long s_nDim(sp_->nDim);
   long s_num1(sp_->num1);
   double s_dt(timeStep);
@@ -565,10 +530,10 @@ void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {
 void SoftParticleDoubleNoseHoover::updateThermalVel() {
   // update nose hoover damping
   std::tuple<double, double, double> ekins = sp_->getParticleKineticEnergy12();
-  lcoeff1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
-  lcoeff2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
-  double s_gamma1(lcoeff1);
-  double s_gamma2(lcoeff2);
+  gamma1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
+  gamma2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
+  double s_gamma1(gamma1);
+  double s_gamma2(gamma2);
   long s_nDim(sp_->nDim);
   long s_num1(sp_->num1);
   double s_dt(sp_->dt);

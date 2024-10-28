@@ -2019,14 +2019,14 @@ double SP2D::getNoiseWork() {
   long s_nDim(nDim);
   double s_noise(this->sim_->noise);
   auto r = thrust::counting_iterator<long>(0);
-	const double* thermalVel = thrust::raw_pointer_cast(&(this->sim_->d_thermalVel[0]));
+	const double* rand = thrust::raw_pointer_cast(&(this->sim_->d_rand[0]));
 	const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
 	double* nWork = thrust::raw_pointer_cast(&d_noiseWork[0]);
 
   auto computeNoiseWork = [=] __device__ (long pId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      nWork[pId] += s_dt * s_noise * thermalVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+      nWork[pId] += s_dt * s_noise * rand[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
     }
   };
 
@@ -2258,13 +2258,13 @@ void SP2D::calcParticleWorkAB() {
     // add work done by white noise
     double s_noise(this->sim_->noise);
     auto t = thrust::counting_iterator<long>(0);
-	  const double *thermalVel = thrust::raw_pointer_cast(&(this->sim_->d_thermalVel[0]));
+	  const double *rand = thrust::raw_pointer_cast(&(this->sim_->d_rand[0]));
 
     auto addNoiseWorkAB = [=] __device__ (long pId) {
       if(flagAB[pId] == 1) {
         #pragma unroll (MAXDIM)
         for (long dim = 0; dim < s_nDim; dim++) {
-          pEnergyAB[pId] += s_dt * s_noise * thermalVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+          pEnergyAB[pId] += s_dt * s_noise * rand[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
         }
       }
     };
@@ -2488,20 +2488,15 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
     break;
     case simControlStruct::langevinEnum::langevin2:
     this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
-    this->sim_->noise = sqrt(2. * Temp * gamma);
-    this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
-    this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
-    this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
-    this->sim_->d_rand.resize(numParticles * nDim);
+    this->sim_->noise = sqrt(2. * Temp * gamma / dt);
     this->sim_->d_rando.resize(numParticles * nDim);
-    thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
     thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
     cout << "SP2D::initSoftParticleLangevin:: langevinType 2";
     break;
   }
   this->sim_->gamma = gamma;
-  this->sim_->d_thermalVel.resize(numParticles * nDim);
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  this->sim_->d_rand.resize(numParticles * nDim);
+  thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
   resetLastPositions();
   setInitialPositions();
   if(readState == false) {
@@ -2517,17 +2512,14 @@ void SP2D::softParticleLangevinLoop() {
 void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
   this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noise = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
+  this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
+  thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
+  thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
   // subset variables
   this->sim_->firstIndex = firstIndex;
   this->sim_->mass = mass;
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
   resetLastPositions();
   setInitialPositions();
   if(readState == false) {
@@ -2546,14 +2538,11 @@ void SP2D::softParticleLangevinSubSetLoop() {
 void SP2D::initSoftParticleLangevinExtField(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevinExtField(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noise = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
+  this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
+  thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
   resetLastPositions();
   setInitialPositions();
   if(readState == false) {
@@ -2569,14 +2558,11 @@ void SP2D::softParticleLangevinExtFieldLoop() {
 void SP2D::initSoftParticleLangevinPerturb(double Temp, double gamma, double extForce, long firstIndex, bool readState) {
   this->sim_ = new SoftParticleLangevinPerturb(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noise = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
+  this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
+  thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
   this->sim_->extForce = extForce;
   this->sim_->firstIndex = firstIndex;
   resetLastPositions();
@@ -2595,14 +2581,11 @@ void SP2D::softParticleLangevinPerturbLoop() {
 void SP2D::initSoftParticleLangevinFlow(double Temp, double gamma, bool readState) {
   this->sim_ = new SoftParticleLangevinFlow(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
-  this->sim_->noise = sqrt(2. * Temp * gamma);
-  this->sim_->lcoeff1 = 0.25 * dt * sqrt(dt) * gamma * this->sim_->noise;
-  this->sim_->lcoeff2 = 0.5 * sqrt(dt) * this->sim_->noise;
-  this->sim_->lcoeff3 = (0.5 / sqrt(3)) * sqrt(dt) * dt * this->sim_->noise;
+  this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
   this->sim_->d_rando.resize(numParticles * nDim);
-  this->sim_->d_thermalVel.resize(d_particleVel.size());
-  thrust::fill(this->sim_->d_thermalVel.begin(), this->sim_->d_thermalVel.end(), double(0));
+  thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
+  thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
   resetLastPositions();
   setInitialPositions();
   calcSurfaceHeight();
@@ -2718,8 +2701,8 @@ void SP2D::softParticleNoseHooverLoop() {
 
 void SP2D::getDoubleNoseHooverParams(double &mass, double &damping1, double &damping2) {
   mass = this->sim_->mass;
-  damping1 = this->sim_->lcoeff1;
-  damping2 = this->sim_->lcoeff2;
+  damping1 = this->sim_->gamma1;
+  damping2 = this->sim_->gamma2;
   //cout << "SP2D::getNoseHooverParams:: damping: " << this->sim_->gamma << endl;
 }
 
@@ -2727,8 +2710,8 @@ void SP2D::getDoubleNoseHooverParams(double &mass, double &damping1, double &dam
 void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double mass, double gamma1, double gamma2, bool readState) {
   this->sim_ = new SoftParticleDoubleNoseHoover(this, SimConfig(Temp1, 0, Temp2));
   this->sim_->mass = mass;
-  this->sim_->lcoeff1 = gamma1;
-  this->sim_->lcoeff2 = gamma2;
+  this->sim_->gamma1 = gamma1;
+  this->sim_->gamma2 = gamma2;
   resetLastPositions();
   setInitialPositions();
   shift = true;
@@ -2737,7 +2720,7 @@ void SP2D::initSoftParticleDoubleNoseHoover(double Temp1, double Temp2, double m
   }
   std::tuple<double, double, double> Temps = getParticleT1T2();
   cout << "SP2D::initSoftParticleDoubleNoseHoover:: T1: " << setprecision(12) << get<0>(Temps) << " T2: " << get<1>(Temps) << " T: " << get<2>(Temps) << endl;
-  cout << " mass: " << this->sim_->mass << ", damping1: " << this->sim_->lcoeff1 << " damping2: " << this->sim_->lcoeff2 << endl;
+  cout << " mass: " << this->sim_->mass << ", damping1: " << this->sim_->gamma1 << " damping2: " << this->sim_->gamma2 << endl;
 }
 
 void SP2D::softParticleDoubleNoseHooverLoop() {
