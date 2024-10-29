@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, dampingDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // variables
   bool fixedbc = false, roundbc = true, fixedSides = false, reflect = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setLangevinType(simControlStruct::langevinEnum::langevin1);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }

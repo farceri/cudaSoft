@@ -67,14 +67,14 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-#EXE = runNVE2LJ
+EXE = runNVE2LJ
 #EXE = runNH
 #EXE = runNH2LJ
 #EXE = runNVT
 #EXE = runNVT2LJ
 #EXE = runActive
 #EXE = runActive2LJ
-EXE = runVicsek
+#EXE = runVicsek
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT

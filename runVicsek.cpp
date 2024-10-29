@@ -37,8 +37,8 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = atof(argv[12]), ew = 1e02, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping, waveQ, width;
-  double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
-  double Tinject = atof(argv[3]), Jvicsek = atof(argv[4]), driving = atof(argv[5]), Rvicsek = 5, range = 3;
+  double alphaUnit, forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]);
+  double Tinject = atof(argv[3]), Rvicsek = atof(argv[4]), driving = atof(argv[5]), Jvicsek, range = 3;
   std::string outDir, energyFile, currentDir, potType = argv[11], inDir = argv[1], dirSample, whichDynamics = "vicsek";
   //thrust::host_vector<double> boxSize(nDim);
   if(nDim == 3) {
@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setLangevinType(simControlStruct::langevinEnum::langevin1);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -82,16 +83,16 @@ int main(int argc, char **argv) {
   }
   if(vicsekDir == true) {
     if(reflect == true) {
-      whichDynamics = "reflect-jvic";
+      whichDynamics = "reflect-rvic";
     } else {
-      whichDynamics = "jvic";
+      whichDynamics = "rvic";
     }
     dirSample = whichDynamics + argv[4] + "-f0" + argv[5] + "/";
   } else {
     if(readNH == true) {
       dirSample = whichDynamics + "T" + argv[3] + "/";
     } else {
-      dirSample = whichDynamics + "jvic" + argv[4] + "-f0" + argv[5] + "/";
+      dirSample = whichDynamics + "rvic" + argv[4] + "-f0" + argv[5] + "/";
     }
   }
   ioSPFile ioSP(&sp);
@@ -112,7 +113,7 @@ int main(int argc, char **argv) {
       if(runDynamics == true) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
-          outDir = outDir + "damping" + argv[8] + "/jvic" + argv[4] + "-f0" + argv[5] + "/";
+          outDir = outDir + "damping" + argv[8] + "/rvic" + argv[4] + "-f0" + argv[5] + "/";
         }
         if(logSave == true) {
           inDir =	outDir;
@@ -175,13 +176,15 @@ int main(int argc, char **argv) {
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
+  alphaUnit = ec / (sigma * sigma);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
   cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
-  cout << "Vicsek - alignement: " << Jvicsek << " driving: " << driving << endl;
+  Jvicsek = 4*sqrt(2*damping*Tinject);
+  cout << "Vicsek - radius:" << Rvicsek << " driving: " << driving << " strength: " << Jvicsek << endl;
   damping /= timeUnit;
   driving *= forceUnit;
-  Jvicsek *= timeUnit;
+  Jvicsek *= alphaUnit;
   Rvicsek *= sigma;
   sp.setVicsekParams(driving, Jvicsek, Rvicsek);
   ioSP.saveLangevinParams(outDir, damping);

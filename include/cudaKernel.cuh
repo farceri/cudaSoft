@@ -1075,14 +1075,16 @@ __global__ void kernelCalcParticleWorkAB(const double* pRad, const double* pPos,
 __global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-    	double thisAngle, otherAngle;
+    	auto otherAngle = 0.;
 		// zero out the angular acceleration and get particle positions
 		pAlpha[particleId] = 0;
-		thisAngle = pAngle[particleId];
+		auto thisAngle = pAngle[particleId];
 		// interaction with neighbor particles
 		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
 			if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
-				pAlpha[particleId] -= d_Jvicsek * sin(thisAngle - otherAngle);
+				auto deltaAngle = thisAngle - otherAngle;
+				checkAngleMinusPIPlusPI(deltaAngle);
+				pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
 			}
 		}
   	}
