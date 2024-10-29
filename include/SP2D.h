@@ -104,7 +104,6 @@ public:
   thrust::device_vector<double> d_particleLastVel;
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
-  thrust::device_vector<double> d_particleEnergyAB;
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
@@ -114,6 +113,10 @@ public:
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
   thrust::device_vector<long> d_wallCount;
+  // two-type particles variables
+  thrust::device_vector<long> d_flagAB;
+  thrust::device_vector<double> d_squaredVelAB;
+  thrust::device_vector<double> d_particleEnergyAB;
   // hydrodynamical variables
   thrust::device_vector<double> d_flowVel;
   thrust::device_vector<double> d_surfaceHeight;
@@ -463,11 +466,11 @@ public:
 
   void calcParticleEnergyAB();
   
-  std::tuple<double, double> getParticleEnergyAB();
+  std::tuple<double, double, long> getParticleEnergyAB();
 
   void calcParticleWorkAB();
 
-  std::tuple<double, double> getParticleWorkAB();
+  std::tuple<double, double, double, long> getParticleWorkAB();
 
   void removeCOMDrift();
 

@@ -962,62 +962,7 @@ inline __device__ double calcLJMinusPlusEnergy(const double* thisPos, const doub
 }
 
 // AB particle-particle interaction energy
-__global__ void kernelCalcParticleEnergyAB(const double* pRad, const double* pPos, const double* pVel, double* sqVel, double* pEnergyAB) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-		auto otherId = -1;
-    	double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
-		// zero out the squared velocity and get particle positions
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-			sqVel[particleId * d_nDim + dim] = 0;
-		}
-		auto thisRad = pRad[particleId];
-		pEnergyAB[particleId] = 0;
-		auto isAB = false;
-		// interaction with neighbor particles
-		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
-				auto radSum = thisRad + otherRad;
-				switch (d_simControl.potentialType) {
-					case simControlStruct::potentialEnum::doubleLJ:
-					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
-					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
-						isAB = true;
-						pEnergyAB[particleId] += calcDoubleLJEnergy(thisPos, otherPos, radSum, particleId, otherId);
-					}
-					break;
-					case simControlStruct::potentialEnum::LJMinusPlus:
-					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
-						isAB = true;
-						pEnergyAB[particleId] += calcLJMinusPlusEnergy(thisPos, otherPos, radSum, particleId, otherId);
-					}
-					break;
-					case simControlStruct::potentialEnum::LJWCA:
-					otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
-					if((particleId < d_num1 && otherId >= d_num1) || (particleId >= d_num1 && otherId < d_num1)) {
-						isAB = true;
-						pEnergyAB[particleId] += calcWCAEnergy(thisPos, otherPos, radSum);
-					} else {
-						pEnergyAB[particleId] += calcLJEnergy(thisPos, otherPos, radSum);
-					}
-					break;
-					default:
-					break;
-				}
-				//if(particleId == 116 && d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId] == 109) printf("particleId %ld \t neighbor: %ld \t overlap %e \n", particleId, d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId], calcOverlap(thisPos, otherPos, radSum));
-			}
-		}
-		if(isAB == true) {
-			for (long dim = 0; dim < d_nDim; dim++) {
-				sqVel[particleId * d_nDim + dim] = pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
-			}
-		}
-  	}
-}
-
-//AB particle-particle interaction work
-__global__ void kernelCalcParticleWorkAB(const double* pRad, const double* pPos, const double* pVel, double* sqVel, double* pEnergyAB, long* flagAB) {
+__global__ void kernelCalcParticleEnergyAB(const double* pRad, const double* pPos, const double* pVel, double* sqVel, double* pEnergyAB, long* flagAB) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		auto otherId = -1;

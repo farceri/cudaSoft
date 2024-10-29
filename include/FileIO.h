@@ -102,9 +102,11 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    std::tuple<double, double> eab = sp_->getParticleEnergyAB();
-    energyFile << setprecision(precision) << get<0>(eab) / numParticles << "\t";
-    energyFile << setprecision(precision) << get<1>(eab) / numParticles << "\t";
+    std::tuple<double, double, long> eab = sp_->getParticleEnergyAB();
+    long numParticlesAB = get<2>(eab);
+    energyFile << setprecision(precision) << get<0>(eab) << "\t";
+    energyFile << setprecision(precision) << get<1>(eab) << "\t";
+    energyFile << numParticlesAB << "\t";
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 
@@ -157,9 +159,11 @@ public:
     } else {
       energyFile << "\t";
     }
-    std::tuple<double, double> eab = sp_->getParticleWorkAB();
-    energyFile << setprecision(precision) << get<0>(eab) / numParticles << "\t";
-    energyFile << setprecision(precision) << get<1>(eab) / numParticles << "\t";
+    std::tuple<double, double, double, long> eab = sp_->getParticleWorkAB();
+    long numParticlesAB = get<3>(eab);
+    energyFile << setprecision(precision) << get<0>(eab) << "\t";
+    energyFile << setprecision(precision) << (get<1>(eab) + get<2>(eab)) << "\t";
+    energyFile << numParticlesAB << "\t";
     energyFile << setprecision(precision) << etot / numParticles << endl;
   }
 

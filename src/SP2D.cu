@@ -1289,8 +1289,12 @@ void SP2D::setLJcutoff(double LJcutoff_) {
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
-  d_squaredVel.resize(numParticles * nDim);
+  d_flagAB.resize(numParticles);
+  thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
+  d_squaredVelAB.resize(numParticles * nDim);
   d_particleEnergyAB.resize(numParticles);
+  thrust::fill(d_squaredVelAB.begin(), d_squaredVelAB.end(), double(0));
+  thrust::fill(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   eAA = eAA_;
@@ -1643,7 +1647,7 @@ void SP2D::calcVicsekVelocityAlignment() {
 
 double SP2D::getVicsekVelocityAlignment() {
   calcVicsekVelocityAlignment();
-  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0)) / numParticles;
+  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 void SP2D::calcNeighborVelocityAlignment() {
@@ -1654,7 +1658,7 @@ void SP2D::calcNeighborVelocityAlignment() {
 
 double SP2D::getNeighborVelocityAlignment() {
   calcNeighborVelocityAlignment();
-  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0)) / numParticles;
+  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
@@ -2228,35 +2232,32 @@ void SP2D::calcParticleEnergyAB() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
+	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVelAB[0]);
 	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
   switch (simControl.neighborType) {
     case simControlStruct::neighborEnum::neighbor:
-    kernelCalcParticleEnergyAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB);
+    kernelCalcParticleEnergyAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB, flagAB);
     break;
     default:
     break;
   }
 }
 
-std::tuple<double, double> SP2D::getParticleEnergyAB() {
+std::tuple<double, double, long> SP2D::getParticleEnergyAB() {
   calcParticleEnergyAB();
-  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
-  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
-  return std::make_tuple(ekin, epot);
+  long numParticlesAB = thrust::reduce(d_flagAB.begin(), d_flagAB.end(), 0, thrust::plus<long>());
+  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
+  double ekin = 0.5 * thrust::reduce(d_squaredVelAB.begin(), d_squaredVelAB.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(epot, ekin, numParticlesAB);
 }
 
 void SP2D::calcParticleWorkAB() {
-  thrust::device_vector<long> d_flagAB(numParticles);
-  thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-	double *sqVelAB = thrust::raw_pointer_cast(&d_squaredVel[0]);
-	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
+  thrust::fill(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
 	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
+	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *pEnergyAB = thrust::raw_pointer_cast(&d_particleEnergyAB[0]);
   if(simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
-    kernelCalcParticleWorkAB<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, sqVelAB, pEnergyAB, flagAB);
     // add work done by damping forces
     double s_dt(dt);
     long s_nDim(nDim);
@@ -2306,11 +2307,14 @@ void SP2D::calcParticleWorkAB() {
   }
 }
 
-std::tuple<double, double> SP2D::getParticleWorkAB() {
+std::tuple<double, double, double, long> SP2D::getParticleWorkAB() {
+  calcParticleEnergyAB();
+  long numParticlesAB = thrust::reduce(d_flagAB.begin(), d_flagAB.end(), 0, thrust::plus<long>());
+  double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
+  double ekin = 0.5 * thrust::reduce(d_squaredVelAB.begin(), d_squaredVelAB.end(), double(0), thrust::plus<double>());
   calcParticleWorkAB();
-  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
-  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
-  return std::make_tuple(ekin, work);
+  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(epot, ekin, work, numParticlesAB);
 }
 
 //************************* contacts and neighbors ***************************//
