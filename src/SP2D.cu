@@ -48,7 +48,7 @@ SP2D::SP2D(long nParticles, long dim) {
   setNDim(nDim);
   setNumParticles(numParticles);
 	simControl.particleType = simControlStruct::particleEnum::passive;
-	simControl.langevinType = simControlStruct::langevinEnum::langevin2;
+	simControl.noiseType = simControlStruct::noiseEnum::langevin2;
 	simControl.geometryType = simControlStruct::geometryEnum::normal;
 	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
@@ -174,22 +174,22 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
   } else if(simControl.particleType == simControlStruct::particleEnum::active) {
     if(nDim == 2) {
       d_particleAngle.resize(numParticles);
-      d_activeAngle.resize(numParticles);
+      d_randAngle.resize(numParticles);
     } else if(nDim == 3) {
       d_particleAngle.resize(numParticles * nDim);
-      d_activeAngle.resize(numParticles * nDim);
+      d_randAngle.resize(numParticles * nDim);
     }
     thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
-    thrust::fill(d_activeAngle.begin(), d_activeAngle.end(), double(0));
+    thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
     d_velAlign.resize(numParticles);
     thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    d_randAngle.resize(numParticles);
     d_particleAngle.resize(numParticles);
-    d_particleOmega.resize(numParticles);
     d_particleAlpha.resize(numParticles);
+    thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
     thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
-    thrust::fill(d_particleOmega.begin(), d_particleOmega.end(), double(0));
     thrust::fill(d_particleAlpha.begin(), d_particleAlpha.end(), double(0));
     initVicsekNeighbors(numParticles);
     d_vicsekLastPos.resize(numParticles * nDim);
@@ -203,14 +203,20 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
 	syncSimControlToDevice();
 }
 
-void SP2D::setLangevinType(simControlStruct::langevinEnum langevinType_) {
-	simControl.langevinType = langevinType_;
-  if(simControl.langevinType == simControlStruct::langevinEnum::langevin1) {
-    cout << "SP2D::setLangevinType: langevinType: langevin1" << endl;
-  } else if(simControl.langevinType == simControlStruct::langevinEnum::langevin2) {
-    cout << "SP2D::setLangevinType: langevinType: langevin2" << endl;
+void SP2D::setNoiseType(simControlStruct::noiseEnum noiseType_) {
+	simControl.noiseType = noiseType_;
+  if(simControl.noiseType == simControlStruct::noiseEnum::langevin1) {
+    cout << "SP2D::setNoiseType: noiseType: langevin1" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::langevin2) {
+    cout << "SP2D::setNoiseType: noiseType: langevin2" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::brownian) {
+    cout << "SP2D::setNoiseType: noiseType: brownian" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::activeNoise) {
+    cout << "SP2D::setNoiseType: noiseType: velActive" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::vicsekNoise) {
+    cout << "SP2D::setNoiseType: noiseType: velVicsek" << endl;
   } else {
-    cout << "SP2D::setLangevinType: please specify valid particleType: langevin1 or langevin2" << endl;
+    cout << "SP2D::setNoiseType: please specify valid particleType: langevin1, langevin2, velActive or velVicsek" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -263,7 +269,7 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     setBoxType(simControlStruct::boxEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: harmonic" << " boxType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    setBoxType(simControlStruct::boxEnum::lennardJones);
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: lennardJones" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
@@ -274,10 +280,10 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     setBoxType(simControlStruct::boxEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: adhesive" << " boxType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    setBoxType(simControlStruct::boxEnum::lennardJones);
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
-    setBoxType(simControlStruct::boxEnum::lennardJones);
+    setBoxType(simControlStruct::boxEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << " boxType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
     setBoxType(simControlStruct::boxEnum::WCA);
@@ -1250,8 +1256,9 @@ void SP2D::getSelfPropulsionParams(double &driving_, double &taup_) {
   //cout << "SP2D::getSelfPropulsionParams:: driving: " << driving_ << " taup: " << taup_ << endl;
 }
 
-void SP2D::setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_) {
+void SP2D::setVicsekParams(double driving_, double taup_, double Jvicsek_, double Rvicsek_) {
   driving = driving_;
+  taup = taup_;
   Jvicsek = Jvicsek_;
   Rvicsek = Rvicsek_;
   double boxRadius = getBoxRadius();
@@ -1260,13 +1267,16 @@ void SP2D::setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_) {
     cout << "SP2D::setVicsekParams:: Rvicsek cannot be grater than half the boxRadius, setting Rvicsek equal to half the boxRadius" << endl;
   }
   cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
+  cudaMemcpyToSymbol(d_taup, &taup, sizeof(taup));
   cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
   //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
-void SP2D::getVicsekParams(double &driving_, double &Jvicsek_, double &Rvicsek_) {
+void SP2D::getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, double &Rvicsek_) {
   driving_ = driving;
+  taup_ = taup;
   Jvicsek_ = Jvicsek;
+  Rvicsek_ = Rvicsek;
   //cout << "SP2D::getVicsekParams:: driving: " << driving_ << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
@@ -1439,17 +1449,14 @@ void SP2D::addSelfPropulsion() {
   double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	if(nDim == 2) {
-    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_activeAngle.begin(), gaussNum(0.f,1.f));
-    const double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), wrappedGaussNum(0.f,amplitude));
+    double *randAngle = thrust::raw_pointer_cast(&d_randAngle[0]);
 
     auto updateActiveNoise2D = [=] __device__ (long pId) {
-      pAngle[pId] += amplitude * activeAngle[pId];
-      while (pAngle[pId] > PI) {
-        pAngle[pId] -= 2 * PI;
-      }
-      while (pAngle[pId] < -PI) {
-          pAngle[pId] += 2 * PI;
-      }
+      pAngle[pId] += randAngle[pId];
+      pAngle[pId] = pAngle[pId] + PI;
+      pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
+      pAngle[pId] = pAngle[pId] - PI;
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1460,28 +1467,28 @@ void SP2D::addSelfPropulsion() {
 
   } else if(nDim == 3) {
     auto s = thrust::counting_iterator<long>(0);
-    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles * nDim, d_activeAngle.begin(), gaussNum(0.f,1.f));
-    double *activeAngle = thrust::raw_pointer_cast(&d_activeAngle[0]);
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles * nDim, d_randAngle.begin(), gaussNum(0.f,1.f));
+    double *randAngle = thrust::raw_pointer_cast(&d_randAngle[0]);
 
     auto normalizeVector = [=] __device__ (long particleId) {
       auto norm = 0.0;
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < nDim; dim++) {
-        norm += activeAngle[particleId * s_nDim + dim] * activeAngle[particleId * s_nDim + dim];
+        norm += randAngle[particleId * s_nDim + dim] * randAngle[particleId * s_nDim + dim];
       }
       norm = sqrt(norm);
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
-        activeAngle[particleId * s_nDim + dim] /= norm;
+        randAngle[particleId * s_nDim + dim] /= norm;
       }
     };
 
     thrust::for_each(s, s + numParticles, normalizeVector);
 
     auto updateActiveNoise3D = [=] __device__ (long particleId) {
-      pAngle[particleId * s_nDim] += amplitude * (pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim + 2] - pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim + 1]);
-      pAngle[particleId * s_nDim + 1] += amplitude * (pAngle[particleId * s_nDim + 2] * activeAngle[particleId * s_nDim] - pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 2]);
-      pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * activeAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * activeAngle[particleId * s_nDim]);
+      pAngle[particleId * s_nDim] += amplitude * (pAngle[particleId * s_nDim + 1] * randAngle[particleId * s_nDim + 2] - pAngle[particleId * s_nDim + 2] * randAngle[particleId * s_nDim + 1]);
+      pAngle[particleId * s_nDim + 1] += amplitude * (pAngle[particleId * s_nDim + 2] * randAngle[particleId * s_nDim] - pAngle[particleId * s_nDim] * randAngle[particleId * s_nDim + 2]);
+      pAngle[particleId * s_nDim + 2] += amplitude * (pAngle[particleId * s_nDim] * randAngle[particleId * s_nDim + 1] - pAngle[particleId * s_nDim + 1] * randAngle[particleId * s_nDim]);
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[particleId * s_nDim + dim] += s_driving * pAngle[particleId * s_nDim + dim];
@@ -1493,19 +1500,26 @@ void SP2D::addSelfPropulsion() {
 }
 
 void SP2D::addVicsekAlignment() {
-  int s_nDim(nDim);
-  double s_driving(driving);
-  auto r = thrust::counting_iterator<long>(0);
-  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	if(nDim == 2) {
+    int s_nDim(nDim);
+    double s_dt(dt);
+    double s_driving(driving);
+    double s_gamma(this->sim_->gamma);
+    double amplitude = sqrt(2.0 * dt / taup);
+    auto r = thrust::counting_iterator<long>(0);
+    thrust::counting_iterator<long> index_sequence_begin(lrand48());
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), wrappedGaussNum(0.f,amplitude));
+    const double *pAlpha = thrust::raw_pointer_cast(&d_particleAlpha[0]);
+    double *randAngle = thrust::raw_pointer_cast(&d_randAngle[0]);
+    double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+    double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+
     auto updateVicsekAlignment2D = [=] __device__ (long pId) {
-      while (pAngle[pId] > PI) {
-        pAngle[pId] -= 2 * PI;
-      }
-      while (pAngle[pId] < -PI) {
-          pAngle[pId] += 2 * PI;
-      }
+      // overdamped equation for the angle with vicsek alignment as torque
+      pAngle[pId] += randAngle[pId] + s_dt * pAlpha[pId] / s_gamma;
+      pAngle[pId] = pAngle[pId] + PI;
+      pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
+      pAngle[pId] = pAngle[pId] - PI;
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1621,13 +1635,18 @@ void SP2D::addParticleGravity() {
 
 void SP2D::calcParticleForceEnergy() {
   calcParticleInteraction();
-  if(simControl.particleType == simControlStruct::particleEnum::active) {
+  switch (simControl.particleType) {
+    case simControlStruct::particleEnum::active:
     addSelfPropulsion();
-  } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    break;
+    case simControlStruct::particleEnum::vicsek:
     calcVicsekAlignment();
     addVicsekAlignment();
+    break;
+    default:
+    break;
   }
-  if(simControl.geometryType != simControlStruct::geometryEnum::normal) {
+  if (simControl.geometryType != simControlStruct::geometryEnum::normal) {
     addParticleWallInteraction();
   }
   switch (simControl.gravityType) {
@@ -1637,6 +1656,17 @@ void SP2D::calcParticleForceEnergy() {
     default:
     break;
   }
+}
+
+void SP2D::calcVicsekUnitVelocityMagnitude() {
+  const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
+  kernelCalcVicsekUnitVelocityMagnitude<<<dimGrid, dimBlock>>>(pAngle, velAlign);
+}
+
+double SP2D::getVicsekUnitVelocityMagnitude() {
+  calcVicsekUnitVelocityMagnitude();
+  return abs(thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>())) / numParticles;
 }
 
 void SP2D::calcVicsekVelocityAlignment() {
@@ -2500,23 +2530,34 @@ void SP2D::particleFIRELoop() {
   this->fire_->minimizerParticleLoop();
 }
 
-//***************************** NVT integrators ******************************//
+//***************************** Langevin integrators ******************************//
 void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
-  switch (simControl.langevinType) {
-    case simControlStruct::langevinEnum::langevin1:
+  switch (simControl.noiseType) {
+    case simControlStruct::noiseEnum::langevin1:
     this->sim_ = new SoftParticleLangevin(this, SimConfig(Temp, 0, 0));
-    this->sim_->noise = sqrt(2. * Temp * gamma / dt);
-    cout << "SP2D::initSoftParticleLangevin:: langevinType 1";
+    cout << "SP2D::initSoftParticleLangevin:: noiseType 1";
     break;
-    case simControlStruct::langevinEnum::langevin2:
+    case simControlStruct::noiseEnum::langevin2:
     this->sim_ = new SoftParticleLangevin2(this, SimConfig(Temp, 0, 0));
-    this->sim_->noise = sqrt(2. * Temp * gamma / dt);
     this->sim_->d_rando.resize(numParticles * nDim);
     thrust::fill(this->sim_->d_rando.begin(), this->sim_->d_rando.end(), double(0));
-    cout << "SP2D::initSoftParticleLangevin:: langevinType 2";
+    cout << "SP2D::initSoftParticleLangevin:: noiseType 2";
+    break;
+    case simControlStruct::noiseEnum::brownian:
+    this->sim_ = new SoftParticleBrownian(this, SimConfig(Temp, 0, 0));
+    cout << "SP2D::initSoftParticleLangevin:: Brownian integrator";
+    break;
+    case simControlStruct::noiseEnum::activeNoise:
+    this->sim_ = new SoftParticleActiveBrownian(this, SimConfig(Temp, 0, 0));
+    cout << "SP2D::initSoftParticleLangevin:: Active Brownian integrator";
+    break;
+    case simControlStruct::noiseEnum::vicsekNoise:
+    this->sim_ = new SoftParticleVicsek(this, SimConfig(Temp, 0, 0));
+    cout << "SP2D::initSoftParticleLangevin:: Overdamped Vicsek integrator";
     break;
   }
   this->sim_->gamma = gamma;
+  this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
   thrust::fill(this->sim_->d_rand.begin(), this->sim_->d_rand.end(), double(0));
   resetLastPositions();

@@ -97,21 +97,9 @@ inline __device__ double pbcDistanceLE(const double x1, const double y1, const d
 }
 
 inline __device__ void checkAngleMinusPIPlusPI(double &angle) {
-    while (angle > PI) {
-        angle -= 2 * PI;
-    }
-    while (angle < -PI) {
-        angle += 2 * PI;
-    }
-}
-
-inline __device__ void checkAngle02PI(double &angle) {
-    while (angle > 2 * PI) {
-        angle -= 2 * PI;
-    }
-    while (angle < 0) {
-        angle += 2 * PI;
-    }
+	angle = angle + PI;
+	angle = angle - 2.0 * PI * floor(angle / (2.0 * PI));
+	angle = angle - PI;
 }
 
 inline __device__ void cartesianToPolar(const double* vec, double &r, double &theta) {
@@ -1022,16 +1010,47 @@ __global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) 
   	if (particleId < d_numParticles) {
     	auto otherAngle = 0.;
 		// zero out the angular acceleration and get particle positions
-		pAlpha[particleId] = 0;
+		pAlpha[particleId] = 0.;
 		auto thisAngle = pAngle[particleId];
 		// interaction with neighbor particles
-		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
-				auto deltaAngle = thisAngle - otherAngle;
-				checkAngleMinusPIPlusPI(deltaAngle);
-				pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
+		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
+					auto deltaAngle = thisAngle - otherAngle;
+					checkAngleMinusPIPlusPI(deltaAngle);
+					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
+				}
 			}
 		}
+  	}
+}
+
+// particle-particle vicsek interaction
+__global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	auto otherAngle = 0.;
+		// zero out the angular acceleration and get particle positions
+		auto thisAngle = 0.;
+		// interaction with neighbor particles
+		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
+					thisAngle += otherAngle;
+				}
+			}
+			thisAngle /= d_vicsekMaxNeighborListPtr[particleId];
+		}
+		pAngle[particleId] = thisAngle;
+  	}
+}
+
+// vicsek average unit velocity
+__global__ void kernelCalcVicsekUnitVelocityMagnitude(const double* pAngle, double* velAlign) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		// compute unit vector magnitude
+		velAlign[particleId] = cos(pAngle[particleId]) + sin(pAngle[particleId]);
   	}
 }
 
@@ -1044,18 +1063,18 @@ __global__ void kernelCalcVicsekVelocityAlignment(const double* pVel, double* ve
 		// zero out squared velocity components
 		for (long dim = 0; dim < d_nDim; dim++) {
 			thisVel[dim] = pVel[particleId * d_nDim + dim];
-			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+			thisVelSquared += thisVel[dim] * thisVel[dim];
 		}
 		velAlign[particleId] = 0.;
 		// alignment with vicsek neighbor particles
-		for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
-				for (long dim = 0; dim < d_nDim; dim++) {
-					velAlign[particleId] += thisVel[dim] * otherVel[dim];
+		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+				if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
+					for (long dim = 0; dim < d_nDim; dim++) {
+						velAlign[particleId] += thisVel[dim] * otherVel[dim];
+					}
 				}
 			}
-		}
-		if(d_vicsekMaxNeighborListPtr[particleId] != 0) {
 			velAlign[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
 		}
   	}

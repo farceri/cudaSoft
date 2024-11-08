@@ -194,4 +194,37 @@ public:
   virtual void integrate();
 };
 
+// Soft particle Brownian integrator child of SoftParticleLangevin
+class SoftParticleBrownian: public SoftParticleLangevin
+{
+public:
+  SoftParticleBrownian() = default;
+  SoftParticleBrownian(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+
+  virtual void updatePosition(double timeStep);
+  virtual void updateThermalVel();
+  virtual void integrate();
+};
+
+// Soft particle Active Brownian integrator child of SoftParticleBrownian
+class SoftParticleActiveBrownian: public SoftParticleBrownian
+{
+public:
+  SoftParticleActiveBrownian() = default;
+  SoftParticleActiveBrownian(SP2D * spPtr, SimConfig config) : SoftParticleBrownian:: SoftParticleBrownian(spPtr, config){;}
+
+  virtual void updateThermalVel();
+  virtual void integrate();
+};
+
+// Soft particle ActiveBrownian integrator + Vicsek alignment child of SoftParticleActiveBrownian
+class SoftParticleVicsek: public SoftParticleActiveBrownian
+{
+public:
+  SoftParticleVicsek() = default;
+  SoftParticleVicsek(SP2D * spPtr, SimConfig config) : SoftParticleActiveBrownian:: SoftParticleActiveBrownian(spPtr, config){;}
+  
+  virtual void integrate();
+};
+
 #endif // SIMULATOR_H //

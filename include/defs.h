@@ -86,4 +86,25 @@ struct gaussNum
     }
 };
 
+struct wrappedGaussNum
+{
+    double a, b;
+    mutable thrust::default_random_engine rng;
+
+    __host__ __device__
+    wrappedGaussNum(double _a=0.f, double _b=1.f) : a(_a), b(_b) {};
+
+    __host__ __device__
+    double operator()(const unsigned int n) const
+    {
+        thrust::normal_distribution<double> dist(a, b);
+        rng.discard(n);
+        double wrapNum = dist(rng);
+        wrapNum = wrapNum + PI;
+        wrapNum = wrapNum - 2.0 * PI * floor(wrapNum / (2.0 * PI));
+        wrapNum = wrapNum - PI;
+        return wrapNum;
+    }
+};
+
 #endif /* DEFS_H_ */

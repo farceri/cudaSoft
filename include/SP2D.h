@@ -23,7 +23,7 @@ using std::tuple;
 
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
-  enum class langevinEnum {langevin1, langevin2} langevinType;
+  enum class noiseEnum {langevin1, langevin2, brownian, activeNoise, vicsekNoise} noiseType;
   enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -108,7 +108,7 @@ public:
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
   thrust::device_vector<double> d_velAlign;
-  thrust::device_vector<double> d_activeAngle;
+  thrust::device_vector<double> d_randAngle;
   thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
@@ -168,7 +168,7 @@ public:
 
   void setParticleType(simControlStruct::particleEnum particleType_);
 
-  void setLangevinType(simControlStruct::langevinEnum langevinType_);
+  void setNoiseType(simControlStruct::noiseEnum noiseType_);
 
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
@@ -323,8 +323,8 @@ public:
   void setSelfPropulsionParams(double driving_, double taup_);
   void getSelfPropulsionParams(double &driving_, double &taup_);
 
-  void setVicsekParams(double driving_, double Jvicsek_, double Rvicsek_);
-  void getVicsekParams(double &driving_, double &Jvicsek_, double &Rvicsek_);
+  void setVicsekParams(double driving_, double taup_, double Jvicsek_, double Rvicsek_);
+  void getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, double &Rvicsek_);
 
   void setAdhesionParams(double l1_, double l2_);
 
@@ -372,6 +372,10 @@ public:
   void addParticleGravity();
 
   void calcParticleForceEnergy();
+
+  void calcVicsekUnitVelocityMagnitude();
+
+  double getVicsekUnitVelocityMagnitude();
 
   void calcVicsekVelocityAlignment();
 
@@ -502,7 +506,7 @@ public:
 
   void particleFIRELoop();
 
-  // NVT integrators
+  // Langevin integrators
   void initSoftParticleLangevin(double Temp, double gamma, bool readState);
 
   void softParticleLangevinLoop();
@@ -519,6 +523,7 @@ public:
 
   void softParticleLangevinPerturbLoop();
 
+  // Fluid flow integrators
   void initSoftParticleLangevinFlow(double Temp, double gamma, bool readState);
 
   void softParticleLangevinFlowLoop();

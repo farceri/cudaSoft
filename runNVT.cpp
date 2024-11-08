@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = false, dampingDir = true, justRun = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool fixedbc = false, roundbc = true, fixedSides = false, reflect = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;

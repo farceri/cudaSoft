@@ -170,20 +170,18 @@ public:
   void saveAlignEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
-    double edamp = sp_->getDampingWork();
-    double enoise = sp_->getNoiseWork();
-    double etot = epot + ekin + edamp + enoise;
+    double etot = epot + ekin;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles << "\t";
-    energyFile << setprecision(precision) << enoise / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double velAlign = sp_->getNeighborVelocityAlignment();
       energyFile << "\t" << setprecision(precision) << velAlign << endl;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double velAlign = sp_->getVicsekVelocityAlignment();
+      double velAlign = sp_->getVicsekUnitVelocityMagnitude();
+      energyFile << "\t" << setprecision(precision) << velAlign << "\t";
+      velAlign = sp_->getVicsekVelocityAlignment();
       energyFile << "\t" << setprecision(precision) << velAlign << endl;
     } else {
       cout << endl;
@@ -704,10 +702,10 @@ public:
   void saveParticleNeighbors(string dirName) {
     if(sp_->simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
       save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-      if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-        save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
-        save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
-      }
+    }
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
+      save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
     }
   }
 
@@ -722,11 +720,12 @@ public:
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double driving, Jvicsek, Rvicsek;
-      sp_->getVicsekParams(driving, Jvicsek, Rvicsek);
+      double driving, taup, Jvicsek, Rvicsek;
+      sp_->getVicsekParams(driving, taup, Jvicsek, Rvicsek);
+      saveParams << "taup" << "\t" << taup << endl;
+      saveParams << "f0" << "\t" << driving << endl;
       saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
       saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
-      saveParams << "f0" << "\t" << driving << endl;
     }
     saveParams.close();
   }
@@ -745,11 +744,12 @@ public:
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double driving, Jvicsek, Rvicsek;
-      sp_->getVicsekParams(driving, Jvicsek, Rvicsek);
+      double driving, taup, Jvicsek, Rvicsek;
+      sp_->getVicsekParams(driving, taup, Jvicsek, Rvicsek);
+      saveParams << "taup" << "\t" << taup << endl;
+      saveParams << "f0" << "\t" << driving << endl;
       saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
       saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
-      saveParams << "f0" << "\t" << driving << endl;
     }
     saveParams.close();
   }

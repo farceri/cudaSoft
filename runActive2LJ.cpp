@@ -31,12 +31,12 @@ int main(int argc, char **argv) {
   bool readNH = true, activeDir = true, justRun = false;
   bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
-  bool readNVT = false, readState = true, saveFinal = true, logSave = false, linSave = false, savePressure, saveWall;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), waveQ;
-  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]), range = 3;
+  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping;
   std::string outDir, energyFile, currentDir, potType = argv[12], inDir = argv[1], dirSample, whichDynamics = "active";
   if(nDim == 3) {
@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
-        readNVT = true; // initialize from NVT
+        initAngles = true; // initialize from NVT
         if(activeDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(readNVT == true) {
+    if(initAngles == true) {
       ioSP.readParticleVelocity(inDir, numParticles, nDim);
       sp.initializeParticleAngles();
     } else {
@@ -164,18 +164,16 @@ int main(int argc, char **argv) {
   cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
   damping /= timeUnit;
   driving = driving*forceUnit;
-  Dr = 1/(tp*timeUnit);
+  tp *= timeUnit;
   sp.setSelfPropulsionParams(driving, tp);
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
-  //sp.initSoftParticleActiveLangevin(Tinject, Dr, driving, damping, readState);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
-  range *= LJcut * sigma;
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -184,15 +182,9 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    //sp.softParticleActiveLangevinLoop();
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      if(savePressure == true) {
-        ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles, saveWall);
-      } else {
-        ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
-      }
-      //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
+      ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
@@ -233,7 +225,6 @@ int main(int argc, char **argv) {
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
-        //ioSP.saveDumpPacking(currentDir, numParticles, nDim, step * timeStep);
       }
     }
     step += 1;

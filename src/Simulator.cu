@@ -44,18 +44,6 @@ void SoftParticleLangevin::injectKineticEnergy() {
   conserveMomentum();
 }
 
-void SoftParticleLangevin::updatePosition(double timeStep) {
-	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
-	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
-}
-
-void SoftParticleLangevin::updateVelocity(double timeStep) {
-  double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
-  kernelUpdateParticleVel<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, pForce, timeStep);
-}
-
 void SoftParticleLangevin::updateThermalVel() {
   // generate random numbers between 0 and 1 for thermal noise
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
@@ -77,6 +65,18 @@ void SoftParticleLangevin::updateThermalVel() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinAddThermostatForces);
+}
+
+void SoftParticleLangevin::updateVelocity(double timeStep) {
+  double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+  kernelUpdateParticleVel<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, pForce, timeStep);
+}
+
+void SoftParticleLangevin::updatePosition(double timeStep) {
+	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
+	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+  kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
 }
 
 void SoftParticleLangevin::conserveMomentum() {
@@ -128,12 +128,6 @@ void SoftParticleLangevin2::updateVelocity(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticleVel);
-
-  if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-    double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));
-    const double* pAlpha = thrust::raw_pointer_cast(&(sp_->d_particleAlpha[0]));
-    kernelUpdateParticleOmega<<<sp_->dimGrid, sp_->dimBlock>>>(pOmega, pAlpha, timeStep);
-  }
 }
 
 void SoftParticleLangevin2::updatePosition(double timeStep) {
@@ -152,12 +146,6 @@ void SoftParticleLangevin2::updatePosition(double timeStep) {
   };
 
   thrust::for_each(r, r + sp_->numParticles, langevinUpdateParticlePos);
-  
-  if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-    double* pAngle = thrust::raw_pointer_cast(&(sp_->d_particleAngle[0]));
-    const double* pOmega = thrust::raw_pointer_cast(&(sp_->d_particleOmega[0]));
-    kernelUpdateParticleAngle<<<sp_->dimGrid, sp_->dimBlock>>>(pAngle, pOmega, timeStep);
-  }
 }
 
 //************** soft particle langevin with massive particles ***************//
@@ -557,3 +545,77 @@ void SoftParticleDoubleNoseHoover::updateThermalVel() {
   thrust::for_each(r, r + sp_->numParticles, doubleNoseHooverSecondUpdateParticleVel);
 }
 
+//**************************** brownian integrator *****************************//
+void SoftParticleBrownian::integrate() {
+  sp_->checkParticleNeighbors();
+  sp_->calcParticleForceEnergy();
+  updateThermalVel();
+  updatePosition(sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleBrownian::updateThermalVel() {
+  // generate random numbers between 0 and 1 for thermal noise
+  thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, d_rand.begin(), gaussNum(0.f,1.f));
+  // assign overdamped velocity
+  long s_nDim(sp_->nDim);
+  double s_gamma(gamma);
+  double s_noise(noise);
+  auto r = thrust::counting_iterator<long>(0);
+  const double *rand = thrust::raw_pointer_cast(&d_rand[0]);
+  const double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+  double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+
+  auto updateBrownianVel = [=] __device__ (long particleId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+		  pVel[particleId * s_nDim + dim] = (pForce[particleId * s_nDim + dim] + s_noise * rand[particleId * s_nDim + dim]) / s_gamma;
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, updateBrownianVel);
+}
+
+void SoftParticleBrownian::updatePosition(double timeStep) {
+	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
+	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+  kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
+}
+
+//**************************** active brownian integrator *****************************//
+void SoftParticleActiveBrownian::integrate() {
+  sp_->checkParticleNeighbors();
+  sp_->calcParticleForceEnergy();
+  updateThermalVel();
+  updatePosition(sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleActiveBrownian::updateThermalVel() {
+  // assign overdamped velocity as total force over damping
+  long s_nDim(sp_->nDim);
+  double s_gamma(gamma);
+  auto r = thrust::counting_iterator<long>(0);
+  const double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+  double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+
+  auto updateActiveBrownianVel = [=] __device__ (long particleId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      // self-propulsion has already been added to the force
+		  pVel[particleId * s_nDim + dim] = pForce[particleId * s_nDim + dim] / s_gamma;
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, updateActiveBrownianVel);
+}
+
+//**************************** vicsek integrator *****************************//
+void SoftParticleVicsek::integrate() {
+  sp_->checkParticleNeighbors();
+  sp_->calcParticleForceEnergy();
+  updateThermalVel();
+  updatePosition(sp_->dt);
+  //conserveMomentum();
+}
