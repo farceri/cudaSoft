@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(dynType == "l1") {
-    sp.setLangevinType(simControlStruct::langevinEnum::langevin1);
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
   }
   if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);

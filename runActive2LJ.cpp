@@ -38,13 +38,17 @@ int main(int argc, char **argv) {
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), waveQ;
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
   double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping;
-  std::string outDir, energyFile, currentDir, potType = argv[12], inDir = argv[1], dirSample, whichDynamics = "active";
+  std::string outDir, potType = argv[12], energyFile, currentDir, inDir = argv[1];
+  std::string dynType = argv[14], dirSample, whichDynamics = "active";
   if(nDim == 3) {
     LJcut = 2.5;
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
+  if(dynType == "l1") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
