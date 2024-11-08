@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   bool readNH = false, dampingDir = true, justRun = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, fixedSides = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true, fixedSides = false;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
