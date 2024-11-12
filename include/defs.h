@@ -35,6 +35,14 @@ struct cube {
   __device__ __host__ double operator()(const double xi) { return xi*xi*xi; }
 };
 
+struct cosine {
+  __device__ __host__ double operator()(const double xi) { return cos(xi); }
+};
+
+struct sine {
+  __device__ __host__ double operator()(const double xi) { return sin(xi); }
+};
+
 struct randNum
 {
     double a, b;

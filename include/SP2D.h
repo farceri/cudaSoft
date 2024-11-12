@@ -107,12 +107,14 @@ public:
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
-  thrust::device_vector<double> d_velAlign;
   thrust::device_vector<double> d_randAngle;
   thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
   thrust::device_vector<double> d_wallForce;
   thrust::device_vector<long> d_wallCount;
+  // correlation variables
+  thrust::device_vector<double> d_velCorr;
+  thrust::device_vector<double> d_vortexParam;
   // two-type particles variables
   thrust::device_vector<long> d_flagAB;
   thrust::device_vector<double> d_squaredVelAB;
@@ -373,17 +375,13 @@ public:
 
   void calcParticleForceEnergy();
 
-  void calcVicsekUnitVelocityMagnitude();
+  std::tuple<double, double> getVicsekOrderParameters();
 
-  double getVicsekUnitVelocityMagnitude();
+  double getVicsekVortexParameter();
 
-  void calcVicsekVelocityAlignment();
+  double getVicsekVelocityCorrelation();
 
-  double getVicsekVelocityAlignment();
-
-  void calcNeighborVelocityAlignment();
-
-  double getNeighborVelocityAlignment();
+  double getNeighborVelocityCorrelation();
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 

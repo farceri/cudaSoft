@@ -1046,16 +1046,34 @@ __global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
 }
 
 // vicsek average unit velocity
-__global__ void kernelCalcVicsekUnitVelocityMagnitude(const double* pAngle, double* velAlign) {
+__global__ void kernelCalcVelocityComplexParts(const double* pVel, double* reVel, double* imVel) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		// compute unit vector magnitude
-		velAlign[particleId] = cos(pAngle[particleId]) + sin(pAngle[particleId]);
+		auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+		reVel[particleId] = cos(velAngle);
+		imVel[particleId] = sin(velAngle);
   	}
 }
 
+
+__global__ void kernelCalcVortexParameters(const double* pPos, const double* pAngle, double* vortexParam) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// get driving angle and position angle from polar coordinates
+		auto thisAngle = pAngle[particleId];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		vortexParam[particleId] = sin(thisTheta - thisAngle);
+	}
+}
+
 // vicsek velocity alignment
-__global__ void kernelCalcVicsekVelocityAlignment(const double* pVel, double* velAlign) {
+__global__ void kernelCalcVicsekVelocityCorrelation(const double* pVel, double* velCorr) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
     	double thisVel[MAXDIM], otherVel[MAXDIM];
@@ -1065,23 +1083,23 @@ __global__ void kernelCalcVicsekVelocityAlignment(const double* pVel, double* ve
 			thisVel[dim] = pVel[particleId * d_nDim + dim];
 			thisVelSquared += thisVel[dim] * thisVel[dim];
 		}
-		velAlign[particleId] = 0.;
+		velCorr[particleId] = 0.;
 		// alignment with vicsek neighbor particles
 		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
 			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
 				if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
 					for (long dim = 0; dim < d_nDim; dim++) {
-						velAlign[particleId] += thisVel[dim] * otherVel[dim];
+						velCorr[particleId] += thisVel[dim] * otherVel[dim];
 					}
 				}
 			}
-			velAlign[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
+			velCorr[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
 		}
   	}
 }
 
 // neighbor velocity alignment
-__global__ void kernelCalcNeighborVelocityAlignment(const double* pVel, double* velAlign) {
+__global__ void kernelCalcNeighborVelocityCorrelation(const double* pVel, double* velCorr) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
     	double thisVel[MAXDIM], otherVel[MAXDIM];
@@ -1091,17 +1109,17 @@ __global__ void kernelCalcNeighborVelocityAlignment(const double* pVel, double* 
 			thisVel[dim] = pVel[particleId * d_nDim + dim];
 			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
 		}
-		velAlign[particleId] = 0.;
+		velCorr[particleId] = 0.;
 		// alignment with vicsek neighbor particles
 		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
 			if (extractParticleNeighborVel(particleId, nListId, pVel, otherVel)) {
 				for (long dim = 0; dim < d_nDim; dim++) {
-					velAlign[particleId] += thisVel[dim] * otherVel[dim];
+					velCorr[particleId] += thisVel[dim] * otherVel[dim];
 				}
 			}
 		}
 		if(d_partMaxNeighborListPtr[particleId] != 0) {
-			velAlign[particleId] /= (thisVelSquared * d_partMaxNeighborListPtr[particleId]);
+			velCorr[particleId] /= (thisVelSquared * d_partMaxNeighborListPtr[particleId]);
 		}
   	}
 }
@@ -1716,9 +1734,7 @@ __global__ void kernelReflectParticleRoundBoxWithNoise(const double* pRad, const
 		cartesianToPolar(thisPos, thisR, thisTheta);
 		if((d_boxRadius - thisR) < thisRad) {
 			// add Gaussian noise to the angle of reflection
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			auto reflectAngle = 2 * thisTheta - velAngle; // angle of reflection in the global frame
-			reflectAngle += randAngle[particleId];
+			auto reflectAngle = thisTheta + randAngle[particleId];
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);

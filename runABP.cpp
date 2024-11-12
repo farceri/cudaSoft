@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
   } else {
     whichDynamics = "active/wall/";
-  };
+  }
   dirSample = whichDynamics + "tp" + argv[3] + "/";
   // set input and output
   ioSPFile ioSP(&sp);

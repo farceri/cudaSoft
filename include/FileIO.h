@@ -176,13 +176,13 @@ public:
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     energyFile << setprecision(precision) << etot / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
-      double velAlign = sp_->getNeighborVelocityAlignment();
-      energyFile << "\t" << setprecision(precision) << velAlign << endl;
+      double velCorr = sp_->getNeighborVelocityCorrelation();
+      energyFile << "\t" << setprecision(precision) << velCorr << endl;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double velAlign = sp_->getVicsekUnitVelocityMagnitude();
-      energyFile << "\t" << setprecision(precision) << velAlign << "\t";
-      velAlign = sp_->getVicsekVelocityAlignment();
-      energyFile << "\t" << setprecision(precision) << velAlign << endl;
+      double vortexParam = sp_->getVicsekVortexParameter();
+      energyFile << "\t" << setprecision(precision) << vortexParam << "\t";
+      double velCorr = sp_->getVicsekVelocityCorrelation();
+      energyFile << "\t" << setprecision(precision) << velCorr << endl;
     } else {
       cout << endl;
     }

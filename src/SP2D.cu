@@ -181,8 +181,8 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     }
     thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
-    d_velAlign.resize(numParticles);
-    thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
+    d_velCorr.resize(numParticles);
+    thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
     d_randAngle.resize(numParticles);
@@ -194,8 +194,10 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     initVicsekNeighbors(numParticles);
     d_vicsekLastPos.resize(numParticles * nDim);
     thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
-    d_velAlign.resize(numParticles);
-    thrust::fill(d_velAlign.begin(), d_velAlign.end(), double(0));
+    d_velCorr.resize(numParticles);
+    thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
+    d_vortexParam.resize(numParticles);
+    thrust::fill(d_vortexParam.begin(), d_vortexParam.end(), double(0));
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
@@ -1657,38 +1659,40 @@ void SP2D::calcParticleForceEnergy() {
     break;
   }
 }
+std::tuple<double, double> SP2D::getVicsekOrderParameters() {
+  thrust::device_vector<double> d_reVel(numParticles);
+  thrust::device_vector<double> d_imVel(numParticles);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *reVel = thrust::raw_pointer_cast(&d_reVel[0]);
+  double *imVel = thrust::raw_pointer_cast(&d_imVel[0]);
+  kernelCalcVelocityComplexParts<<<dimGrid, dimBlock>>>(pVel, reVel, imVel);
+  double realVel = thrust::reduce(d_reVel.begin(), d_reVel.end(), double(0), thrust::plus<double>()) / numParticles;
+  double imagVel = thrust::reduce(d_imVel.begin(), d_imVel.end(), double(0), thrust::plus<double>()) / numParticles;
+  double absVel = (abs(realVel) + abs(imagVel));
+  double phaseVel = atan2(realVel, imagVel);
+  return std::make_tuple(absVel, phaseVel);
+}
 
-void SP2D::calcVicsekUnitVelocityMagnitude() {
+double SP2D::getVicsekVortexParameter() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
-  kernelCalcVicsekUnitVelocityMagnitude<<<dimGrid, dimBlock>>>(pAngle, velAlign);
+  double *vortexParam = thrust::raw_pointer_cast(&d_vortexParam[0]);
+  kernelCalcVortexParameters<<<dimGrid, dimBlock>>>(pPos, pAngle, vortexParam);
+  return abs(thrust::reduce(d_vortexParam.begin(), d_vortexParam.end(), double(0), thrust::plus<double>()) / numParticles);
 }
 
-double SP2D::getVicsekUnitVelocityMagnitude() {
-  calcVicsekUnitVelocityMagnitude();
-  return abs(thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>())) / numParticles;
-}
-
-void SP2D::calcVicsekVelocityAlignment() {
+double SP2D::getVicsekVelocityCorrelation() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
-  kernelCalcVicsekVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, velAlign);
+  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
+  kernelCalcVicsekVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
+  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
-double SP2D::getVicsekVelocityAlignment() {
-  calcVicsekVelocityAlignment();
-  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>()) / numParticles;
-}
-
-void SP2D::calcNeighborVelocityAlignment() {
+double SP2D::getNeighborVelocityCorrelation() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *velAlign = thrust::raw_pointer_cast(&d_velAlign[0]);
-  kernelCalcNeighborVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, velAlign);
-}
-
-double SP2D::getNeighborVelocityAlignment() {
-  calcNeighborVelocityAlignment();
-  return thrust::reduce(d_velAlign.begin(), d_velAlign.end(), double(0), thrust::plus<double>()) / numParticles;
+  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
+  kernelCalcNeighborVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
+  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {

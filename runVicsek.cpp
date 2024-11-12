@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool fixedbc = false, roundbc = true, reflect = false, reflectnoise = false;
-  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = true, linSave = false;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
   } else {
     whichDynamics = "vicsek/wall/";
-  };
+  }
   dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
@@ -126,6 +126,7 @@ int main(int argc, char **argv) {
   velUnit = sigma / timeUnit;
   alphaUnit = ec / (sigma * sigma);
   driving = sqrt(2*damping*driving) / damping;
+  Jvicsek = Jvicsek * sigma / damping;
   cout << "Units - time: " << timeUnit << " space: " << sigma << " velocity: " << velUnit << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
   cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep / damping << endl;

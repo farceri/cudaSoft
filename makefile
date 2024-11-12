@@ -73,11 +73,11 @@ INC_DIR = include
 #EXE = runNVT
 #EXE = runNVT2LJ
 #EXE = runActive
-EXE = runActive2LJ
+#EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
-#EXE = runVicsek
+EXE = runVicsek
 #EXE = runABP
 
 # mechanics
