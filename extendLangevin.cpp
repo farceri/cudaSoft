@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sp.setEnergyCostant(ec);
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);

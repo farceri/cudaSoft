@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
   }
   // save initial configuration
   ioSP.saveParticlePacking(outDir);
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;

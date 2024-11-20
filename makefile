@@ -24,7 +24,7 @@ CC_LIBS= -lstdc++fs
 # NVCC compiler options:
 NVCC=/usr/bin/nvcc
 #NVCC=nvcc
-NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr #-g -G
+NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr #-G
 NVCC_LIBS=
 
 LFLAGS= -lm -Wno-deprecated-gpu-targets
@@ -77,8 +77,9 @@ INC_DIR = include
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
-EXE = runVicsek
+#EXE = runVicsek
 #EXE = runABP
+EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE

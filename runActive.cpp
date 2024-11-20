@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = "active/";
     cout << "Setting default harmonic potential" << endl;
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
   }
   if(activeDir == true) {
     readNH = false;

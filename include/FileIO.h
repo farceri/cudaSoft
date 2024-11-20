@@ -181,6 +181,8 @@ public:
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
       double vortexParam = sp_->getVicsekVortexParameter();
       energyFile << "\t" << setprecision(precision) << vortexParam << "\t";
+      double orderParam = sp_->getVicsekOrderParameter();
+      energyFile << "\t" << setprecision(precision) << orderParam << "\t";
       double velCorr = sp_->getVicsekVelocityCorrelation();
       energyFile << "\t" << setprecision(precision) << velCorr << endl;
     } else {
@@ -215,7 +217,7 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleISF(waveNumber) << endl;
   }
 
-  void savePressureEnergy(long step, double timeStep, long numParticles, bool saveWall) {
+  void savePressureEnergy(long step, double timeStep, long numParticles, bool wallPressure) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
     double etot = epot + ekin;
@@ -235,7 +237,7 @@ public:
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       energyFile << "\t" << setprecision(precision) << sp_->getParticleActivePressure();
     }
-    if(saveWall == true) {
+    if(wallPressure == true) {
       energyFile << "\t" << setprecision(precision) << sp_->getParticleWallPressure() << endl;
     } else {
       energyFile << endl;
@@ -365,12 +367,12 @@ public:
     energyFile << setprecision(precision) << sp_->getParticleExtensileStress() << endl;
   }
 
-  void saveParticleFixedBoxEnergy(long step, double timeStep, long numParticles) {
+  void saveParticleFixedWallEnergy(long step, double timeStep, long numParticles) {
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePotentialEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticleKineticEnergy() / numParticles << "\t";
     energyFile << setprecision(precision) << sp_->getParticlePressure() << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleBoxPressure() << endl;
+    energyFile << setprecision(precision) << sp_->getParticleWallPressure() << endl;
   }
 
   void closeEnergyFile() {
@@ -487,14 +489,19 @@ public:
 
   void save2DIndexFile(string fileName, thrust::host_vector<long> data, long numCols) {
     this->openOutputFile(fileName);
-    long numRows = int(data.size()/numCols);
-    for (long row = 0; row < numRows; row++) {
-      for(long col = 0; col < numCols; col++) {
-        outputFile << data[row * numCols + col] << "\t";
+    if(numCols == 0) {
+      cout << "save2dIndexFile: empty array!" << endl;
+      return;
+    } else {
+      long numRows = int(data.size()/numCols);
+      for (long row = 0; row < numRows; row++) {
+        for(long col = 0; col < numCols; col++) {
+          outputFile << data[row * numCols + col] << "\t";
+        }
+        outputFile << endl;
       }
-      outputFile << endl;
+      outputFile.close();
     }
-    outputFile.close();
   }
 
   thrust::host_vector<double> readBoxSize(string dirName, long nDim_) {
@@ -504,10 +511,50 @@ public:
     return boxSize_;
   }
 
+  long readWallParams(string dirName) {
+    string fileParams = dirName + "wallParams.dat";
+    ifstream readParams(fileParams.c_str());
+    if (!readParams.is_open()) {
+      cout << "Error: Unable to open file " << fileParams << " - setting default values" << endl;
+      return 0;
+    }
+    string paramName;
+    double paramValue;
+    long numWall_ = 0;
+    double wallRad_ = 0.;
+    while (readParams >> paramName >> paramValue) {
+      if(paramName == "numWall") {
+        numWall_ = paramValue;
+      } else if(paramName == "wallRad") {
+        wallRad_ = paramValue;
+      }
+    }
+    readParams.close();
+    double wallRadius_ = read0DFile(dirName + "boxSize.dat");
+    sp_->setRoundWallParams(numWall_, wallRad_, wallRadius_);
+    cout << "FileIO::readWallParams: wallRad: " << wallRad_ << " numWall: " << numWall_ << endl;
+    return numWall_;
+  }
+
+  void readWall(string dirName, long nDim_) {
+    long numWall_ = readWallParams(dirName);
+    if(numWall_ != 0) {
+      sp_->initMobileWallVariables(numWall_);
+      thrust::host_vector<double> wLength_(numWall_);
+      thrust::host_vector<double> wAngle_(numWall_);
+      thrust::host_vector<double> wPos_(numWall_ * nDim_);
+      thrust::host_vector<double> wVel_(numWall_ * nDim_);
+      
+      wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
+      sp_->setWallPositions(wPos_);
+      wVel_ = read2DFile(dirName + "wallVel.dat", numWall_);
+      sp_->setWallVelocities(wVel_);
+    } else {
+      cout << "FileIO::readWall: numWall is zero! WARNING!" << endl;
+    }
+  }
+
   void readParticlePackingFromDirectory(string dirName, long numParticles_, long nDim_) {
-    sp_->initParticleVariables(numParticles_);
-    sp_->initParticleNeighbors(numParticles_);
-    sp_->syncParticleNeighborsToDevice();
     thrust::host_vector<double> pPos_(numParticles_ * nDim_);
     thrust::host_vector<double> pRad_(numParticles_);
 
@@ -523,12 +570,12 @@ public:
     sp_->setParticleRadii(pRad_);
 
     // set box dimensions
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
       double boxRadius_ = read0DFile(dirName + "boxSize.dat");
       sp_->setBoxRadius(boxRadius_);
       boxRadius_ = sp_->getBoxRadius();
       if(nDim_ == 2) {
-        cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-R: " << boxRadius_ << endl;
+        cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " boxRadius: " << boxRadius_ << endl;
       }
     } else {
       thrust::host_vector<double> boxSize_(nDim_);
@@ -546,9 +593,6 @@ public:
   }
 
   void readPBCParticlePackingFromDirectory(string dirName, long numParticles_, long nDim_) {
-    sp_->initParticleVariables(numParticles_);
-    sp_->initParticleNeighbors(numParticles_);
-    sp_->syncParticleNeighborsToDevice();
     thrust::host_vector<double> boxSize_(nDim_);
     thrust::host_vector<double> pPos_(numParticles_ * nDim_);
     thrust::host_vector<double> pRad_(numParticles_);
@@ -593,6 +637,24 @@ public:
     save2DFile(dirName + "particleContacts.dat", sp_->getContacts(), sp_->contactLimit);
   }
 
+  void saveWallParams(string dirName) {
+    string fileParams = dirName + "wallParams.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    long numWall = sp_->getNumWall();
+    saveParams << "numWall" << "\t" << numWall << endl;
+    double wallRad = sp_->getWallRad();
+    saveParams << "wallRad" << "\t" << wallRad << endl;
+    saveParams.close();
+  }
+
+  void saveWall(string dirName) {
+    //save1DFile(dirName + "wallLengths.dat", sp_->getWallLengths());
+    //save1DFile(dirName + "wallAngles.dat", sp_->getWallAngles());
+    save2DFile(dirName + "wallPos.dat", sp_->getWallPositions(), sp_->nDim);
+    save2DFile(dirName + "wallVel.dat", sp_->getWallVelocities(), sp_->nDim);
+  }
+
   void savePackingParams(string dirName) {
     string fileParams = dirName + "params.dat";
     ofstream saveParams(fileParams.c_str());
@@ -617,7 +679,7 @@ public:
     savePackingParams(dirName);
     // save vectors
     long nDim = sp_->getNDim();
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundBox) {
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
       double boxRadius_ = sp_->getBoxRadius();
       save0DFile(dirName + "boxSize.dat", boxRadius_);
     } else {
@@ -635,8 +697,10 @@ public:
         cout << "FileIO::saveParticlePacking: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
       }
     }
-    //save1DFile(dirName + "particleEnergies.dat", sp_->getParticleEnergies());
-    //save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+      saveWallParams(dirName);
+      saveWall(dirName);
+    }
   }
 
   void savePBCParticlePacking(string dirName) {
@@ -656,7 +720,7 @@ public:
     } else if(nDim_ == 3) {
       particleVel_ = read3DFile(dirName + "particleVel.dat", numParticles_);
     } else {
-      cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed!" << endl;
+      cout << "FileIO::readParticleVelocity: only dimensions 2 and 3 are allowed!" << endl;
     }
     sp_->setParticleVelocities(particleVel_);
   }
@@ -688,6 +752,9 @@ public:
         save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
       }
     }
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+      saveWall(dirName);
+    }
   }
 
   void saveParticleEnergies(string dirName) {
@@ -705,7 +772,10 @@ public:
     }
     if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
       save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
-      save2DFile(dirName + "particleForces.dat", sp_->getParticleForces(), sp_->nDim);
+    }
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+      save2DIndexFile(dirName + "wallNeighbors.dat", sp_->getWallNeighbors(), sp_->wallNeighborListSize);
+      save2DFile(dirName + "wallForces.dat", sp_->getWallForces(), sp_->nDim);
     }
   }
 

@@ -15,9 +15,9 @@ using namespace std;
 // position updates
 __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const double timeStep);
 __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, const double timeStep);
-// angle updates
-__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep);
-__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep);
+// wall updates
+__global__ void kernelUpdateWallPos(double* wPos, const double* wVel, const double timeStep);
+__global__ void kernelUpdateWallVel(double* wVel, const double* wForce, const double timeStep);
 // momentum conservation
 __global__ void kernelSumParticleVelocity(double* pVel, double* velSum);
 __global__ void kernelSubtractParticleDrift(double* pVel, double* velSum);
@@ -71,12 +71,24 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
   double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
   kernelUpdateParticleVel<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, pForce, timeStep);
+
+  if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+    double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
+    const double* wForce = thrust::raw_pointer_cast(&(sp_->d_wallForce[0]));
+    kernelUpdateWallVel<<<sp_->dimGrid, sp_->dimBlock>>>(wVel, wForce, timeStep);
+  }
 }
 
 void SoftParticleLangevin::updatePosition(double timeStep) {
 	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
 	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
   kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
+
+  if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+    double* wPos = thrust::raw_pointer_cast(&(sp_->d_wallPos[0]));
+    const double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
+    kernelUpdateWallPos<<<sp_->dimGrid, sp_->dimBlock>>>(wPos, wVel, timeStep);
+  }
 }
 
 void SoftParticleLangevin::conserveMomentum() {

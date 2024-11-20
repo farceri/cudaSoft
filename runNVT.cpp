@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setLangevinType(simControlStruct::langevinEnum::langevin1);
+  sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -62,22 +62,22 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = "langevin/";
     cout << "Setting default harmonic potential" << endl;
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
   }
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
   } else if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxEnergyScale(ew);
+    sp.setWallEnergyScale(ew);
   }else {
     cout << "Setting default rectangular geometry" << endl;
   }
   if(reflect == true) {
-    sp.setBoxType(simControlStruct::boxEnum::reflect);
+    sp.setWallType(simControlStruct::wallEnum::reflect);
   }
   if(dampingDir == true) {
     whichDynamics = "damping";
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;
@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
       ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
       if(fixedSides == true) {
-        ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveParticleFixedWallEnergy(step+initialStep, timeStep, numParticles);
       }
       if(step % checkPointFreq == 0) {
         cout << "Langevin: current step: " << step + initialStep;

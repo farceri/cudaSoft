@@ -1,6 +1,6 @@
 //
 // Author: Francesco Arceri
-// Date:   10-03-2021
+// Date:   11-02-2024
 //
 // Include C++ header files
 
@@ -25,16 +25,17 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool fixedbc = false, roundbc = true, reflect = false, reflectnoise = false;
-  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readState = true, saveFinal = true, logSave = true, linSave = false;
+  bool initAngles = false, fixedbc = false, roundbc = true;
   // variables
   long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double ew = 10*ec, Tinject = 0, driving = 2, damping = 1, tp = atof(argv[3]);
-  std::string inDir = argv[1], outDir, currentDir, dirSample, potType = argv[7], energyFile, whichDynamics = "active/";
+  std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "active/";
+  std::string inDir = argv[1], potType = argv[7], wallType = argv[8];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
@@ -43,11 +44,11 @@ int main(int argc, char **argv) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
@@ -63,12 +64,12 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  if(reflect == true) {
-    whichDynamics = "active/smooth/";
-    sp.setBoxType(simControlStruct::boxEnum::reflect);
-  } else if(reflectnoise == true) {
+  if(wallType == "reflect") {
+    whichDynamics = "active/reflect/";
+    sp.setWallType(simControlStruct::wallEnum::reflect);
+  } else if(wallType == "noise") {
     whichDynamics = "active/noise/";
-    sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
+    sp.setWallType(simControlStruct::wallEnum::reflectnoise);
   } else {
     whichDynamics = "active/wall/";
   }
@@ -121,7 +122,7 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ec);
   velUnit = sigma / timeUnit;
   alphaUnit = ec / (sigma * sigma);

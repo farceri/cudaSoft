@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << " Fext: " << externalForce << endl;
   if(whichDynamics == "active-langevin/") {
     cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sp.getMeanParticleSigma() << " v0: " << driving / damping << " Dr: " << Dr << endl;
-    cout << "Force Peclet number: " << 2. * sp.getMeanParticleSigma() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
+    cout << "Force Peclet number: " << sp.getMeanParticleSigma() * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
   }
   // initialize simulation
   cutDistance = sp.setDisplacementCutoff(cutoff);

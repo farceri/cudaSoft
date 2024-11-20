@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // save initial configuration
   sp.setEnergyCostant(ec);
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ec);
   forceUnit = ec / sigma;

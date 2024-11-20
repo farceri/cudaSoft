@@ -24,11 +24,13 @@ using std::tuple;
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
   enum class noiseEnum {langevin1, langevin2, brownian, activeNoise, vicsekNoise} noiseType;
-  enum class geometryEnum {normal, leesEdwards, fixedBox, fixedSides2D, fixedSides3D, roundBox} geometryType;
+  enum class geometryEnum {normal, leesEdwards, fixedWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
-  enum class boxEnum {harmonic, lennardJones, WCA, reflect, reflectnoise} boxType;
+  enum class wallEnum {harmonic, lennardJones, WCA, reflect, reflectnoise} wallType;
+  enum class mobileEnum {on, rigid, off} mobileType;
   enum class gravityEnum {on, off} gravityType;
+  enum class alignEnum {additive, nonAdditive} alignType;
 };
 
 // pointer-to-member function call macro
@@ -97,8 +99,8 @@ public:
   bool shift;
 
   // dynamical particle variables
-  thrust::device_vector<double> d_particlePos;
   thrust::device_vector<double> d_particleRad;
+  thrust::device_vector<double> d_particlePos;
   thrust::device_vector<double> d_particleVel;
   thrust::device_vector<double> d_squaredVel;
   thrust::device_vector<double> d_particleLastVel;
@@ -110,10 +112,26 @@ public:
   thrust::device_vector<double> d_randAngle;
   thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
+  // wall variables
+  thrust::device_vector<double> d_wallLength;
+  thrust::device_vector<double> d_wallAngle;
+  thrust::device_vector<double> d_wallPos;
+  thrust::device_vector<double> d_wallVel;
   thrust::device_vector<double> d_wallForce;
+  thrust::device_vector<double> d_wallEnergy;
+  thrust::device_vector<double> d_sqWallVel;
   thrust::device_vector<long> d_wallCount;
+  long numWall;
+  double wallRad;
+  double wallArea;
+  double wallArea0;
+  double wallLength0;
+  double wallAngle0;
+  thrust::device_vector<double> d_wallCOM;
+  double ea, el, eb;
   // correlation variables
   thrust::device_vector<double> d_velCorr;
+  thrust::device_vector<double> d_unitVel;
   thrust::device_vector<double> d_vortexParam;
   // two-type particles variables
   thrust::device_vector<long> d_flagAB;
@@ -138,6 +156,7 @@ public:
   long contactLimit;
 
 	// neighbor list
+  thrust::device_vector<int> d_flag;
   thrust::device_vector<long> d_partNeighborList;
   thrust::device_vector<long> d_partMaxNeighborList;
   long partMaxNeighbors;
@@ -145,11 +164,19 @@ public:
   long neighborLimit;
 
   // Vicsek interaction list
+  thrust::device_vector<int> d_vicsekFlag;
   thrust::device_vector<long> d_vicsekNeighborList;
   thrust::device_vector<long> d_vicsekMaxNeighborList;
   long vicsekMaxNeighbors;
 	long vicsekNeighborListSize;
   long vicsekNeighborLimit;
+
+  // Wall interaction list
+  thrust::device_vector<long> d_wallNeighborList;
+  thrust::device_vector<long> d_wallMaxNeighborList;
+  long wallMaxNeighbors;
+	long wallNeighborListSize;
+  long wallNeighborLimit;
 
   double checkGPUMemory();
 
@@ -162,6 +189,12 @@ public:
   void initParticleNeighbors(long numParticles_);
 
   void initVicsekNeighbors(long numParticles_);
+
+  void initRigidWallVariables(long numWall_);
+
+  void initMobileWallVariables(long numWall_);
+
+  void initWallNeighbors(long numParticles_);
 
   //setters and getters
   void syncSimControlToDevice();
@@ -181,11 +214,17 @@ public:
   void setPotentialType(simControlStruct::potentialEnum potentialType_);
 	simControlStruct::potentialEnum getPotentialType();
 
-  void setBoxType(simControlStruct::boxEnum boxType_);
-	simControlStruct::boxEnum getBoxType();
+  void setWallType(simControlStruct::wallEnum wallType_);
+	simControlStruct::wallEnum getWallType();
+
+  void setMobileType(simControlStruct::mobileEnum mobileType_);
+	simControlStruct::mobileEnum getMobileType();
 
   void setGravityType(simControlStruct::gravityEnum gravityType_);
 	simControlStruct::gravityEnum getGravityType();
+
+  void setAlignType(simControlStruct::alignEnum alignType_);
+	simControlStruct::alignEnum getAlignType();
 
   void setLEshift(double LEshift_);
   double getLEshift();
@@ -194,15 +233,15 @@ public:
 
   void applyExtension(double strainy_);
 
-  void applyUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
+  void applyUniaxialExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
-  void applyCenteredUniaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
+  void applyCenteredUniaxialExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
-  void applyBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
+  void applyBiaxialExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
-  void applyBiaxialExpExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
+  void applyBiaxialExpExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
-  void applyCenteredBiaxialExtension(thrust::host_vector<double> &newBoxSize_, double strain_, long direction_);
+  void applyCenteredBiaxialExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
   void setDimBlock(long dimBlock_);
   long getDimBlock();
@@ -214,6 +253,11 @@ public:
 	long getNumParticles();
 
   long getTypeNumParticles();
+
+  void setNumWall(long numWall_);
+	long getNumWall();
+
+  double getWallRad();
 
   void setParticleLengthScale();
 
@@ -241,8 +285,6 @@ public:
   thrust::host_vector<double> getParticlePositions();
   thrust::host_vector<double> getPBCParticlePositions();
 
-  thrust::host_vector<double> getParticleDeltas();
-
   void resetLastPositions();
 
   void resetVicsekLastPositions();
@@ -259,11 +301,24 @@ public:
   void setParticleForces(thrust::host_vector<double> &particleForce_);
   thrust::host_vector<double> getParticleForces();
 
+  thrust::host_vector<double> getWallForces();
+
   thrust::host_vector<double> getParticleEnergies();
 
   void setParticleAngles(thrust::host_vector<double> &particleAngle_);
-  void checkParticleAngles();
   thrust::host_vector<double> getParticleAngles();
+
+  void setWallPositions(thrust::host_vector<double> &wallPos_);
+  thrust::host_vector<double> getWallPositions();
+
+  void setWallVelocities(thrust::host_vector<double> &wallVel_);
+  thrust::host_vector<double> getWallVelocities();
+
+  void setWallLengths(thrust::host_vector<double> &wallLength_);
+  thrust::host_vector<double> getWallLengths();
+
+  void setWallAngles(thrust::host_vector<double> &wallAngle_);
+  thrust::host_vector<double> getWallAngles();
 
   thrust::host_vector<long> getContacts();
 
@@ -282,6 +337,8 @@ public:
   void checkParticleNeighbors();
 
   void checkVicsekNeighbors();
+
+  void checkWallNeighbors();
 
   double getParticleMaxDisplacement();
 
@@ -316,6 +373,14 @@ public:
 
   void initializeParticleAngles();
 
+  void setRoundWallParams(long numWall_, double wallRad_, double wallRadius_);
+
+  void initRigidWall();
+
+  void initMobileWall();
+
+  void initWall();
+
   // force and energy
   void setEnergyCostant(double ec_);
   double getEnergyCostant();
@@ -340,7 +405,7 @@ public:
 
   void setMieParams(double LJcutoff_, double nPower_, double mPower_);
 
-  void setBoxEnergyScale(double ew_);
+  void setWallEnergyScale(double ew_);
 
   void setGravity(double gravity_, double ew_);
 
@@ -365,7 +430,17 @@ public:
 
   void calcParticleWallInteraction();
 
-  void checkParticleInsideRoundBox();
+  void calcParticleFixedWallInteraction();
+
+  void calcWallAreaAndPos();
+
+  void calcWallShape();
+
+  void calcWallShapeForceEnergy();
+  
+  void calcParticleMobileWallInteraction();
+
+  void checkParticleInsideRoundWall();
 
   void reflectParticleOnWall();
 
@@ -375,7 +450,7 @@ public:
 
   void calcParticleForceEnergy();
 
-  std::tuple<double, double> getVicsekOrderParameters();
+  double getVicsekOrderParameter();
 
   double getVicsekVortexParameter();
 
@@ -428,8 +503,6 @@ public:
 
   double getParticleWallPressure();
 
-  double getParticleBoxPressure();
-
   std::tuple<double, double> getColumnWork(double width);
   
   std::tuple<double, double> getColumnActiveWork(double width);
@@ -440,7 +513,11 @@ public:
 
   double getParticlePotentialEnergy();
 
+  double getWallPotentialEnergy();
+
   double getParticleKineticEnergy();
+
+  double getWallKineticEnergy();
 
   double getDampingWork();
 
@@ -448,11 +525,17 @@ public:
 
   double getSelfPropulsionWork();
 
-  double getParticleEnergy();
-
   double getParticleWork();
 
   double getParticleTemperature();
+
+  double getWallTemperature();
+
+  double getParticleEnergy();
+
+  double getWallEnergy();
+
+  double getTotalEnergy();
 
   void adjustKineticEnergy(double prevEtot);
 
@@ -481,6 +564,8 @@ public:
 
   thrust::host_vector<long> getVicsekNeighbors();
 
+  thrust::host_vector<long> getWallNeighbors();
+
   void calcParticleNeighbors(double cutDistance);
 
   void calcParticleNeighborList(double cutDistance);
@@ -490,6 +575,10 @@ public:
   void calcVicsekNeighborList();
 
   void syncVicsekNeighborsToDevice();
+
+  void calcWallNeighborList(double cutDistance);
+
+  void syncWallNeighborsToDevice();
 
   void calcParticleContacts(double gapSize);
 

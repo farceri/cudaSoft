@@ -50,8 +50,8 @@ int main(int argc, char **argv) {
   }
   if(fixedSides == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxType(simControlStruct::boxEnum::WCA);
-    sp.setBoxEnergyScale(ew);
+    sp.setWallType(simControlStruct::wallEnum::WCA);
+    sp.setWallEnergyScale(ew);
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;
@@ -185,7 +185,7 @@ int main(int argc, char **argv) {
     if(step % saveEnergyFreq == 0) {
       ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
-      //ioSP.saveParticleFixedBoxEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveParticleFixedWallEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin 2LJ: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

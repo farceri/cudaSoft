@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveSimpleEnergy(step, timeStep);
+      ioSP.saveSimpleEnergy(step, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Run: current step: " << step;
         cout << " E: " << sp.getParticleEnergy() + sp.getParticleKineticEnergy();

@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
   ioSP.saveParticlePacking(outDir);
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;

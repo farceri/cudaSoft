@@ -56,6 +56,18 @@ __constant__ double d_nPower;
 __constant__ double d_mPower;
 __constant__ double d_mieConstant;
 __constant__ double d_Miecut;
+// Wall shape constants
+__constant__ long d_numWall;
+__constant__ double d_wallRad;
+__constant__ double d_wallArea;
+__constant__ double d_wallArea0;
+__constant__ double d_wallLength0;
+__constant__ double d_wallAngle0;
+__constant__ double d_wallEnergy;
+__constant__ double* d_wallCOMPtr;
+__constant__ double d_ea;
+__constant__ double d_el;
+__constant__ double d_eb;
 // Gravity
 __constant__ double d_gravity;
 __constant__ double d_ew; // wall
@@ -70,6 +82,13 @@ __constant__ long* d_partMaxNeighborListPtr;
 __constant__ long d_partNeighborListSize;
 // make the neighborLoops only go up to neighborMax
 __constant__ long d_partMaxNeighbors;
+
+// particle-wall interaction neighborList
+__constant__ long* d_wallNeighborListPtr;
+__constant__ long* d_wallMaxNeighborListPtr;
+__constant__ long d_wallNeighborListSize;
+// make the neighborLoops only go up to neighborMax
+__constant__ long d_wallMaxNeighbors;
 
 // vicsek interaction neighborList
 __constant__ long* d_vicsekNeighborListPtr;
@@ -170,7 +189,7 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 		distanceSq = deltax * deltax + deltay * deltay;
 		return sqrt(distanceSq);
 		break;
-		case simControlStruct::geometryEnum::fixedBox:
+		case simControlStruct::geometryEnum::fixedWall:
 		#pragma unroll (MAXDIM)
 	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
@@ -194,7 +213,7 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 		distanceSq += delta * delta;
 		return sqrt(distanceSq);
 		break;
-		case simControlStruct::geometryEnum::roundBox:
+		case simControlStruct::geometryEnum::roundWall:
 		#pragma unroll (MAXDIM)
 	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
@@ -236,7 +255,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 		distanceSq = deltaVec[0] * deltaVec[0] + deltaVec[1] * deltaVec[1];
 		return sqrt(distanceSq);
 		break;
-		case simControlStruct::geometryEnum::fixedBox:
+		case simControlStruct::geometryEnum::fixedWall:
 		#pragma unroll (MAXDIM)
 	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
@@ -261,7 +280,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 		distanceSq += deltaVec[0] * deltaVec[0];
 		return sqrt(distanceSq);
 		break;
-		case simControlStruct::geometryEnum::roundBox:
+		case simControlStruct::geometryEnum::roundWall:
 		#pragma unroll (MAXDIM)
 	  	for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
@@ -295,6 +314,28 @@ inline __device__ void getParticlePos(const long pId, const double* pPos, double
   	for (long dim = 0; dim < d_nDim; dim++) {
 		tPos[dim] = pPos[pId * d_nDim + dim];
 	}
+}
+
+inline __device__ void getParticleVel(const long pId, const double* pVel, double* tVel) {
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+		tVel[dim] = pVel[pId * d_nDim + dim];
+	}
+}
+
+inline __device__ void getWallPos(const long wId, const double* wPos, double* tWall) {
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+		tWall[dim] = wPos[wId * d_nDim + dim];
+	}
+}
+
+inline __device__ void getRelativeWallPos(const long wId, const double* wPos, double* wallPos) {
+	getWallPos(wId, wPos, wallPos);
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	wallPos[dim] = pbcDistance(wallPos[dim], d_wallCOMPtr[dim], dim);
+  	}
 }
 
 inline __device__ void getPBCParticlePos(const long pId, const double* pPos, double* tPos) {
@@ -374,6 +415,17 @@ inline __device__ bool extractVicsekNeighborVel(const long particleId, const lon
 		#pragma unroll (MAXDIM)
     	for (long dim = 0; dim < d_nDim; dim++) {
       		otherVel[dim] = pVel[otherId * d_nDim + dim];
+    	}
+    	return true;
+  	}
+  	return false;
+}
+
+inline __device__ bool extractWallNeighbor(const long wallId, const double* wPos, double* wallPos) {
+  	if (wallId != -1) {
+		#pragma unroll (MAXDIM)
+    	for (long dim = 0; dim < d_nDim; dim++) {
+      		wallPos[dim] = wPos[wallId * d_nDim + dim];
     	}
     	return true;
   	}
@@ -565,6 +617,23 @@ inline __device__ double calcWallContactInteraction(const double* thisPos, const
 	return 0.;
 }
 
+inline __device__ double calcMobileWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce, double* wallForce) {
+	double delta[MAXDIM];
+	//overlap = calcOverlap(thisPos, wallPos, radSum);
+	auto distance = calcDeltaAndDistance(thisPos, wallPos, delta);
+	auto overlap = 1 - distance / radSum;
+	if (overlap > 0) {
+		auto gradMultiple = d_ew * overlap / radSum;
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
+			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
+		}
+		return (0.5 * d_ew * overlap * overlap) * 0.5;
+	}
+	return 0.;
+}
+
 inline __device__ double calcLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
 	//distance = calcDistance(thisPos, otherPos);
@@ -607,6 +676,28 @@ inline __device__ double calcWallLJInteraction(const double* thisPos, const doub
 	}
 }
 
+inline __device__ double calcMobileWallLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce, double* wallForce) {
+	double delta[MAXDIM];
+	//distance = calcDistance(thisPos, otherPos);
+	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+	//printf("distance %lf \n", distance);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (d_LJcutoff * radSum)) {
+		auto forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
+		auto gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance - forceShift;
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
+			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
+	  	}
+		return 0.5 * (4 * d_ew * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
+	} else {
+		return 0.0;
+	}
+}
+
 inline __device__ double calcWCAInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce) {
 	double delta[MAXDIM];
 	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
@@ -638,6 +729,24 @@ inline __device__ double calcWallWCAInteraction(const double* thisPos, const dou
 	    	currentForce[dim] += gradMultiple * delta[dim] / distance;
 	  	}
 	  	return d_ew * (4 * (ratio12 - ratio6) + 1);
+	}
+	return 0.0;
+}
+
+inline __device__ double calcMobileWallWCAInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce, double* wallForce) {
+	double delta[MAXDIM];
+	auto distance = calcDeltaAndDistance(thisPos, wallPos, delta);
+	auto ratio = radSum / distance;
+	auto ratio6 = pow(ratio, 6);
+	auto ratio12 = ratio6 * ratio6;
+	if (distance < (WCAcut * radSum)) {
+		auto gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance;
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
+			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
+	  	}
+	  	return 0.5 * d_ew * (4 * (ratio12 - ratio6) + 1);
 	}
 	return 0.0;
 }
@@ -1004,8 +1113,8 @@ __global__ void kernelCalcParticleEnergyAB(const double* pRad, const double* pPo
   	}
 }
 
-// particle-particle vicsek interaction
-__global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) {
+// particle-particle kuramoto / vicsek additive interaction
+__global__ void kernelCalcVicsekAdditiveAlignment(const double* pAngle, double* pAlpha) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
     	auto otherAngle = 0.;
@@ -1025,101 +1134,23 @@ __global__ void kernelCalcVicsekAlignment(const double* pAngle, double* pAlpha) 
   	}
 }
 
-// particle-particle vicsek interaction
-__global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
+// particle-particle kuramoto / vicsek non-additive interaction
+__global__ void kernelCalcVicsekNonAdditiveAlignment(const double* pAngle, double* pAlpha) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
     	auto otherAngle = 0.;
 		// zero out the angular acceleration and get particle positions
-		auto thisAngle = 0.;
+		pAlpha[particleId] = 0.;
+		auto thisAngle = pAngle[particleId];
 		// interaction with neighbor particles
 		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
 			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
 				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
-					thisAngle += otherAngle;
+					auto deltaAngle = thisAngle - otherAngle;
+					checkAngleMinusPIPlusPI(deltaAngle);
+					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle) / d_vicsekMaxNeighborListPtr[particleId];
 				}
 			}
-			thisAngle /= d_vicsekMaxNeighborListPtr[particleId];
-		}
-		pAngle[particleId] = thisAngle;
-  	}
-}
-
-// vicsek average unit velocity
-__global__ void kernelCalcVelocityComplexParts(const double* pVel, double* reVel, double* imVel) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-		// compute unit vector magnitude
-		auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-		reVel[particleId] = cos(velAngle);
-		imVel[particleId] = sin(velAngle);
-  	}
-}
-
-
-__global__ void kernelCalcVortexParameters(const double* pPos, const double* pAngle, double* vortexParam) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM];
-		// get driving angle and position angle from polar coordinates
-		auto thisAngle = pAngle[particleId];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
-		double thisR, thisTheta;
-		cartesianToPolar(thisPos, thisR, thisTheta);
-		vortexParam[particleId] = sin(thisTheta - thisAngle);
-	}
-}
-
-// vicsek velocity alignment
-__global__ void kernelCalcVicsekVelocityCorrelation(const double* pVel, double* velCorr) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-    	double thisVel[MAXDIM], otherVel[MAXDIM];
-		auto thisVelSquared =  0.;
-		// zero out squared velocity components
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisVel[dim] = pVel[particleId * d_nDim + dim];
-			thisVelSquared += thisVel[dim] * thisVel[dim];
-		}
-		velCorr[particleId] = 0.;
-		// alignment with vicsek neighbor particles
-		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
-			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
-				if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
-					for (long dim = 0; dim < d_nDim; dim++) {
-						velCorr[particleId] += thisVel[dim] * otherVel[dim];
-					}
-				}
-			}
-			velCorr[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
-		}
-  	}
-}
-
-// neighbor velocity alignment
-__global__ void kernelCalcNeighborVelocityCorrelation(const double* pVel, double* velCorr) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-    	double thisVel[MAXDIM], otherVel[MAXDIM];
-		auto thisVelSquared =  0.;
-		// zero out squared velocity components
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisVel[dim] = pVel[particleId * d_nDim + dim];
-			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
-		}
-		velCorr[particleId] = 0.;
-		// alignment with vicsek neighbor particles
-		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
-			if (extractParticleNeighborVel(particleId, nListId, pVel, otherVel)) {
-				for (long dim = 0; dim < d_nDim; dim++) {
-					velCorr[particleId] += thisVel[dim] * otherVel[dim];
-				}
-			}
-		}
-		if(d_partMaxNeighborListPtr[particleId] != 0) {
-			velCorr[particleId] /= (thisVelSquared * d_partMaxNeighborListPtr[particleId]);
 		}
   	}
 }
@@ -1226,9 +1257,7 @@ __global__ void kernelCalcWallForce(const double* pRad, const double* pPosPBC, c
 		long otherId;
 		auto midHeight = d_boxSizePtr[1] * 0.5;
 		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPosPBC, thisPos);
 		wallForce[particleId] = 0.0;
 		wallCount[particleId] = 0;
 		if(d_partMaxNeighborListPtr[particleId] > 0) {
@@ -1292,9 +1321,7 @@ __global__ void kernelCalcCenterWallForce(const double* pRad, const double* pPos
 		long otherId;
 		auto midHeight = d_boxSizePtr[1] * 0.5;
 		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPosPBC[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPosPBC, thisPos);
 		wallForce[particleId] = 0.0;
 		wallCount[particleId] = 0;
 		auto lowBound = (d_boxSizePtr[0] - width) * 0.5;
@@ -1363,29 +1390,27 @@ __global__ void kernelAddWallActiveForce(const double* pAngle, double* wallForce
 }
 
 // particle-box contact interaction in rectangular boundary
-__global__ void kernelCalcParticleBoxInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+__global__ void kernelCalcParticleWallInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
 		// we don't zero out the force and the energy because this function always
 		// gets called after the particle-particle interaction is computed
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		auto radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
 		if(thisPos[0] < (WCAcut * radSum)) {
 			wallPos[0] = 0;
 			wallPos[1] = thisPos[1];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1394,14 +1419,14 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 		} else if((d_boxSizePtr[0] - thisPos[0]) < (WCAcut * radSum)) {
 			wallPos[0] = d_boxSizePtr[0];
 			wallPos[1] = thisPos[1];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1411,14 +1436,14 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 		if(thisPos[1] < (WCAcut * radSum)) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1427,14 +1452,14 @@ __global__ void kernelCalcParticleBoxInteraction(const double* pRad, const doubl
 		} else if((d_boxSizePtr[1] - thisPos[1]) < (WCAcut * radSum)) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1451,37 +1476,35 @@ __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const d
 		double thisPos[MAXDIM], wallPos[MAXDIM];
 		// we don't zero out the force and the energy because this function always
 		// gets called after the particle-particle interaction is computed
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		auto radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
 		if(thisPos[1] < (WCAcut * radSum)) {
 			wallPos[1] = 0;
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			}
 		} else if((d_boxSizePtr[1] - thisPos[1]) < (WCAcut * radSum)) {
 			wallPos[1] = d_boxSizePtr[1];
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1498,9 +1521,7 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 		double thisPos[MAXDIM], wallPos[MAXDIM];
 		// we don't zero out the force and the energy because this function always
 		// gets called after the particle-particle interaction is computed
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		auto radSum = thisRad;
 		// check if particle is close to the wall at a distance less than its radius
@@ -1508,14 +1529,14 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 			wallPos[2] = 0;
 			wallPos[1] = thisPos[1];
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1525,14 +1546,14 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 			wallPos[2] = d_boxSizePtr[2];
 			wallPos[1] = thisPos[1];
 			wallPos[0] = thisPos[0];
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1543,15 +1564,13 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 }
 
 // particle-box contact interaction in circular boundary - the center of the simulation box is assumed to be the origin
-__global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
+__global__ void kernelCalcParticleRoundWallInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM];
 		// we don't zero out the force and the energy because this function always
 		// gets called after the particle-particle interaction is computed
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		auto radSum = thisRad;
 		// check if particle is far from the origin more than the box radius R minus the particle radius
@@ -1560,14 +1579,14 @@ __global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const 
 		if((d_boxRadius - thisR) < (WCAcut * radSum)) {
 			wallPos[0] = d_boxRadius * cos(thisTheta);
 			wallPos[1] = d_boxRadius * sin(thisTheta);
-			switch (d_simControl.boxType) {
-			case simControlStruct::boxEnum::harmonic:
+			switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::lennardJones:
+			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
-			case simControlStruct::boxEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim]);
 			break;
 			default:
@@ -1577,13 +1596,165 @@ __global__ void kernelCalcParticleRoundBoxInteraction(const double* pRad, const 
 	}
 }
 
-__global__ void kernelCheckParticleInsideRoundBox(const double* pRad, double* pPos) {
+inline __device__ double calcAngle(const double* nSegment, const double* pSegment) {
+	auto midSine = nSegment[0] * pSegment[1] - nSegment[1] * pSegment[0];
+	auto midCosine = nSegment[0] * pSegment[0] + nSegment[1] * pSegment[1];
+	return atan2(midSine, midCosine);
+}
+
+// compute segment lengths and angles from wall monomers
+__global__ void kernelCalcWallShape(const double* wPos, double* wLength, double* wAngle) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
+		double delta[MAXDIM], nextSegment[MAXDIM], prevSegment[MAXDIM];
+		getWallPos(wallId, wPos, thisPos);
+		auto nextId = wallId + 1;
+		if(nextId >= d_numWall) {
+			nextId -= d_numWall;
+		}
+		auto prevId = wallId - 1;
+		if(prevId < 0) {
+			prevId += d_numWall;
+		}
+		auto segmentLength = 0.;
+		for (long dim = 0; dim < d_nDim; dim++) {
+		delta[dim] = wPos[nextId * d_nDim + dim] - thisPos[dim];
+		nextPos[dim] = thisPos[dim] + delta[dim];
+		segmentLength += delta[dim] * delta[dim];
+		delta[dim] = wPos[prevId * d_nDim + dim] - thisPos[dim];
+		prevPos[dim] = thisPos[dim] + delta[dim];
+		}
+		wLength[wallId] = sqrt(segmentLength);
+		getSegment(nextPos, thisPos, nextSegment);
+		getSegment(thisPos, prevPos, prevSegment);
+		wAngle[wallId] = calcAngle(nextSegment, prevSegment);
+	}
+}
+
+inline __device__ double calcAreaForceEnergy(const double* nPos, const double* pPos, double* wForce) {
+	auto deltaArea = (d_wallArea / d_wallArea0) - 1.; // area variation
+	auto gradMultiple = d_ea * deltaArea / d_wallArea0;
+  	wForce[0] += 0.5 * gradMultiple * (pPos[1] - nPos[1]);
+  	wForce[1] += 0.5 * gradMultiple * (nPos[0] - pPos[0]);
+  	return (0.5 * d_ea * deltaArea * deltaArea);
+}
+
+inline __device__ double calcPerimeterForceEnergy(const double nLength, const double pLength, const double* vPos, const double* nPos, const double* pPos, double* wForce) {
+  	//compute length variations
+  	auto pDelta = (pLength / d_wallLength0) - 1.;
+  	auto nDelta = (nLength / d_wallLength0) - 1.;
+	// compute force
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	wForce[dim] += d_el * ((nDelta * (nPos[dim] - vPos[dim]) / (d_wallLength0 * nLength)) - (pDelta * (vPos[dim] - pPos[dim]) / (d_wallLength0 * pLength)));
+  	}
+  	return (0.5 * d_el * pDelta * pDelta);
+}
+
+inline __device__ double calcBendingForceEnergy(const double* prevSegment, const double* nextSegment, 
+												const double tAngleDelta, const double nAngleDelta, const double pAngleDelta, double* wForce) {
+	double preNormalSegment[MAXDIM], nextNormalSegment[MAXDIM];
+	// get normal segments
+	getNormalVector(prevSegment, preNormalSegment);
+	getNormalVector(nextSegment, nextNormalSegment);
+	// compute angle variations
+	auto prevVar = (tAngleDelta - pAngleDelta) / calcNormSq(prevSegment);
+	auto nextVar = (tAngleDelta - nAngleDelta) / calcNormSq(nextSegment);
+	// compute force
+	#pragma unroll (MAXDIM)
+	for (long dim = 0; dim < d_nDim; dim++) {
+		wForce[dim] += d_eb * (prevVar * preNormalSegment[dim] + nextVar * nextNormalSegment[dim]);
+	}
+	return (0.5 * d_eb * tAngleDelta * tAngleDelta);
+}
+
+// shape interaction for mobile wall
+__global__ void kernelCalcWallShapeForceEnergy(const double* wLength, const double* wAngle, const double* wPos, double* wForce, double* wEnergy) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
+		double nextSegment[MAXDIM], prevSegment[MAXDIM];
+		auto nextId = wallId + 1;
+		if(nextId > d_numWall) {
+			nextId = 0;
+		}
+	  	auto prevId = wallId -1;
+		if(prevId < 0) {
+			prevId = d_numWall - 1;
+		}
+		// zero out the existing force
+    	for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[wallId * d_nDim + dim] = 0.;
+		}
+		wEnergy[wallId] = 0.;
+		// get positions relative to particle center of mass
+		getRelativeWallPos(wallId, wPos, thisPos);
+	  	getRelativeWallPos(nextId, wPos, nextPos);
+	  	getRelativeWallPos(prevId, wPos, prevPos);
+		// area force
+		wEnergy[wallId] += calcAreaForceEnergy(nextPos, prevPos, &wForce[wallId*d_nDim]) / d_numWall;
+		// segment force
+		getSegment(nextPos, thisPos, nextSegment);
+		getSegment(thisPos, prevPos, prevSegment);
+	  	auto prevLength = calcNorm(prevSegment);
+	  	auto nextLength = calcNorm(nextSegment);
+	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, prevLength, thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
+		// bending force
+	  	auto prevAngleDelta = wAngle[prevId] - d_wallAngle0;
+	  	auto thisAngleDelta = wAngle[wallId] - d_wallAngle0;
+	 	auto nextAngleDelta = wAngle[nextId] - d_wallAngle0;
+		wEnergy[wallId] += calcBendingForceEnergy(prevSegment, nextSegment, thisAngleDelta, nextAngleDelta, prevAngleDelta, &wForce[wallId*d_nDim]);
+	}
+}
+
+// particle-box contact interaction in circular boundary - the center of the simulation box is assumed to be the origin
+__global__ void kernelCalcParticleMobileRoundWallInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy, 
+															const double* wPos, double* wForce, double* wEnergy) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		// we don't zero out the force and the energy because this function always
+		// gets called after the particle-particle interaction is computed
+		getParticlePos(particleId, pPos, thisPos);
+		auto thisRad = pRad[particleId];
+		// check if particle is far from the origin more than the box radius R minus the particle radius
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+
+		auto wallId = -1;
+		for (long wListId = 0; wListId < d_wallMaxNeighborListPtr[particleId]; wListId++) {
+			wallId = d_wallNeighborListPtr[particleId * d_wallMaxNeighbors + wListId];
+			if (extractWallNeighbor(wallId, wPos, wallPos)) {
+				auto radSum = thisRad + d_wallRad;
+				auto energy = 0.;
+				switch (d_simControl.wallType) {
+				case simControlStruct::wallEnum::harmonic:
+				energy = calcMobileWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				break;
+				case simControlStruct::wallEnum::lennardJones:
+				energy = calcMobileWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				break;
+				case simControlStruct::wallEnum::WCA:
+				energy = calcMobileWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				break;
+				default:
+				break;
+				}
+				if(energy != 0) {
+					atomicAdd(&pEnergy[particleId], energy);
+					atomicAdd(&wEnergy[wallId], energy);
+				}
+			}
+		}
+	}
+}
+
+__global__ void kernelCheckParticleInsideRoundWall(const double* pRad, double* pPos) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		// check if particle is outside round box
 		double thisR, thisTheta;
@@ -1600,13 +1771,11 @@ __global__ void kernelCheckParticleInsideRoundBox(const double* pRad, double* pP
 	}
 }
 
-__global__ void kernelReflectParticleFixedBox(const double* pRad, const double* pPos, double* pVel) {
+__global__ void kernelReflectParticleFixedWall(const double* pRad, const double* pPos, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		if(thisPos[0] < thisRad) {
 			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
@@ -1625,9 +1794,7 @@ __global__ void kernelReflectParticleFixedSides2D(const double* pRad, const doub
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		if(thisPos[1] < thisRad) {
 			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
@@ -1641,9 +1808,7 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		if(thisPos[2] < thisRad) {
 			pVel[particleId * d_nDim + 2] = -pVel[particleId * d_nDim + 2];
@@ -1653,13 +1818,11 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 	}
 }
 
-__global__ void kernelReflectParticleRoundBox(const double* pRad, const double* pPos, double* pVel) {
+__global__ void kernelReflectParticleRoundWall(const double* pRad, const double* pPos, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		// check if particle is far from the origin more than the box radius R minus the particle radius
 		double thisR, thisTheta;
@@ -1668,25 +1831,19 @@ __global__ void kernelReflectParticleRoundBox(const double* pRad, const double* 
 			auto radialDistance = thisR - d_boxRadius;
 			printf("particle %ld is outside of the box at distance %lf\n", particleId, radialDistance);
 		}
-		if((d_boxRadius - thisR) < thisRad) {
-			//auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			//auto reflectAngle = velAngle - thisTheta; // angle of reflection
-			//auto reflectAngle = 2 * thisTheta - velAngle; // angle of reflection in the global frame
-			auto reflectAngle = thisTheta;
-			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
-			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
-			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
+			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(thisTheta);
 		}
 	}
 }
 
-__global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+__global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		if(thisPos[0] < thisRad) {
 			// add Gaussian noise to the angle of reflection
@@ -1721,13 +1878,11 @@ __global__ void kernelReflectParticleFixedBoxWithNoise(const double* pRad, const
 	}
 }
 
-__global__ void kernelReflectParticleRoundBoxWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+__global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM];
-		for (long dim = 0; dim < d_nDim; dim++) {
-			thisPos[dim] = pPos[particleId * d_nDim + dim];
-		}
+		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		// check if particle is far from the origin more than the box radius R minus the particle radius
 		double thisR, thisTheta;
@@ -1874,7 +2029,7 @@ inline __device__ void calcWallStress(const double* thisPos, const double* wallP
 	}
 }
 
-__global__ void kernelCalcBoxStress(const double* pRad, const double* pPos, double* wallStress) {
+__global__ void kernelCalcWallStress(const double* pRad, const double* pPos, double* wallStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double thisPos[MAXDIM], wallPos[MAXDIM], force[MAXDIM];
@@ -2041,6 +2196,34 @@ __global__ void kernelCalcParticleNeighborList(const double* pPos, const double*
   	}
 }
 
+// list of neighboring monomers on wall (ring polymer)
+__global__ void kernelCalcParticleWallNeighborList(const double* pPos, const double* pRad, const double* wPos, const double cutDistance) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		auto addedNeighbor = 0;
+		double thisPos[MAXDIM], wallPos[MAXDIM];
+		getParticlePos(particleId, pPos, thisPos);
+		auto thisRad = pRad[particleId];
+		// get polar coordinates
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+
+		for (long wallId = 0; wallId < d_numWall; wallId++) {
+			getWallPos(wallId, wPos, wallPos);
+			bool isNeighbor = false;
+			auto radSum = thisRad + d_wallRad;
+			isNeighbor = (-calcOverlap(thisPos, wallPos, radSum) < cutDistance);// cutDistance should be greater than radSum
+			//isNeighbor = (calcDistance(thisPos, otherPos) < (cutDistance * radSum));
+			if (addedNeighbor < d_wallNeighborListSize) {
+				d_wallNeighborListPtr[particleId * d_wallNeighborListSize + addedNeighbor] = wallId*isNeighbor -1*(!isNeighbor);
+				//if(isNeighbor == true) printf("particleId %ld \t otherId: %ld \t isNeighbor: %i \n", particleId, otherId, isNeighbor);
+			}
+			addedNeighbor += isNeighbor;
+		}
+		d_wallMaxNeighborListPtr[particleId] = addedNeighbor;
+  	}
+}
+
 __global__ void kernelCalcVicsekNeighborList(const double* pPos, const double* pRad, const double Rvicsek) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
@@ -2184,10 +2367,111 @@ __global__ void kernelCalcParticleScatteringFunction(const double* pPos, const d
 	}
 }
 
+// particle-particle vicsek interaction
+__global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	auto otherAngle = 0.;
+		// zero out the angular acceleration and get particle positions
+		auto thisAngle = 0.;
+		// interaction with neighbor particles
+		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
+					thisAngle += otherAngle;
+				}
+			}
+			thisAngle /= d_vicsekMaxNeighborListPtr[particleId];
+		}
+		pAngle[particleId] = thisAngle;
+  	}
+}
+
+// vicsek average unit velocity
+__global__ void kernelCalcUnitVelocity(const double* pVel, double* unitVel) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		// compute unit vector magnitude
+		auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+		unitVel[particleId * d_nDim] = cos(velAngle);
+		unitVel[particleId * d_nDim + 1] = sin(velAngle);
+  	}
+}
+
+// vorticity parameter
+__global__ void kernelCalcVortexParameters(const double* pPos, const double* pVel, double* vortexParam) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		double thisPos[MAXDIM];
+		// get driving angle and position angle from polar coordinates
+		auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisPos[dim] = pPos[particleId * d_nDim + dim];
+		}
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		vortexParam[particleId] = sin(thisTheta - velAngle);
+	}
+}
+
+// vicsek velocity alignment
+__global__ void kernelCalcVicsekVelocityCorrelation(const double* pVel, double* velCorr) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisVel[MAXDIM], otherVel[MAXDIM];
+		auto thisVelSquared =  0.;
+		// zero out squared velocity components
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisVel[dim] = pVel[particleId * d_nDim + dim];
+			thisVelSquared += thisVel[dim] * thisVel[dim];
+		}
+		velCorr[particleId] = 0.;
+		// alignment with vicsek neighbor particles
+		if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+			for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+				if (extractVicsekNeighborVel(particleId, nListId, pVel, otherVel)) {
+					for (long dim = 0; dim < d_nDim; dim++) {
+						velCorr[particleId] += thisVel[dim] * otherVel[dim];
+					}
+				}
+			}
+			velCorr[particleId] /= (thisVelSquared * d_vicsekMaxNeighborListPtr[particleId]);
+		}
+  	}
+}
+
+// neighbor velocity alignment
+__global__ void kernelCalcNeighborVelocityCorrelation(const double* pVel, double* velCorr) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+    	double thisVel[MAXDIM], otherVel[MAXDIM];
+		auto thisVelSquared =  0.;
+		// zero out squared velocity components
+		for (long dim = 0; dim < d_nDim; dim++) {
+			thisVel[dim] = pVel[particleId * d_nDim + dim];
+			thisVelSquared += pVel[particleId * d_nDim + dim] * pVel[particleId * d_nDim + dim];
+		}
+		velCorr[particleId] = 0.;
+		// alignment with vicsek neighbor particles
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			if (extractParticleNeighborVel(particleId, nListId, pVel, otherVel)) {
+				for (long dim = 0; dim < d_nDim; dim++) {
+					velCorr[particleId] += thisVel[dim] * otherVel[dim];
+				}
+			}
+		}
+		if(d_partMaxNeighborListPtr[particleId] != 0) {
+			velCorr[particleId] /= (thisVelSquared * d_partMaxNeighborListPtr[particleId]);
+		}
+  	}
+}
+
 //******************************** integrators *******************************//
 __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const double timeStep) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
     	for (long dim = 0; dim < d_nDim; dim++) {
 			pPos[particleId * d_nDim + dim] += timeStep * pVel[particleId * d_nDim + dim];
 		}
@@ -2197,6 +2481,7 @@ __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const 
 __global__ void kernelSetPBC(double* pPos) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			pPos[particleId * d_nDim + dim] -= floor(pPos[particleId * d_nDim + dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
 		}
@@ -2206,6 +2491,7 @@ __global__ void kernelSetPBC(double* pPos) {
 __global__ void kernelCheckParticlePBC(double* pPosPBC, const double* pPos) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			pPosPBC[particleId * d_nDim + dim] = pPos[particleId * d_nDim + dim] - floor(pPos[particleId * d_nDim + dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
 		}
@@ -2215,30 +2501,17 @@ __global__ void kernelCheckParticlePBC(double* pPosPBC, const double* pPos) {
 __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, const double timeStep) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
     	for (long dim = 0; dim < d_nDim; dim++) {
 			pVel[particleId * d_nDim + dim] += timeStep * pForce[particleId * d_nDim + dim];
 		}
   	}
 }
 
-__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-		pAngle[particleId * d_nDim] += timeStep * pOmega[particleId];
-  	}
-	//checkAngleMinusPIPlusPI(pAngle[particleId]);
-}
-
-__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep) {
-  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-  	if (particleId < d_numParticles) {
-		pOmega[particleId] += timeStep * pAlpha[particleId];
-  	}
-}
-
 __global__ void kernelSumParticleVelocity(double* pVel, double* velSum) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			velSum[dim] += pVel[particleId * d_nDim + dim];
 		}
@@ -2248,6 +2521,7 @@ __global__ void kernelSumParticleVelocity(double* pVel, double* velSum) {
 __global__ void kernelSubtractParticleDrift(double* pVel, double* velSum) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
 		}
@@ -2257,6 +2531,7 @@ __global__ void kernelSubtractParticleDrift(double* pVel, double* velSum) {
 __global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, long firstId) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles && particleId > firstId) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			velSum[dim] += pVel[particleId * d_nDim + dim];
 		}
@@ -2266,10 +2541,31 @@ __global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, lo
 __global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, long firstId) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles && particleId > firstId) {
+		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
 		}
 	}
+}
+
+__global__ void kernelUpdateWallPos(double* wPos, const double* wVel, const double timeStep) {
+  	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (wallId < d_numWall) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wPos[wallId * d_nDim + dim] += timeStep * wVel[wallId * d_nDim + dim];
+		}
+  	}
+}
+
+__global__ void kernelUpdateWallVel(double* wVel, const double* wForce, const double timeStep) {
+  	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (wallId < d_numWall) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wVel[wallId * d_nDim + dim] += timeStep * wForce[wallId * d_nDim + dim];
+		}
+  	}
 }
 
 

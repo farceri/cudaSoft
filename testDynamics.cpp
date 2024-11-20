@@ -42,29 +42,29 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
   } else {
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
     cout << "Setting Harmonic potential" << endl;
   }
   if(alltoall == true) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setWallEnergyScale(ew);
     cout << "Setting fixed rectangular boundary conditins" << endl;
   } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
     cout << "Setting fixed circular boundary conditins" << endl;
   } else {
     cout << "Setting periodic boundary conditins" << endl;
   }
   if(fixedbc == true || roundbc == true) {
     if(reflect == true) {
-      sp.setBoxType(simControlStruct::boxEnum::reflect);
+      sp.setWallType(simControlStruct::wallEnum::reflect);
     cout << "Setting reflective walls" << endl;
     } else if(reflectnoise == true) {
-      sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
+      sp.setWallType(simControlStruct::wallEnum::reflectnoise);
     cout << "Setting reflective walls with noise" << endl;
     } else {
       cout << "Setting repulsive walls" << endl;
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   if(testNVT == true) {
     outDir = inDir + "testNVT/";
     std::experimental::filesystem::create_directory(outDir);
-    sigma = 2 * sp.getMeanParticleSigma();
+    sigma = sp.getMeanParticleSigma();
     damping = sqrt(iod) / sigma;
     timeUnit = sigma / sqrt(ec);
     timeStep = sp.setTimeStep(timeStep * timeUnit);
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
       outDir = outDir + "/";
     }
     std::experimental::filesystem::create_directory(outDir);
-    sigma = 2 * sp.getMeanParticleSigma();
+    sigma = sp.getMeanParticleSigma();
     timeUnit = sigma / sqrt(ec);//mass is 1 - sqrt(m sigma^2 / epsilon)
     timeStep = sp.setTimeStep(timeStep * timeUnit);
     cout << "NVE: time step: " << timeStep << " sigma: " << sigma << endl;

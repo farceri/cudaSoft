@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readState = false, save = true, saveSame = false, lj = true;
+  bool readState = false, save = true, saveSame = false, lj = true, saveWall = false;
   long step, maxStep = 1e04, printFreq = int(maxStep / 10);
   long numParticles = atol(argv[5]), nDim = 2, minStep = 20, numStep = 0, repetition = 0;
   double timeStep = atof(argv[2]), timeUnit, LJcut = 5.5, damping, inertiaOverDamping = 10;
@@ -61,7 +61,7 @@ int main(int argc, char **argv) {
   //timeStep = sp.setTimeStep(timeStep);
   cout << "Time step: " << timeStep << " sigma: " << sigma << endl;
   cout << "Thermal energy scale: " << Tinject << endl;
-  ioSP.saveLangevinParams(outDir, sigma, damping);
+  ioSP.saveLangevinParams(outDir, damping);
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   strain = strainStep;
   while (strain < (maxStrain + strainStep)) {
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveParticlePacking(currentDir);
     }
-    ioSP.savePressureEnergy(strain, numParticles);
+    ioSP.savePressureEnergy(strain, timeStep, numParticles, saveWall);
     strain += strainStep;
   }
   if(saveSame == true) {

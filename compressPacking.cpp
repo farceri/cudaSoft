@@ -46,14 +46,14 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
   } else if(gforce == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setBoxEnergyScale(ew);
+    sp.setWallEnergyScale(ew);
   } else {
     cout << "Setting default rectangular geometry with periodic boundary conditions" << endl;
   }
@@ -67,13 +67,13 @@ int main(int argc, char **argv) {
     inDir = argv[9];
     inDir = outDir + inDir + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-    sigma = 2 * sp.getMeanParticleSigma();
+    sigma = sp.getMeanParticleSigma();
     if(readState == true) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
     // use harmonic potential for FIRE minimization
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
     // initialize polydisperse packing
     if(roundbc == true) {
       sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     //sp.setScaledMonoRandomParticles(phi0, lx, ly, lz);
     //sp.setScaledBiRandomParticles(phi0, lx, ly, lz);
     sp.scaleParticlePacking();
-    sigma = 2 * sp.getMeanParticleSigma();
+    sigma = sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
     cutDistance = sp.setDisplacementCutoff(cutoff);
@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
     cout << "Setting WCA potential" << endl;
   } else {
     cout << "Setting Harmonic potential" << endl;
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
   }
   if(gforce == true) {
     sp.setGravityType(simControlStruct::gravityEnum::on);
@@ -244,7 +244,7 @@ int main(int argc, char **argv) {
         } else if(nDim == 3) {
           cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
         } else {
-          cout << "BoxSize: only dimensions 2 and 3 are allowed!" << endl;
+          cout << "WallSize: only dimensions 2 and 3 are allowed!" << endl;
         }
       }
       searchStep += 1;

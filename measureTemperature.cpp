@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
   cout << "Time step: " << timeStep << " Tinject: " << Tinject << endl;
   if(whichDynamics == "active-langevin/") {
     cout << "Velocity Peclet number: " << ((driving/damping) / Dr) / sigma << " v0: " << driving / damping << " Dr: " << Dr << endl;
-    cout << "Force Peclet number: " << 2. * sigma * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
+    cout << "Force Peclet number: " << sigma * driving / Tinject << " Tinject: " << Tinject << " driving: " << driving << endl;
   }
   // initialize simulation
   sp.calcParticleNeighborList(cutDistance);

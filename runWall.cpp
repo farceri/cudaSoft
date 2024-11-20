@@ -1,6 +1,6 @@
 //
 // Author: Francesco Arceri
-// Date:   11-02-2024
+// Date:   11-18-2024
 //
 // Include C++ header files
 
@@ -25,36 +25,37 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readState = true, saveFinal = true, logSave = true, linSave = false;
-  bool initAngles = false, fixedbc = false, roundbc = true, additive = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readWall = false, initAngles = false, rigid = false;
   // variables
-  long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
+  long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = atof(argv[3]), driving = 2, damping = 1, tp = atof(argv[4]);
-  std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "vicsek/";
-  std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
+  double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = 1e02, driving = 2, damping = 1, tp = atof(argv[3]);
+  std::string outDir, currentDir, dirSample, energyFile, whichDynamics, wallDir;
+  std::string inDir = argv[1], potType = argv[7], particleType = argv[8];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setParticleType(simControlStruct::particleEnum::vicsek);
-  if(additive == false) {
-    sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
-    whichDynamics = "vicsek-na/";
+  if(particleType == "vicsek") {
+    sp.setParticleType(simControlStruct::particleEnum::vicsek);
+    sp.setNoiseType(simControlStruct::noiseEnum::vicsekNoise);
+  } else {
+    sp.setParticleType(simControlStruct::particleEnum::active);
+    sp.setNoiseType(simControlStruct::noiseEnum::activeNoise);
   }
-  sp.setNoiseType(simControlStruct::noiseEnum::vicsekNoise);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
-  if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
-    sp.setWallEnergyScale(ew);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-    sp.setWallEnergyScale(ew);
+  sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+  sp.setWallEnergyScale(ew);
+  if(rigid == true) {
+    wallDir = "rigid/";
+    sp.setMobileType(simControlStruct::mobileEnum::rigid);
   } else {
-    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+    wallDir = "mobile/";
+    sp.setMobileType(simControlStruct::mobileEnum::on);
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
@@ -68,19 +69,17 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  if(wallType == "reflect") {
-    whichDynamics = "vicsek/reflect/";
-    sp.setWallType(simControlStruct::wallEnum::reflect);
-  } else if(wallType == "noise") {
-    whichDynamics = "vicsek/noise/";
-    sp.setWallType(simControlStruct::wallEnum::reflectnoise);
+  if(particleType == "vicsek") {
+    whichDynamics = "vicsek/" + wallDir;
+    dirSample = whichDynamics + "j1e02-tp" + argv[3] + "/";
   } else {
-    whichDynamics = "vicsek/wall/";
+    whichDynamics = "active/" + wallDir;
+    dirSample = whichDynamics + "tp" + argv[3] + "/";
   }
-  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics
+    readWall = true;
     readState = true;
     inDir = inDir + dirSample;
     outDir = inDir;
@@ -101,6 +100,7 @@ int main(int argc, char **argv) {
     }
   } else {//start a new dyanmics
     if(readAndMakeNewDir == true) {
+      readWall = true;
       readState = true;
       outDir = inDir + "../../" + dirSample;
     } else {
@@ -122,6 +122,11 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   }
+  if(readWall == true) {
+    ioSP.readWall(inDir, nDim);
+  } else {
+    sp.initWall();
+  }
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
@@ -134,14 +139,20 @@ int main(int argc, char **argv) {
   Jvicsek = Jvicsek * sigma / damping;
   cout << "Units - time: " << timeUnit << " space: " << sigma << " velocity: " << velUnit << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
-  cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep / damping << endl;
+  if(particleType == "vicsek") {
+    cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep / damping << endl;
+  }
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
   driving *= velUnit;
   damping /= timeUnit;
-  Jvicsek *= alphaUnit;
-  Rvicsek *= sigma;
-  sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
+  if(particleType == "vicsek") {
+    Jvicsek *= alphaUnit;
+    Rvicsek *= sigma;
+    sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
+  } else {
+    sp.setSelfPropulsionParams(driving, tp);
+  }
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
   sp.initSoftParticleLangevin(Tinject, damping, readState);
@@ -150,7 +161,7 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
-  waveQ = sp.getSoftWaveNumber();
+  waveQ = 3.14;//sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -164,8 +175,9 @@ int main(int argc, char **argv) {
       ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Vicsek: current step: " << step + initialStep;
-        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        cout << " E/N: " << sp.getTotalEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
+        cout << " Twall: " << sp.getWallTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {

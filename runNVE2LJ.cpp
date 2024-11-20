@@ -42,8 +42,8 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
-    sp.setBoxEnergyScale(ew);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setWallEnergyScale(ew);
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
-  sigma = 2 * sp.getMeanParticleSigma();
+  sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ea);// sqrt(m sigma^2 / epsilon)
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << endl;

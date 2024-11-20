@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
         cout << "FIRE: iteration: " << iteration;
         cout << " force: " << setprecision(precision) << forceCheck;
         cout << " energy: " << setprecision(precision) << energyCheck;
-        cout << " pressure: " << sp.getParticleVirialPressure();
+        cout << " pressure: " << sp.getParticlePressure();
         cout << " shear stress: " << sp.getParticleShearStress() << endl;
         if(lastEnergyCheck <= energyCheck) {
           repetition += 1;
@@ -101,7 +101,6 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(currentDir);
       ioSP.saveAthermalParticlePacking(currentDir);
     }
-    ioSP.saveParticleStressEnergy(strain, numParticles);
     strain += strainStep;
   }
   ioSP.closeEnergyFile();

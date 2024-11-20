@@ -34,17 +34,17 @@ int main(int argc, char **argv) {
   // initialize sp object
   SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedBox);
+    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
   } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundBox);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
   } else {
     cout << "Setting periodic boundary conditins" << endl;
   }
   if(fixedbc == true || roundbc == true) {
     if(reflect == true) {
-      sp.setBoxType(simControlStruct::boxEnum::reflect);
+      sp.setWallType(simControlStruct::wallEnum::reflect);
     } else if(reflectnoise == true) {
-      sp.setBoxType(simControlStruct::boxEnum::reflectnoise);
+      sp.setWallType(simControlStruct::wallEnum::reflectnoise);
     } else {
       cout << "Setting WCA repulsive walls" << endl;
     }
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
     dirSample = "harmonic/";
-    sp.setBoxType(simControlStruct::boxEnum::harmonic);
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
     cout << "Setting Harmonic potential between particles and walls" << endl;
   }
   if(alltoall == true) {
