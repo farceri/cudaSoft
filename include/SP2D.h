@@ -23,10 +23,10 @@ using std::tuple;
 
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
-  enum class noiseEnum {langevin1, langevin2, brownian, activeNoise, vicsekNoise} noiseType;
+  enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian, drivenLangevin} noiseType;
   enum class geometryEnum {normal, leesEdwards, fixedWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
-  enum class potentialEnum {harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
+  enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
   enum class wallEnum {harmonic, lennardJones, WCA, reflect, reflectnoise} wallType;
   enum class mobileEnum {on, rigid, off} mobileType;
   enum class gravityEnum {on, off} gravityType;
@@ -133,6 +133,7 @@ public:
   thrust::device_vector<double> d_velCorr;
   thrust::device_vector<double> d_unitVel;
   thrust::device_vector<double> d_vortexParam;
+  thrust::device_vector<double> d_angMom;
   // two-type particles variables
   thrust::device_vector<long> d_flagAB;
   thrust::device_vector<double> d_squaredVelAB;
@@ -338,8 +339,6 @@ public:
 
   void checkVicsekNeighbors();
 
-  void checkWallNeighbors();
-
   double getParticleMaxDisplacement();
 
   void checkParticleDisplacement();
@@ -442,6 +441,8 @@ public:
 
   void checkParticleInsideRoundWall();
 
+  void checkReflectiveWall();
+
   void reflectParticleOnWall();
 
   void reflectParticleOnWallWithNoise();
@@ -457,6 +458,8 @@ public:
   double getVicsekVelocityCorrelation();
 
   double getNeighborVelocityCorrelation();
+
+  double getParticleAngularMomentum();
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 
@@ -502,6 +505,8 @@ public:
   std::tuple<double, double, double> getParticleStressComponents();
 
   double getParticleWallPressure();
+
+  std::tuple<double, double> getWallPressure();
 
   std::tuple<double, double> getColumnWork(double width);
   

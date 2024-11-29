@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
-  bool readWall = false, initAngles = false, rigid = false;
+  bool readWall = false, initAngles = false;
   // variables
   long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -35,27 +35,31 @@ int main(int argc, char **argv) {
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = 1e02, driving = 2, damping = 1, tp = atof(argv[3]);
   std::string outDir, currentDir, dirSample, energyFile, whichDynamics, wallDir;
-  std::string inDir = argv[1], potType = argv[7], particleType = argv[8];
+  std::string inDir = argv[1], potType = argv[7], particleType = argv[8], wallType = argv[9];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(particleType == "vicsek") {
     sp.setParticleType(simControlStruct::particleEnum::vicsek);
-    sp.setNoiseType(simControlStruct::noiseEnum::vicsekNoise);
-  } else {
+    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+  } else if(particleType == "active") {
     sp.setParticleType(simControlStruct::particleEnum::active);
-    sp.setNoiseType(simControlStruct::noiseEnum::activeNoise);
+    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+  } else {
+    cout << "Particles are set to be passive!" << endl;
   }
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
   sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
   sp.setWallEnergyScale(ew);
-  if(rigid == true) {
+  if(wallType == "rigid") {
     wallDir = "rigid/";
     sp.setMobileType(simControlStruct::mobileEnum::rigid);
-  } else {
+  } else if(wallType == "mobile") {
     wallDir = "mobile/";
     sp.setMobileType(simControlStruct::mobileEnum::on);
+  } else {
+    cout << "WALLTYPE IS OFF!" << endl;
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
@@ -177,7 +181,9 @@ int main(int argc, char **argv) {
         cout << "Vicsek: current step: " << step + initialStep;
         cout << " E/N: " << sp.getTotalEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
-        cout << " Twall: " << sp.getWallTemperature();
+        if(wallType == "mobile") {
+          cout << " Twall: " << sp.getWallTemperature();
+        }
         cout << " ISF: " << sp.getParticleISF(waveQ);
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {

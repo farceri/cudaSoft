@@ -25,15 +25,15 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readState = true, saveFinal = true, logSave = true, linSave = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, fixedbc = false, roundbc = true, additive = true;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = atof(argv[3]), driving = 2, damping = 1, tp = atof(argv[4]);
+  double ew = 10*ec, Tinject = 0, Rvicsek = atof(argv[3]), Jvicsek = 1e02, driving = 2, damping = 1, tp = atof(argv[4]);
   std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "vicsek/";
   std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
   // initialize sp object
@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
     whichDynamics = "vicsek-na/";
   }
-  sp.setNoiseType(simControlStruct::noiseEnum::vicsekNoise);
+  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -62,6 +62,9 @@ int main(int argc, char **argv) {
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  } else if(potType == "none") {
+    sp.setPotentialType(simControlStruct::potentialEnum::none);
+    whichDynamics = whichDynamics + "points/";
   } else {
     cout << "Setting default harmonic potential" << endl;
   }
@@ -69,15 +72,15 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   if(wallType == "reflect") {
-    whichDynamics = "vicsek/reflect/";
+    whichDynamics = whichDynamics + "reflect/";
     sp.setWallType(simControlStruct::wallEnum::reflect);
   } else if(wallType == "noise") {
-    whichDynamics = "vicsek/noise/";
+    whichDynamics = whichDynamics + "noise/";
     sp.setWallType(simControlStruct::wallEnum::reflectnoise);
   } else {
-    whichDynamics = "vicsek/wall/";
+    whichDynamics = whichDynamics + "wall/";
   }
-  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
+  dirSample = whichDynamics + "rj" + argv[3] + "-tp" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics

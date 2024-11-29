@@ -224,6 +224,8 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
     d_velCorr.resize(numParticles);
     thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
+    d_angMom.resize(numParticles);
+    thrust::fill(d_angMom.begin(), d_angMom.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
   } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
     d_randAngle.resize(numParticles);
@@ -236,11 +238,9 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     d_vicsekLastPos.resize(numParticles * nDim);
     thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
     d_velCorr.resize(numParticles);
-    d_unitVel.resize(numParticles * nDim);
-    d_vortexParam.resize(numParticles);
     thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
-    thrust::fill(d_unitVel.begin(), d_unitVel.end(), double(0));
-    thrust::fill(d_vortexParam.begin(), d_vortexParam.end(), double(0));
+    d_angMom.resize(numParticles);
+    thrust::fill(d_angMom.begin(), d_angMom.end(), double(0));
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
@@ -256,12 +256,12 @@ void SP2D::setNoiseType(simControlStruct::noiseEnum noiseType_) {
     cout << "SP2D::setNoiseType: noiseType: langevin2" << endl;
   } else if(simControl.noiseType == simControlStruct::noiseEnum::brownian) {
     cout << "SP2D::setNoiseType: noiseType: brownian" << endl;
-  } else if(simControl.noiseType == simControlStruct::noiseEnum::activeNoise) {
-    cout << "SP2D::setNoiseType: noiseType: velActive" << endl;
-  } else if(simControl.noiseType == simControlStruct::noiseEnum::vicsekNoise) {
-    cout << "SP2D::setNoiseType: noiseType: velVicsek" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::drivenBrownian) {
+    cout << "SP2D::setNoiseType: noiseType: drivenBrownian" << endl;
+  } else if(simControl.noiseType == simControlStruct::noiseEnum::drivenLangevin) {
+    cout << "SP2D::setNoiseType: noiseType: drivenLangevin" << endl;
   } else {
-    cout << "SP2D::setNoiseType: please specify valid particleType: langevin1, langevin2, velActive or velVicsek" << endl;
+    cout << "SP2D::setNoiseType: please specify valid particleType: langevin1, langevin2, drivenBrownian and drivenLangevin" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -273,12 +273,20 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
   } else if(simControl.geometryType == simControlStruct::geometryEnum::leesEdwards) {
     cout << "SP2D::setGeometryType: geometryType: leesEdwards" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedWall) {
+    d_wallForce.resize(numParticles * nDim);
+    thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
     cout << "SP2D::setGeometryType: geometryType: fixedWall" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides2D) {
+    d_wallForce.resize(numParticles * nDim);
+    thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
     cout << "SP2D:;setGeometryType: geometryType: fixedSides2D" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides3D) {
+    d_wallForce.resize(numParticles * nDim);
+    thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
     cout << "SP2D::setGeometryType: geometryType: fixedSides3D" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
+    d_wallForce.resize(numParticles * nDim);
+    thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
     cout << "SP2D::setGeometryType: geometryType: roundWall" << endl;
   } else {
     cout << "SP2D::setGeometryType: please specify valid geometryType: normal, leesEdwards, fixedWall, fixedSides2D, fixedSides3D or roundWall" << endl;
@@ -310,31 +318,29 @@ simControlStruct::neighborEnum SP2D::getNeighborType() {
 
 void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
 	simControl.potentialType = potentialType_;
-  if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
+  if(simControl.potentialType == simControlStruct::potentialEnum::none) {
+    setWallType(simControlStruct::wallEnum::reflect);
+    cout << "SP2D::setPotentialType: potentialType: harmonic" << " wallType: harmonic" << endl;
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
     setWallType(simControlStruct::wallEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: harmonic" << " wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: lennardJones" << " wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
-    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: WCA" << " default wallType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
     setWallType(simControlStruct::wallEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: adhesive" << " wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
-    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << " wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
-    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: LJWCA" << " wallType: lennardJones" << endl;
   } else {
-    cout << "SP2D::setPotentialType: please specify valid potentialType: harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
+    cout << "SP2D::setPotentialType: please specify valid potentialType: none, harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1668,7 +1674,11 @@ void SP2D::calcParticleInteraction() {
 void SP2D::addSelfPropulsion() {
   int s_nDim(nDim);
   double s_driving(driving);
-  double amplitude = sqrt(2.0 * dt / taup);
+  // use this to be able to set taup to 0
+  double amplitude = 0.;
+  if(taup != 0) {
+    amplitude = sqrt(2.0 * dt / taup);
+  }
   auto r = thrust::counting_iterator<long>(0);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
   double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
@@ -1730,7 +1740,11 @@ void SP2D::addVicsekAlignment() {
     double s_dt(dt);
     double s_driving(driving);
     double s_gamma(this->sim_->gamma);
-    double amplitude = sqrt(2.0 * dt / taup);
+    // use this to be able to set taup to 0
+    double amplitude = 0.;
+    if(taup != 0) {
+      amplitude = sqrt(2.0 * dt / taup);
+    }
     auto r = thrust::counting_iterator<long>(0);
     thrust::counting_iterator<long> index_sequence_begin(lrand48());
     thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), wrappedGaussNum(0.f,amplitude));
@@ -1774,18 +1788,19 @@ void SP2D::calcParticleFixedWallInteraction() {
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
 	double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   switch (simControl.geometryType) {
     case simControlStruct::geometryEnum::fixedWall:
-    kernelCalcParticleWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    kernelCalcParticleWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides2D:
-    kernelCalcParticleSidesInteraction2D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    kernelCalcParticleSidesInteraction2D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides3D:
-    kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    kernelCalcParticleSidesInteraction3D<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wForce);
     break;
     case simControlStruct::geometryEnum::roundWall:
-    kernelCalcParticleRoundWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy);
+    kernelCalcParticleRoundWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wForce);
     break;
     default:
     break;
@@ -1855,9 +1870,6 @@ void SP2D::calcParticleMobileWallInteraction() {
 
 void SP2D::calcParticleWallInteraction() {
   switch (simControl.mobileType) {
-		case simControlStruct::mobileEnum::off:
-    calcParticleFixedWallInteraction();
-    break;
     case simControlStruct::mobileEnum::on:
     calcWallShapeForceEnergy();
     calcParticleMobileWallInteraction();
@@ -1867,31 +1879,48 @@ void SP2D::calcParticleWallInteraction() {
     thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
     calcParticleMobileWallInteraction();
     break;
+		case simControlStruct::mobileEnum::off:
+    calcParticleFixedWallInteraction();
+    break;
   }
 }
 
 void SP2D::checkParticleInsideRoundWall() {
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  kernelCheckParticleInsideRoundWall<<<dimGrid, dimBlock>>>(pRad, pPos);
+  kernelCheckParticleInsideRoundWall<<<dimGrid, dimBlock>>>(pPos);
+}
+
+void SP2D::checkReflectiveWall() {
+  switch (simControl.wallType) {
+    case simControlStruct::wallEnum::reflect:
+    reflectParticleOnWall();
+    break;
+    case simControlStruct::wallEnum::reflectnoise:
+    reflectParticleOnWallWithNoise();
+    break;
+    default:
+    break;
+  }
 }
 
 void SP2D::reflectParticleOnWall() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   switch (simControl.geometryType) {
     case simControlStruct::geometryEnum::fixedWall:
-    kernelReflectParticleFixedWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    kernelReflectParticleFixedWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides2D:
-    kernelReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    kernelReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides3D:
-    kernelReflectParticleFixedSides3D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    kernelReflectParticleFixedSides3D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
     break;
 		case simControlStruct::geometryEnum::roundWall:
-    kernelReflectParticleRoundWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel);
+    kernelReflectParticleRoundWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
     break;
     default:
     break;
@@ -1925,13 +1954,7 @@ void SP2D::addParticleWallInteraction() {
     case simControlStruct::wallEnum::WCA:
     calcParticleWallInteraction();
     break;
-    case simControlStruct::wallEnum::reflect:
-    checkParticleInsideRoundWall();
-    reflectParticleOnWall();
-    break;
-    case simControlStruct::wallEnum::reflectnoise:
-    checkParticleInsideRoundWall();
-    reflectParticleOnWallWithNoise();
+    default:
     break;
   }
 }
@@ -1944,7 +1967,13 @@ void SP2D::addParticleGravity() {
 }
 
 void SP2D::calcParticleForceEnergy() {
-  calcParticleInteraction();
+  switch (simControl.potentialType) {
+    case simControlStruct::potentialEnum::none:
+    break;
+    default:
+    calcParticleInteraction();
+    break;
+  }
   switch (simControl.particleType) {
     case simControlStruct::particleEnum::active:
     addSelfPropulsion();
@@ -1994,6 +2023,14 @@ double SP2D::getNeighborVelocityCorrelation() {
   double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
   kernelCalcNeighborVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
   return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
+double SP2D::getParticleAngularMomentum() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
+  kernelCalcParticleAngularMomentum<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
+  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
@@ -2270,6 +2307,36 @@ double SP2D::getParticleWallPressure() {
     length += 2 * d_boxSize[dim];
   }
 	return thrust::reduce(d_wallStress.begin(), d_wallStress.end(), double(0), thrust::plus<double>()) / length;
+}
+
+std::tuple<double, double> SP2D::getWallPressure() {
+  if(nDim == 2) {
+    double boxLength = 0.;
+    switch (simControl.geometryType) {
+      case simControlStruct::geometryEnum::fixedWall:
+      boxLength = 2. * thrust::reduce(d_boxSize.begin(), d_boxSize.end(), double(0), thrust::plus<double>());
+      break;
+      case simControlStruct::geometryEnum::roundWall:
+      boxLength = 2. * PI * boxRadius;
+      break;
+      default:
+      break;
+    }
+    if(boxLength != 0.) {
+      typedef thrust::device_vector<double>::iterator Iterator;
+      strided_range<Iterator> xWallForce(d_wallForce.begin(), d_wallForce.end(), 2);
+      strided_range<Iterator> yWallForce(d_wallForce.begin() + 1, d_wallForce.end(), 2);
+      double xForce = thrust::reduce(xWallForce.begin(), xWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
+      double yForce = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;    
+      return std::make_tuple(xForce, yForce);
+    } else {
+      return std::make_tuple(0, 0);
+      cout << "SP2D::getWallPressure: WORK IN PROGRESS, only written for fixedWall and roundWall" << endl;
+    }
+  } else {
+    return std::make_tuple(0, 0);
+    cout << "SP2D::getWallPressure: WORK IN PROGRESS, only written for 2D" << endl;
+  }
 }
 
 std::tuple<double, double> SP2D::getColumnWork(double width) {
@@ -2918,13 +2985,13 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
     this->sim_ = new SoftParticleBrownian(this, SimConfig(Temp, 0, 0));
     cout << "SP2D::initSoftParticleLangevin:: Brownian integrator";
     break;
-    case simControlStruct::noiseEnum::activeNoise:
-    this->sim_ = new SoftParticleActiveBrownian(this, SimConfig(Temp, 0, 0));
-    cout << "SP2D::initSoftParticleLangevin:: Active Brownian integrator";
+    case simControlStruct::noiseEnum::drivenBrownian:
+    this->sim_ = new SoftParticleDrivenBrownian(this, SimConfig(Temp, 0, 0));
+    cout << "SP2D::initSoftParticleLangevin:: Driven Brownian integrator";
     break;
-    case simControlStruct::noiseEnum::vicsekNoise:
-    this->sim_ = new SoftParticleVicsek(this, SimConfig(Temp, 0, 0));
-    cout << "SP2D::initSoftParticleLangevin:: Overdamped Vicsek integrator";
+    case simControlStruct::noiseEnum::drivenLangevin:
+    this->sim_ = new SoftParticleDrivenLangevin(this, SimConfig(Temp, 0, 0));
+    cout << "SP2D::initSoftParticleLangevin:: Driven Langevin integrator";
     break;
   }
   this->sim_->gamma = gamma;

@@ -22,16 +22,16 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = false, alltoall = false, fixedbc = false, roundbc = true, scaleVel = false;
+  bool readNH = false, alltoall = false, fixedbc = false, roundbc = true, reflect = false, scaleVel = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[9]), ew = 1e02*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  double ec = atof(argv[9]), ew = 10*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nve";
   // initialize sp object
@@ -63,6 +63,13 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = whichDynamics + "/";
     cout << "Setting default harmonic potential" << endl;
+  }
+  if(reflect == true) {
+    whichDynamics = whichDynamics + "reflect/";
+    sp.setWallType(simControlStruct::wallEnum::reflect);
+    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+      std::experimental::filesystem::create_directory(inDir + whichDynamics);
+    }
   }
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(alltoall == true) {

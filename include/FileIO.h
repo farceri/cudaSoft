@@ -123,22 +123,24 @@ public:
   void saveEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
     double edamp = sp_->getDampingWork();
     double enoise = sp_->getNoiseWork();
-    double etot = epot + ekin + edamp + enoise;
+    double heat = edamp + enoise;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot << "\t";
     energyFile << setprecision(precision) << edamp / numParticles << "\t";
     energyFile << setprecision(precision) << enoise / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double eactive = sp_->getSelfPropulsionWork();
       energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
-      etot += eactive;
+      heat += eactive;
     } else {
       energyFile << "\t";
     }
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << heat << endl;
   }
 
   void saveEnergyAB(long step, double timeStep, long numParticles) {
@@ -170,19 +172,27 @@ public:
   void saveAlignEnergy(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles;
+    energyFile << setprecision(precision) << ekin / numParticles;
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
+      double wpot = sp_->getWallPotentialEnergy();
+      energyFile << "\t" << setprecision(precision) << wpot / sp_->numWall;
+      if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+        double wkin = sp_->getWallKineticEnergy();
+        energyFile << "\t" << setprecision(precision) << wkin / sp_->numWall;
+      }
+    }
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::fixedWall || sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
+      std::tuple<double, double> wall = sp_->getWallPressure();
+      energyFile << "\t" << setprecision(precision) << get<0>(wall);
+      energyFile << "\t" << setprecision(precision) << get<1>(wall);
+    }
+    energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum();
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double velCorr = sp_->getNeighborVelocityCorrelation();
       energyFile << "\t" << setprecision(precision) << velCorr << endl;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double vortexParam = sp_->getVicsekVortexParameter();
-      energyFile << "\t" << setprecision(precision) << vortexParam << "\t";
-      double orderParam = sp_->getVicsekOrderParameter();
-      energyFile << "\t" << setprecision(precision) << orderParam << "\t";
       double velCorr = sp_->getVicsekVelocityCorrelation();
       energyFile << "\t" << setprecision(precision) << velCorr << endl;
     } else {
@@ -697,7 +707,7 @@ public:
         cout << "FileIO::saveParticlePacking: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
       }
     }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
       saveWallParams(dirName);
       saveWall(dirName);
     }
@@ -752,7 +762,7 @@ public:
         save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
       }
     }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
       saveWall(dirName);
     }
   }
@@ -773,7 +783,7 @@ public:
     if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
       save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
     }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
       save2DIndexFile(dirName + "wallNeighbors.dat", sp_->getWallNeighbors(), sp_->wallNeighborListSize);
       save2DFile(dirName + "wallForces.dat", sp_->getWallForces(), sp_->nDim);
     }

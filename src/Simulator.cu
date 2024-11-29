@@ -33,7 +33,7 @@ void SoftParticleLangevin::integrate() {
   sp_->calcParticleForceEnergy();
   updateThermalVel();
   updateVelocity(0.5 * sp_->dt);
-  //conserveMomentum();
+  conserveMomentum();
 }
 
 void SoftParticleLangevin::injectKineticEnergy() {
@@ -100,6 +100,35 @@ void SoftParticleLangevin::conserveMomentum() {
   kernelSubtractParticleDrift<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, velSum);
 }
 
+//************************* soft particle langevin with driving force ***************************//
+void SoftParticleDrivenLangevin::integrate() {
+  updateVelocity(0.5 * sp_->dt);
+  updatePosition(sp_->dt);
+  sp_->checkParticleNeighbors();
+  sp_->calcParticleForceEnergy();
+  updateThermalVel();
+  updateVelocity(0.5 * sp_->dt);
+  //conserveMomentum();
+}
+
+void SoftParticleDrivenLangevin::updateThermalVel() {
+  // update thermal velocity
+  long s_nDim(sp_->nDim);
+  double s_gamma(gamma);
+  auto r = thrust::counting_iterator<long>(0);
+  const double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
+  double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
+
+  auto langevinAddDampingForces = [=] __device__ (long particleId) {
+    #pragma unroll (MAXDIM)
+		for (long dim = 0; dim < s_nDim; dim++) {
+      pForce[particleId * s_nDim + dim] -= s_gamma * pVel[particleId * s_nDim + dim];
+    }
+  };
+
+  thrust::for_each(r, r + sp_->numParticles, langevinAddDampingForces);
+}
+
 //************************* soft particle langevin ***************************//
 void SoftParticleLangevin2::integrate() {
   updateThermalVel();
@@ -108,7 +137,7 @@ void SoftParticleLangevin2::integrate() {
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5*sp_->dt);
-  //conserveMomentum();
+  conserveMomentum();
 }
 
 void SoftParticleLangevin2::updateThermalVel() {
@@ -368,6 +397,7 @@ void SoftParticleNVE::integrate() {
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
   updateVelocity(0.5 * sp_->dt);
+  sp_->checkReflectiveWall();
   //conserveMomentum();
 }
 
@@ -561,7 +591,7 @@ void SoftParticleDoubleNoseHoover::updateThermalVel() {
 void SoftParticleBrownian::integrate() {
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
-  updateThermalVel();
+  sp_->checkReflectiveWall();
   updatePosition(sp_->dt);
   //conserveMomentum();
 }
@@ -595,16 +625,17 @@ void SoftParticleBrownian::updatePosition(double timeStep) {
   kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
 }
 
-//**************************** active brownian integrator *****************************//
-void SoftParticleActiveBrownian::integrate() {
+//**************************** driven brownian integrator *****************************//
+void SoftParticleDrivenBrownian::integrate() {
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
   updateThermalVel();
+  sp_->checkReflectiveWall();
   updatePosition(sp_->dt);
   //conserveMomentum();
 }
 
-void SoftParticleActiveBrownian::updateThermalVel() {
+void SoftParticleDrivenBrownian::updateThermalVel() {
   // assign overdamped velocity as total force over damping
   long s_nDim(sp_->nDim);
   double s_gamma(gamma);
@@ -621,13 +652,4 @@ void SoftParticleActiveBrownian::updateThermalVel() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, updateActiveBrownianVel);
-}
-
-//**************************** vicsek integrator *****************************//
-void SoftParticleVicsek::integrate() {
-  sp_->checkParticleNeighbors();
-  sp_->calcParticleForceEnergy();
-  updateThermalVel();
-  updatePosition(sp_->dt);
-  //conserveMomentum();
 }

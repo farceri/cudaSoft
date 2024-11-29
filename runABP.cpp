@@ -25,21 +25,21 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readState = true, saveFinal = true, logSave = true, linSave = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, fixedbc = false, roundbc = true;
   // variables
-  long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = 2;
+  long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 0, driving = 2, damping = 1, tp = atof(argv[3]);
+  double ew = 10*ec, Tinject = 0, tp = atof(argv[3]), driving = atof(argv[4]), damping = 1;
   std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "active/";
-  std::string inDir = argv[1], potType = argv[7], wallType = argv[8];
+  std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
-  sp.setNoiseType(simControlStruct::noiseEnum::activeNoise);
+  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = "active/wall/";
   }
-  dirSample = whichDynamics + "tp" + argv[3] + "/";
+  dirSample = whichDynamics + "tp" + argv[3] + "-f0" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics

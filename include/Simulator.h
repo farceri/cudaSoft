@@ -67,7 +67,18 @@ public:
   virtual void integrate();
 };
 
-// Soft particle Langevin integrator child of SimInterface
+// Soft particle Langevin integrator child of SoftParticleLangevin
+class SoftParticleDrivenLangevin: public SoftParticleLangevin
+{
+public:
+  SoftParticleDrivenLangevin() = default;
+  SoftParticleDrivenLangevin(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+
+  virtual void updateThermalVel();
+  virtual void integrate();
+};
+
+// Soft particle Langevin integrator child of SoftParticleLangevin
 class SoftParticleLangevin2: public SoftParticleLangevin
 {
 public:
@@ -206,24 +217,14 @@ public:
   virtual void integrate();
 };
 
-// Soft particle Active Brownian integrator child of SoftParticleBrownian
-class SoftParticleActiveBrownian: public SoftParticleBrownian
+// Soft particle Brownian integrator with driving force child of SoftParticleBrownian
+class SoftParticleDrivenBrownian: public SoftParticleBrownian
 {
 public:
-  SoftParticleActiveBrownian() = default;
-  SoftParticleActiveBrownian(SP2D * spPtr, SimConfig config) : SoftParticleBrownian:: SoftParticleBrownian(spPtr, config){;}
+  SoftParticleDrivenBrownian() = default;
+  SoftParticleDrivenBrownian(SP2D * spPtr, SimConfig config) : SoftParticleBrownian:: SoftParticleBrownian(spPtr, config){;}
 
   virtual void updateThermalVel();
-  virtual void integrate();
-};
-
-// Soft particle ActiveBrownian integrator + Vicsek alignment child of SoftParticleActiveBrownian
-class SoftParticleVicsek: public SoftParticleActiveBrownian
-{
-public:
-  SoftParticleVicsek() = default;
-  SoftParticleVicsek(SP2D * spPtr, SimConfig config) : SoftParticleActiveBrownian:: SoftParticleActiveBrownian(spPtr, config){;}
-  
   virtual void integrate();
 };
 
