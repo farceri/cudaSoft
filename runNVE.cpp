@@ -26,25 +26,18 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = false, alltoall = false, fixedbc = false, roundbc = true, reflect = false, scaleVel = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readNH = false, alltoall = false, squarebc = false, roundbc = true, scaleVel = false;
+  bool readWall = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = atof(argv[9]), ew = 10*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  double ea = 1e05*ec, el = 1e03*ec, eb = ec;
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
-  std::string outDir, energyFile, currentDir, inDir = argv[1], potType = argv[8], dirSample, whichDynamics = "nve";
+  std::string outDir, energyFile, currentDir, dirSample, whichDynamics = "nve";
+  std::string inDir = argv[1], potType = argv[8], wallType = argv[10];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
-    sp.setWallEnergyScale(ew);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-    sp.setWallEnergyScale(ew);
-  } else {
-    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
-  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -54,22 +47,41 @@ int main(int argc, char **argv) {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
-    if(fixedbc == true || roundbc == true) {
-      whichDynamics = whichDynamics + "-fixed/";
-    } else {
-      whichDynamics = whichDynamics + "-wca/";
-    }
+    whichDynamics = whichDynamics + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
   } else {
     whichDynamics = whichDynamics + "/";
     cout << "Setting default harmonic potential" << endl;
   }
-  if(reflect == true) {
+  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+    std::experimental::filesystem::create_directory(inDir + whichDynamics);
+  }
+  if(squarebc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
+    sp.setWallEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
+  }
+  if(wallType == "rigid") {
+    whichDynamics = whichDynamics + "rigid/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
+  } else if(wallType == "mobile") {
+    whichDynamics = whichDynamics + "mobile/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::mobile);
+    sp.setWallShapeEnergyScales(ea, el, eb);
+  } else if(wallType == "reflect") {
     whichDynamics = whichDynamics + "reflect/";
-    sp.setWallType(simControlStruct::wallEnum::reflect);
-    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-      std::experimental::filesystem::create_directory(inDir + whichDynamics);
-    }
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
+  } else if(wallType == "fixed") {
+    whichDynamics = whichDynamics + "fixed/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+  } else {
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
+  }
+  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+    std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   dirSample = whichDynamics + "T" + argv[3] + "/";
   if(alltoall == true) {
@@ -77,7 +89,6 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   // set input and output
-
   if(justRun == true) {
     outDir = inDir + "dynamics/";
     if(std::experimental::filesystem::exists(outDir) == false) {
@@ -128,10 +139,19 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
   }
+  cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
   }
+  if(readWall == true) {
+    ioSP.readWall(inDir, nDim);
+  } else {
+    sp.initWall();
+  }
+  currentDir = outDir + "/initial/";
+  std::experimental::filesystem::create_directory(currentDir);
+  ioSP.saveParticlePacking(currentDir);
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
@@ -151,7 +171,6 @@ int main(int argc, char **argv) {
   sp.calcParticleNeighbors(cutDistance);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
-  sp.setInitialPositions();
   waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
@@ -170,9 +189,16 @@ int main(int argc, char **argv) {
       ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
-        cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        if(wallType == "mobile") {
+          cout << " E/N: " << sp.getTotalEnergy() / numParticles;
+        } else {
+          cout << " E/N: " << sp.getParticleEnergy() / numParticles;
+        }
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
+        if(wallType == "mobile") {
+          cout << " A: " << sp.getWallArea() << " A0: " << sp.getWallArea0();
+        }
         if(sp.simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
           updateCount = sp.getUpdateCount();
           if(step != 0 && updateCount > 0) {
@@ -186,7 +212,7 @@ int main(int argc, char **argv) {
         }
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          //ioSP.saveParticleNeighbors(outDir);
+          ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -210,7 +236,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
@@ -223,7 +249,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    //ioSP.saveParticleNeighbors(outDir);
+    ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

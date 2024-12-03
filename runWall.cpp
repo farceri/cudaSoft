@@ -74,7 +74,9 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + "mobile/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::mobile);
   } else {
-    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    cout << "Setting default fixed round wall" << endl;
   }
   dirSample = whichDynamics + "tp" + argv[3] + "/";
   // set input and output
@@ -157,9 +159,9 @@ int main(int argc, char **argv) {
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation
   sp.initSoftParticleLangevin(Tinject, damping, readState);
-  ioSP.saveParticlePacking(outDir);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
+  ioSP.saveParticlePacking(outDir);
   ioSP.saveParticleNeighbors(outDir);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();

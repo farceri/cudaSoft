@@ -115,6 +115,7 @@ public:
   // wall variables
   thrust::device_vector<double> d_wallLength;
   thrust::device_vector<double> d_wallAngle;
+  thrust::device_vector<double> d_areaSector;
   thrust::device_vector<double> d_wallPos;
   thrust::device_vector<double> d_wallVel;
   thrust::device_vector<double> d_wallForce;
@@ -127,7 +128,6 @@ public:
   double wallArea0;
   double wallLength0;
   double wallAngle0;
-  thrust::device_vector<double> d_wallCOM;
   double ea, el, eb;
   // correlation variables
   thrust::device_vector<double> d_velCorr;
@@ -191,9 +191,9 @@ public:
 
   void initVicsekNeighbors(long numParticles_);
 
-  void initRigidWallVariables(long numWall_);
+  void initWallVariables(long numWall_);
 
-  void initMobileWallVariables(long numWall_);
+  void initWallShapeVariables(long numWall_);
 
   void initWallNeighbors(long numParticles_);
 
@@ -245,6 +245,7 @@ public:
   void applyCenteredBiaxialExtension(thrust::host_vector<double> &newWallSize_, double strain_, long direction_);
 
   void setDimBlock(long dimBlock_);
+  void setWallBlock(long dimBlock_);
   long getDimBlock();
 
   void setNDim(long nDim_);
@@ -260,6 +261,10 @@ public:
 
   double getWallRad();
 
+  double getWallArea0();
+
+  double getWallArea();
+
   void setParticleLengthScale();
 
   void setLengthScaleToOne();
@@ -268,6 +273,7 @@ public:
   thrust::host_vector<double> getBoxSize();
 
   void setBoxRadius(double boxRadius_);
+  void scaleBoxRadius(double scale_);
   double getBoxRadius();
 
   void setParticleRadii(thrust::host_vector<double> &particleRad_);
@@ -347,8 +353,6 @@ public:
 
   void checkVicsekNeighbors();
 
-  void checkWallNeighbors();
-
   double getSoftWaveNumber();
 
   double getParticleISF(double waveNumber_);
@@ -374,9 +378,13 @@ public:
 
   void initializeParticleAngles();
 
-  void setRoundWallParams(long numWall_, double wallRad_, double wallRadius_);
+  void setWallShapeEnergyScales(double ea_, double el_, double eb_);
+
+  void setMobileWallParams(long numWall_, double wallRad_, double wallArea0_);
 
   void initRigidWall();
+
+  void checkDimGrid();
 
   void initMobileWall();
 
@@ -429,7 +437,7 @@ public:
 
   void calcParticleFixedWallInteraction();
 
-  void calcWallAreaAndPos();
+  void calcWallArea();
 
   void calcWallShape();
 

@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
     whichDynamics = "vicsek-na/";
   }
-  sp.setNoiseType(simControlStruct::noiseEnum::drivenLangevin);
+  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }

@@ -39,11 +39,14 @@ using std::endl;
 SP2D::SP2D(long nParticles, long dim) {
   // default values
   srand48(time(0));
-  dimBlock = 256;
   nDim = dim;
   numParticles = nParticles;
   num1 = numParticles;
-  // the default is monodisperse size distribution
+  if(numParticles < 256) {
+    dimBlock = 32;
+  } else {
+    dimBlock = 256;
+  }
   setDimBlock(dimBlock);
   setNDim(nDim);
   setNumParticles(numParticles);
@@ -72,6 +75,9 @@ SP2D::SP2D(long nParticles, long dim) {
   cutDistance = 1;
   updateCount = 0;
   shift = false;
+  ea = 1e05;
+  el = 1;
+  eb = 1;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -162,7 +168,7 @@ void SP2D::initVicsekNeighbors(long numParticles_) {
   thrust::fill(d_vicsekFlag.begin(), d_vicsekFlag.end(), int(0));
 }
 
-void SP2D::initRigidWallVariables(long numWall_) {
+void SP2D::initWallVariables(long numWall_) {
   d_wallPos.resize(numWall_ * nDim);
   d_wallForce.resize(numWall_ * nDim);
   d_wallEnergy.resize(numWall_);
@@ -171,20 +177,16 @@ void SP2D::initRigidWallVariables(long numWall_) {
   thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
 }
 
-void SP2D::initMobileWallVariables(long numWall_) {
+void SP2D::initWallShapeVariables(long numWall_) {
   d_wallLength.resize(numWall_);
   d_wallAngle.resize(numWall_);
-  d_wallPos.resize(numWall_ * nDim);
+  d_areaSector.resize(numWall_);
   d_wallVel.resize(numWall_ * nDim);
-  d_wallForce.resize(numWall_ * nDim);
-  d_wallEnergy.resize(numWall_);
   d_sqWallVel.resize(numWall_ * nDim);
   thrust::fill(d_wallLength.begin(), d_wallLength.end(), double(0));
   thrust::fill(d_wallAngle.begin(), d_wallAngle.end(), double(0));
-  thrust::fill(d_wallPos.begin(), d_wallPos.end(), double(0));
+  thrust::fill(d_areaSector.begin(), d_areaSector.end(), double(0));
   thrust::fill(d_wallVel.begin(), d_wallVel.end(), double(0));
-  thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
-  thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
   thrust::fill(d_sqWallVel.begin(), d_sqWallVel.end(), double(0));
 }
 
@@ -625,6 +627,20 @@ void SP2D::setDimBlock(long dimBlock_) {
   }
 }
 
+void SP2D::setWallBlock(long dimBlock_) {
+	dimBlock = dimBlock_;
+  cudaError err = cudaMemcpyToSymbol(d_dimBlock, &dimBlock, sizeof(dimBlock));
+  if(err != cudaSuccess) {
+    cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+  }
+  dimGrid = (numWall + dimBlock - 1) / dimBlock;
+  err = cudaMemcpyToSymbol(d_dimGrid, &dimGrid, sizeof(dimGrid));
+  cout << "SP2D::setDimBlock: dimBlock " << dimBlock << " dimGrid " << dimGrid << endl;
+  if(err != cudaSuccess) {
+    cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+  }
+}
+
 long SP2D::getDimBlock() {
   long dimBlockFromDevice;
   //dimBlockFromDevice = d_dimBlock;
@@ -683,6 +699,18 @@ double SP2D::getWallRad() {
 	return wallRadFromDevice;
 }
 
+double SP2D::getWallArea0() {
+  double wallArea0FromDevice;
+  cudaMemcpyFromSymbol(&wallArea0FromDevice, d_wallArea0, sizeof(d_wallArea0));
+	return wallArea0FromDevice;
+}
+
+double SP2D::getWallArea() {
+  double wallAreaFromDevice;
+  cudaMemcpyFromSymbol(&wallAreaFromDevice, d_wallArea, sizeof(d_wallArea));
+	return wallAreaFromDevice;
+}
+
 void SP2D::setParticleLengthScale() {
   rho0 = thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>())/numParticles; // set dimensional factor
   cout << " lengthscale: " << rho0 << endl;
@@ -722,7 +750,7 @@ void SP2D::setBoxRadius(double boxRadius_) {
 		boxRadius = boxRadius_;
 		cudaError err = cudaMemcpyToSymbol(d_boxRadius, &boxRadius, sizeof(boxRadius));
 		if(err != cudaSuccess) {
-			cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+			cout << "cudaMemcpyToSymbol Error: " << cudaGetErrorString(err) << endl;
 		}
 	}
 	else {
@@ -731,11 +759,26 @@ void SP2D::setBoxRadius(double boxRadius_) {
   cout << "SP2D::setBoxRadius: boxRadius: " << boxRadius << endl;
 }
 
+void SP2D::scaleBoxRadius(double scale_) {
+	syncSimControlFromDevice();
+	if(simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
+		boxRadius = scale_ * boxRadius;
+		cudaError err = cudaMemcpyToSymbol(d_boxRadius, &boxRadius, sizeof(boxRadius));
+		if(err != cudaSuccess) {
+			cout << "cudaMemcpyToSymbol Error: " << cudaGetErrorString(err) << endl;
+		}
+	}
+	else {
+		cout << "SP2D::scaleBoxRadius: attempting to scale boxRadius without using round boundary conditions" << endl;
+	}
+  cout << "SP2D::scaleBoxRadius: scale: " << scale_ << " boxRadius: " << boxRadius << endl;
+}
+
 double SP2D::getBoxRadius() {
   double boxRadiusFromDevice;
 	cudaError err = cudaMemcpyFromSymbol(&boxRadiusFromDevice, d_boxRadius, sizeof(d_boxRadius));
 	if(err != cudaSuccess) {
-		cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+		cout << "cudaMemcpyToSymbol Error: " << cudaGetErrorString(err) << endl;
 	}
 	return boxRadiusFromDevice;
 }
@@ -929,31 +972,35 @@ void SP2D::printContacts() {
 }
 
 double SP2D::getParticlePhi() {
-  switch (simControl.geometryType) {
-    case simControlStruct::geometryEnum::roundWall:
-    if(nDim == 2) {
-      thrust::device_vector<double> d_radSquared(numParticles);
-      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
-      return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) / (boxRadius * boxRadius);
-    } else {
-      cout << "SP2D::getParticlePhi: only dimensions 2 in roundWall, rigid and mobile geometry is allowed!" << endl;
-      return 0;
+  if(nDim == 2) {
+    thrust::device_vector<double> d_radSquared(numParticles);
+    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
+    switch (simControl.boundaryType) {
+      case simControlStruct::boundaryEnum::mobile:
+      if(wallArea > 0.) {
+        return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / wallArea;
+      } else {
+        return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) / (boxRadius * boxRadius);
+      }
+      break;
+      default:
+      switch (simControl.geometryType) {
+        case simControlStruct::geometryEnum::roundWall:
+        return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) / (boxRadius * boxRadius);
+        break;
+        default:
+        return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
+        break;
+      }
+      break;
     }
-    break;
-    default:
-    if(nDim == 2) {
-      thrust::device_vector<double> d_radSquared(numParticles);
-      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
-      return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / (d_boxSize[0] * d_boxSize[1]);
-    } else if(nDim == 3) {
-      thrust::device_vector<double> d_radCubed(numParticles);
-      thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
-      return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 4 * PI / (3 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
-    } else {
-      cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
-      return 0;
-    }
-    break;
+  } else if(nDim == 3) {
+    thrust::device_vector<double> d_radCubed(numParticles);
+    thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radCubed.begin(), cube());
+    return thrust::reduce(d_radCubed.begin(), d_radCubed.end(), double(0), thrust::plus<double>()) * 4 * PI / (3 * d_boxSize[0] * d_boxSize[1] * d_boxSize[2]);
+  } else {
+    cout << "SP2D::getParticlePhi: only dimensions 2 and 3 are allowed!" << endl;
+    return 0;
   }
 }
 
@@ -1039,7 +1086,6 @@ double SP2D::getParticleMaxDisplacement() {
 void SP2D::checkParticleDisplacement() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pLastPos = thrust::raw_pointer_cast(&d_particleLastPos[0]);
-  thrust::fill(d_flag.begin(), d_flag.end(), 0);
   int *flag = thrust::raw_pointer_cast(&d_flag[0]);
   kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, pLastPos, flag, cutoff);
   int sumFlag = thrust::reduce(d_flag.begin(), d_flag.end(), int(0), thrust::plus<int>());
@@ -1113,7 +1159,6 @@ void SP2D::checkParticleNeighbors() {
 void SP2D::checkVicsekNeighbors() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *vLastPos = thrust::raw_pointer_cast(&d_vicsekLastPos[0]);
-  thrust::fill(d_vicsekFlag.begin(), d_vicsekFlag.end(), 0);
   int *vicsekFlag = thrust::raw_pointer_cast(&d_vicsekFlag[0]);
   kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, vLastPos, vicsekFlag, Rvicsek);
   int sumFlag = thrust::reduce(d_vicsekFlag.begin(), d_vicsekFlag.end(), int(0), thrust::plus<int>());
@@ -1124,23 +1169,30 @@ void SP2D::checkVicsekNeighbors() {
 }
 
 double SP2D::getSoftWaveNumber() {
-  switch (simControl.geometryType) {
-    case simControlStruct::geometryEnum::roundWall:
-    if(nDim == 2) {
-      return PI / (2. * sqrt(boxRadius * boxRadius * getParticlePhi() / numParticles));
-    } else {
-      cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rigid and mobile geometry is allowed!" << endl;
-      return 0;
-    }
+  switch (simControl.boundaryType) {
+    case simControlStruct::boundaryEnum::mobile:
+    return PI / (2. * sqrt(wallArea * getParticlePhi() / (PI * numParticles)));
     break;
     default:
-    if(nDim == 2) {
-      return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * getParticlePhi() / (PI * numParticles)));
-    } else if (nDim == 3) {
-      return PI / (2. * cbrt(d_boxSize[0] * d_boxSize[1] * d_boxSize[2] * getParticlePhi() / (PI * numParticles)));
-    } else {
-      cout << "SP2D::getSoftWaveNumber: only dimensions 2 and 3 are allowed!" << endl;
-      return 0;
+    switch (simControl.geometryType) {
+      case simControlStruct::geometryEnum::roundWall:
+      if(nDim == 2) {
+        return PI / (2. * sqrt(boxRadius * boxRadius * getParticlePhi() / numParticles));
+      } else {
+        cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rigid and mobile geometry is allowed!" << endl;
+        return 0;
+      }
+      break;
+      default:
+      if(nDim == 2) {
+        return PI / (2. * sqrt(d_boxSize[0] * d_boxSize[1] * getParticlePhi() / (PI * numParticles)));
+      } else if (nDim == 3) {
+        return PI / (2. * cbrt(d_boxSize[0] * d_boxSize[1] * d_boxSize[2] * getParticlePhi() / (PI * numParticles)));
+      } else {
+        cout << "SP2D::getSoftWaveNumber: only dimensions 2 and 3 are allowed!" << endl;
+        return 0;
+      }
+      break;
     }
     break;
   }
@@ -1382,28 +1434,6 @@ void SP2D::initializeParticleAngles() {
   }
 }
 
-void SP2D::setRoundWallParams(long numWall_, double wallRad_, double wallRadius_) {
-  d_wallCOM.resize(nDim);
-  thrust::fill(d_wallCOM.begin(), d_wallCOM.end(), double(0));
-  numWall = numWall_;
-  cudaMemcpyToSymbol(d_numWall, &numWall, sizeof(numWall));
-  wallRad = wallRad_;
-  cudaMemcpyToSymbol(d_wallRad, &wallRad_, sizeof(wallRad_));
-  wallArea0 = PI * wallRadius_ * wallRadius_;
-  cudaMemcpyToSymbol(d_wallArea0, &wallArea0, sizeof(wallArea0));
-  cudaMemcpyToSymbol(d_wallArea, &wallArea0, sizeof(wallArea0));
-  wallLength0 = wallRad;
-  cudaMemcpyToSymbol(d_wallLength0, &wallLength0, sizeof(wallLength0));
-  wallAngle0 = 2. * PI / numWall;
-  cudaMemcpyToSymbol(d_wallAngle0, &wallAngle0, sizeof(wallAngle0));
-  ea = 1;
-  el = 1;
-  eb = 1;
-  cudaMemcpyToSymbol(d_ea, &ea, sizeof(ea));
-  cudaMemcpyToSymbol(d_el, &el, sizeof(el));
-  cudaMemcpyToSymbol(d_eb, &eb, sizeof(eb));
-}
-
 // define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
 void SP2D::initRigidWall() {
   double circleLength = 2. * PI * boxRadius;
@@ -1412,7 +1442,7 @@ void SP2D::initRigidWall() {
   wallRad = 0.5 * (circleLength / numWall);
   cudaMemcpyToSymbol(d_wallRad, &wallRad, sizeof(wallRad));
   cout << "SP2D::initRigidWall:: wallRad: " << wallRad << " numWall: " << numWall << endl;
-  initRigidWallVariables(numWall);
+  initWallVariables(numWall);
   initWallNeighbors(numWall);
   for (long wallId = 0; wallId < numWall; wallId++) {
     d_wallPos[wallId * nDim] = boxRadius * cos((2. * PI * wallId) / numWall);
@@ -1420,34 +1450,60 @@ void SP2D::initRigidWall() {
   }
 }
 
-// define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
-void SP2D::initMobileWall() {
-  d_wallCOM.resize(nDim);
-  thrust::fill(d_wallCOM.begin(), d_wallCOM.end(), double(0));
-  double circleLength = 2. * PI * boxRadius;
-  wallArea0 = PI * boxRadius * boxRadius;
+void SP2D::setWallShapeEnergyScales(double ea_, double el_, double eb_) {
+  ea = ea_;
+  el = el_;
+  eb = eb_;
+  cudaMemcpyToSymbol(d_ea, &ea, sizeof(ea));
+  cudaMemcpyToSymbol(d_el, &el, sizeof(el));
+  cudaMemcpyToSymbol(d_eb, &eb, sizeof(eb));
+  cout << "SP2D::setWallShapeEnergyScales:: area: " << ea << " segment: " << el << " angle: " << eb << endl;
+}
+
+void SP2D::checkDimGrid() {
+  if(numWall > numParticles) {
+	  dimGrid = (numWall + dimBlock - 1) / dimBlock;
+    cudaError err = cudaMemcpyToSymbol(d_dimGrid, &dimGrid, sizeof(dimGrid));
+    cout << "SP2D::checkDimBlock: dimGrid " << dimGrid << endl;
+    if(err != cudaSuccess) {
+      cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
+    }
+  }
+}
+
+void SP2D::setMobileWallParams(long numWall_, double wallRad_, double wallArea0_) {
+  numWall = numWall_;
+  wallRad = wallRad_;
+  wallArea0 = wallArea0_;
+  wallArea = wallArea0_;
+  wallLength0 = 2 * wallRad_;
+  wallAngle0 = 2. * PI / numWall_;
+  cudaMemcpyToSymbol(d_numWall, &numWall, sizeof(numWall));
+  cudaMemcpyToSymbol(d_wallRad, &wallRad, sizeof(wallRad));
   cudaMemcpyToSymbol(d_wallArea0, &wallArea0, sizeof(wallArea0));
   cudaMemcpyToSymbol(d_wallArea, &wallArea0, sizeof(wallArea0));
-  numWall = circleLength / getMinParticleSigma();
-  cudaMemcpyToSymbol(d_numWall, &numWall, sizeof(numWall));
-  wallRad = 0.5 * (circleLength / numWall);
-  cudaMemcpyToSymbol(d_wallRad, &wallRad, sizeof(wallRad));
-  cout << "SP2D::initMobileWall:: wallRad: " << wallRad << " numWall: " << numWall << endl;
-  wallLength0 = 2. * wallRad;
-  wallAngle0 = 2. * PI / numWall;
   cudaMemcpyToSymbol(d_wallLength0, &wallLength0, sizeof(wallLength0));
   cudaMemcpyToSymbol(d_wallAngle0, &wallAngle0, sizeof(wallAngle0));
-  initMobileWallVariables(numWall);
+  checkDimGrid();
+}
+
+// define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
+void SP2D::initMobileWall() {
+  double circleLength = 2. * PI * boxRadius;
+  numWall = circleLength / getMinParticleSigma();
+  wallRad = 0.5 * (circleLength / numWall);
+  cout << "SP2D::initMobileWall:: wallRad: " << wallRad << " numWall: " << numWall << endl;
+  initWallVariables(numWall);
   initWallNeighbors(numWall);
   for (long wallId = 0; wallId < numWall; wallId++) {
-    d_wallLength[wallId] = wallLength0;
-    d_wallAngle[wallId] = wallAngle0;
     d_wallPos[wallId * nDim] = boxRadius * cos((2. * PI * wallId) / numWall);
     d_wallPos[wallId * nDim + 1] = boxRadius * sin((2. * PI * wallId) / numWall);
   }
-  boxRadius = 1.2 * boxRadius;
-  cout << "SP2D::initMobileWall:: increased boxRadius: " << boxRadius << endl;
-  setBoxRadius(boxRadius);
+  wallArea0 = PI * boxRadius * boxRadius;
+  setMobileWallParams(numWall, wallRad, wallArea0);
+  initWallShapeVariables(numWall);
+  // increase boxRadius to track movement of boundary
+  scaleBoxRadius(1.1);
 }
 
 void SP2D::initWall() {
@@ -1818,39 +1874,17 @@ void SP2D::calcParticleFixedWallInteraction() {
   }
 }
 
-void SP2D::calcWallAreaAndPos() {
-  thrust::fill(d_wallCOM.begin(), d_wallCOM.end(), double(0));
-  long nextId;
-  double area = 0.;
-  double currentPos[MAXDIM], nextPos[MAXDIM];
-  for (long dim = 0; dim < nDim; dim++) {
-    currentPos[dim] = d_wallPos[dim];
-  }
-  for (long wallId = 0; wallId < numWall; wallId++) {
-    nextId = wallId + 1;
-    if(nextId >= numWall) {
-      nextId = 0;
-    }
-    for (long dim = 0; dim < nDim; dim++) {
-      nextPos[dim] = d_wallPos[nextId * nDim + dim];
-    }
-    area += currentPos[0] * nextPos[1] - nextPos[0] * currentPos[1];
-    for (long dim = 0; dim < nDim; dim++) {
-      d_wallCOM[dim] += currentPos[dim];
-      currentPos[dim] = nextPos[dim];
-    }
-  }
-  wallArea = abs(area) * 0.5;
+void SP2D::calcWallArea() {
+  const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
+  double *aSector = thrust::raw_pointer_cast(&d_areaSector[0]);
+  kernelCalcWallArea<<<dimGrid, dimBlock>>>(wPos, aSector);
+  wallArea = 0.5 * fabs(thrust::reduce(d_areaSector.begin(), d_areaSector.end(), double(0), plus<double>()));
   cudaMemcpyToSymbol(d_wallArea, &wallArea, sizeof(wallArea));
-	for (long dim = 0; dim < nDim; dim++) {
-	  d_wallCOM[dim] /= numWall;
-	}
-  cudaMemcpyToSymbol(d_wallCOMPtr, &d_wallCOM, sizeof(d_wallCOM));
-  cout << "SP2D::calcWallShape: wallArea " << wallArea << " wallCOM x: " << d_wallCOM[0] << " y: " << d_wallCOM[1] << endl;
+  //cout << "SP2D::calcWallArea: wallArea " << wallArea << endl;
 }
 
 void SP2D::calcWallShape() {
-  calcWallAreaAndPos();
+  calcWallArea();
   const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
   double *wLength = thrust::raw_pointer_cast(&d_wallLength[0]);
   double *wAngle = thrust::raw_pointer_cast(&d_wallAngle[0]);
@@ -1876,9 +1910,15 @@ void SP2D::calcParticleWallInteraction() {
   const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
 	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
 	double *wEnergy = thrust::raw_pointer_cast(&d_wallEnergy[0]);
-  //kernelCalcSmoothWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
-  //kernelCalcParticleWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
-  kernelCalcAllToWallParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    kernelCalcParticleWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
+    //kernelCalcSmoothWallInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
+    break;
+    case simControlStruct::neighborEnum::allToAll:
+    kernelCalcAllToWallParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
+    break;
+  }
 }
 
 void SP2D::addParticleGravity() {
@@ -1996,7 +2036,7 @@ double SP2D::getVicsekOrderParameter() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
   kernelCalcUnitVelocity<<<dimGrid, dimBlock>>>(pVel, unitVel);
-  return abs(thrust::reduce(d_unitVel.begin(), d_unitVel.end(), double(0), thrust::plus<double>())) / numParticles;
+  return fabs(thrust::reduce(d_unitVel.begin(), d_unitVel.end(), double(0), thrust::plus<double>())) / numParticles;
 }
 
 double SP2D::getVicsekVortexParameter() {
@@ -2004,7 +2044,7 @@ double SP2D::getVicsekVortexParameter() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *vortexParam = thrust::raw_pointer_cast(&d_vortexParam[0]);
   kernelCalcVortexParameters<<<dimGrid, dimBlock>>>(pPos, pVel, vortexParam);
-  return abs(thrust::reduce(d_vortexParam.begin(), d_vortexParam.end(), double(0), thrust::plus<double>()) / numParticles);
+  return fabs(thrust::reduce(d_vortexParam.begin(), d_vortexParam.end(), double(0), thrust::plus<double>()) / numParticles);
 }
 
 double SP2D::getVicsekVelocityCorrelation() {
@@ -2789,8 +2829,6 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
 	}
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::rigid:
-    calcWallNeighborList(cutDistance);
-    break;
     case simControlStruct::boundaryEnum::mobile:
     calcWallNeighborList(cutDistance);
     break;

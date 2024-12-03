@@ -64,10 +64,11 @@ __constant__ double d_wallArea0;
 __constant__ double d_wallLength0;
 __constant__ double d_wallAngle0;
 __constant__ double d_wallEnergy;
-__constant__ double* d_wallCOMPtr;
 __constant__ double d_ea;
-__constant__ double d_el;
 __constant__ double d_eb;
+__constant__ double d_el;
+__constant__ double d_stiff = 1;
+__constant__ double d_extSq = 1;
 // Gravity
 __constant__ double d_gravity;
 __constant__ double d_ew; // wall
@@ -346,14 +347,6 @@ inline __device__ void getWallPos(const long wId, const double* wPos, double* tW
 	}
 }
 
-inline __device__ void getRelativeWallPos(const long wId, const double* wPos, double* wallPos) {
-	getWallPos(wId, wPos, wallPos);
-	#pragma unroll (MAXDIM)
-  	for (long dim = 0; dim < d_nDim; dim++) {
-    	wallPos[dim] = pbcDistance(wallPos[dim], d_wallCOMPtr[dim], dim);
-  	}
-}
-
 inline __device__ void getPBCParticlePos(const long pId, const double* pPos, double* tPos) {
 	#pragma unroll (MAXDIM)
   	for (long dim = 0; dim < d_nDim; dim++) {
@@ -437,11 +430,11 @@ inline __device__ bool extractVicsekNeighborVel(const long particleId, const lon
   	return false;
 }
 
-inline __device__ bool extractWallNeighbor(const long wallId, const double* wPos, double* wallPos) {
+inline __device__ bool extractWallNeighborPos(const long wallId, const double* wPos, double* tWallPos) {
   	if (wallId != -1) {
 		#pragma unroll (MAXDIM)
     	for (long dim = 0; dim < d_nDim; dim++) {
-      		wallPos[dim] = wPos[wallId * d_nDim + dim];
+      		tWallPos[dim] = wPos[wallId * d_nDim + dim];
     	}
     	return true;
   	}
@@ -1346,177 +1339,6 @@ __global__ void kernelCalcParticleRoundWallInteraction(const double* pRad, const
 	}
 }
 
-inline __device__ double calcAngle(const double* nSegment, const double* pSegment) {
-	auto midSine = nSegment[0] * pSegment[1] - nSegment[1] * pSegment[0];
-	auto midCosine = nSegment[0] * pSegment[0] + nSegment[1] * pSegment[1];
-	return atan2(midSine, midCosine);
-}
-
-// compute segment lengths and angles from wall monomers
-__global__ void kernelCalcWallShape(const double* wPos, double* wLength, double* wAngle) {
-	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (wallId < d_numWall) {
-		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
-		double delta[MAXDIM], nextSegment[MAXDIM], prevSegment[MAXDIM];
-		getWallPos(wallId, wPos, thisPos);
-		auto nextId = wallId + 1;
-		if(nextId >= d_numWall) {
-			nextId -= d_numWall;
-		}
-		auto prevId = wallId - 1;
-		if(prevId < 0) {
-			prevId += d_numWall;
-		}
-		auto segmentLength = 0.;
-		for (long dim = 0; dim < d_nDim; dim++) {
-		delta[dim] = wPos[nextId * d_nDim + dim] - thisPos[dim];
-		nextPos[dim] = thisPos[dim] + delta[dim];
-		segmentLength += delta[dim] * delta[dim];
-		delta[dim] = wPos[prevId * d_nDim + dim] - thisPos[dim];
-		prevPos[dim] = thisPos[dim] + delta[dim];
-		}
-		wLength[wallId] = sqrt(segmentLength);
-		getSegment(nextPos, thisPos, nextSegment);
-		getSegment(thisPos, prevPos, prevSegment);
-		wAngle[wallId] = calcAngle(nextSegment, prevSegment);
-	}
-}
-
-inline __device__ double calcAreaForceEnergy(const double* nPos, const double* pPos, double* wForce) {
-	auto deltaArea = (d_wallArea / d_wallArea0) - 1.; // area variation
-	auto gradMultiple = d_ea * deltaArea / d_wallArea0;
-  	wForce[0] += 0.5 * gradMultiple * (pPos[1] - nPos[1]);
-  	wForce[1] += 0.5 * gradMultiple * (nPos[0] - pPos[0]);
-  	return (0.5 * d_ea * deltaArea * deltaArea);
-}
-
-inline __device__ double calcPerimeterForceEnergy(const double nLength, const double pLength, const double* vPos, const double* nPos, const double* pPos, double* wForce) {
-  	//compute length variations
-  	auto pDelta = (pLength / d_wallLength0) - 1.;
-  	auto nDelta = (nLength / d_wallLength0) - 1.;
-	// compute force
-	#pragma unroll (MAXDIM)
-  	for (long dim = 0; dim < d_nDim; dim++) {
-    	wForce[dim] += d_el * ((nDelta * (nPos[dim] - vPos[dim]) / (d_wallLength0 * nLength)) - (pDelta * (vPos[dim] - pPos[dim]) / (d_wallLength0 * pLength)));
-  	}
-  	return (0.5 * d_el * pDelta * pDelta);
-}
-
-inline __device__ double calcBendingForceEnergy(const double* prevSegment, const double* nextSegment, 
-												const double tAngleDelta, const double nAngleDelta, const double pAngleDelta, double* wForce) {
-	double preNormalSegment[MAXDIM], nextNormalSegment[MAXDIM];
-	// get normal segments
-	getNormalVector(prevSegment, preNormalSegment);
-	getNormalVector(nextSegment, nextNormalSegment);
-	// compute angle variations
-	auto prevVar = (tAngleDelta - pAngleDelta) / calcNormSq(prevSegment);
-	auto nextVar = (tAngleDelta - nAngleDelta) / calcNormSq(nextSegment);
-	// compute force
-	#pragma unroll (MAXDIM)
-	for (long dim = 0; dim < d_nDim; dim++) {
-		wForce[dim] += d_eb * (prevVar * preNormalSegment[dim] + nextVar * nextNormalSegment[dim]);
-	}
-	return (0.5 * d_eb * tAngleDelta * tAngleDelta);
-}
-
-// shape interaction for mobile wall
-__global__ void kernelCalcWallShapeForceEnergy(const double* wLength, const double* wAngle, const double* wPos, double* wForce, double* wEnergy) {
-	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (wallId < d_numWall) {
-		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
-		double nextSegment[MAXDIM], prevSegment[MAXDIM];
-		auto nextId = wallId + 1;
-		if(nextId > d_numWall) {
-			nextId = 0;
-		}
-	  	auto prevId = wallId -1;
-		if(prevId < 0) {
-			prevId = d_numWall - 1;
-		}
-		// zero out the existing force
-    	for (long dim = 0; dim < d_nDim; dim++) {
-			wForce[wallId * d_nDim + dim] = 0.;
-		}
-		wEnergy[wallId] = 0.;
-		// get positions relative to particle center of mass
-		getRelativeWallPos(wallId, wPos, thisPos);
-	  	getRelativeWallPos(nextId, wPos, nextPos);
-	  	getRelativeWallPos(prevId, wPos, prevPos);
-		// area force
-		wEnergy[wallId] += calcAreaForceEnergy(nextPos, prevPos, &wForce[wallId*d_nDim]) / d_numWall;
-		// segment force
-		getSegment(nextPos, thisPos, nextSegment);
-		getSegment(thisPos, prevPos, prevSegment);
-	  	auto prevLength = calcNorm(prevSegment);
-	  	auto nextLength = calcNorm(nextSegment);
-	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, prevLength, thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
-		// bending force
-	  	auto prevAngleDelta = wAngle[prevId] - d_wallAngle0;
-	  	auto thisAngleDelta = wAngle[wallId] - d_wallAngle0;
-	 	auto nextAngleDelta = wAngle[nextId] - d_wallAngle0;
-		wEnergy[wallId] += calcBendingForceEnergy(prevSegment, nextSegment, thisAngleDelta, nextAngleDelta, prevAngleDelta, &wForce[wallId*d_nDim]);
-	}
-}
-
-inline __device__ double calcMobileWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce, double* wallForce) {
-	double delta[MAXDIM];
-	//overlap = calcOverlap(thisPos, wallPos, radSum);
-	auto distance = calcDeltaAndDistance(thisPos, wallPos, delta);
-	auto overlap = 1 - distance / radSum;
-	if (overlap > 0) {
-		auto gradMultiple = d_ew * overlap / radSum;
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
-			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
-		}
-		return (0.5 * d_ew * overlap * overlap) * 0.5;
-	}
-	return 0.;
-}
-
-inline __device__ double calcMobileWallLJInteraction(const double* thisPos, const double* otherPos, const double radSum, double* currentForce, double* wallForce) {
-	double delta[MAXDIM];
-	//distance = calcDistance(thisPos, otherPos);
-	auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
-	//printf("distance %lf \n", distance);
-	auto ratio = radSum / distance;
-	auto ratio6 = pow(ratio, 6);
-	auto ratio12 = ratio6 * ratio6;
-	if (distance < (d_LJcutoff * radSum)) {
-		auto forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
-		auto gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance - forceShift;
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
-			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
-	  	}
-		return 0.5 * (4 * d_ew * (ratio12 - ratio6) - d_LJecut - abs(forceShift) * (distance - d_LJcutoff * radSum));
-	} else {
-		return 0.0;
-	}
-}
-
-inline __device__ double calcMobileWallWCAInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce, double* wallForce) {
-	double delta[MAXDIM];
-	auto distance = calcDeltaAndDistance(thisPos, wallPos, delta);
-	auto ratio = radSum / distance;
-	auto ratio6 = pow(ratio, 6);
-	auto ratio12 = ratio6 * ratio6;
-	if (distance < (WCAcut * radSum)) {
-		auto gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance;
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			atomicAdd(&currentForce[dim], gradMultiple * delta[dim] / distance);
-			atomicAdd(&wallForce[dim], -gradMultiple * delta[dim] / distance);
-			//currentForce[dim] += gradMultiple * delta[dim] / distance;
-			//wallForce[dim] -= gradMultiple * delta[dim] / distance;
-	  	}
-	  	return 0.5 * d_ew * (4 * (ratio12 - ratio6) + 1);
-	}
-	return 0.0;
-}
-
 // particle-box contact interaction in circular boundary - the center of the simulation box is assumed to be the origin
 __global__ void kernelCalcParticleWallInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy, 
 															const double* wPos, double* wForce, double* wEnergy) {
@@ -1530,25 +1352,25 @@ __global__ void kernelCalcParticleWallInteraction(const double* pRad, const doub
 
 		long wallId = -1;
 		for (long wListId = 0; wListId < d_wallMaxNeighborListPtr[particleId]; wListId++) {
-			wallId = d_wallNeighborListPtr[particleId * d_wallMaxNeighbors + wListId];
-			if (extractWallNeighbor(wallId, wPos, wallPos)) {
+			wallId = d_wallNeighborListPtr[particleId * d_wallNeighborListSize + wListId];
+			if (extractWallNeighborPos(wallId, wPos, wallPos)) {
 				auto radSum = thisRad + d_wallRad;
 				auto interaction = 0.;
 				switch (d_simControl.wallType) {
 				case simControlStruct::wallEnum::harmonic:
-				interaction = calcMobileWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-				atomicAdd(&pEnergy[particleId], interaction);
-				atomicAdd(&wEnergy[wallId], interaction);
+				interaction = calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				pEnergy[particleId] += interaction;
+				wEnergy[wallId] += interaction;
 				break;
 				case simControlStruct::wallEnum::lennardJones:
-				interaction = calcMobileWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-				atomicAdd(&pEnergy[particleId], interaction);
-				atomicAdd(&wEnergy[wallId], interaction);
+				interaction = calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				pEnergy[particleId] += interaction;
+				wEnergy[wallId] += interaction;
 				break;
 				case simControlStruct::wallEnum::WCA:
-				interaction = calcMobileWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-				atomicAdd(&pEnergy[particleId], interaction);
-				atomicAdd(&wEnergy[wallId], interaction);
+				interaction = calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+				pEnergy[particleId] += interaction;
+				wEnergy[wallId] += interaction;
 				break;
 				default:
 				break;
@@ -1575,24 +1397,156 @@ __global__ void kernelCalcAllToWallParticleInteraction(const double* pRad, const
 			auto interaction = 0.;
 			switch (d_simControl.wallType) {
 			case simControlStruct::wallEnum::harmonic:
-			interaction = calcMobileWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-			atomicAdd(&pEnergy[particleId], interaction);
-			atomicAdd(&wEnergy[wallId], interaction);
+			interaction = calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+			pEnergy[particleId]+= interaction;
+			wEnergy[wallId] += interaction;
 			break;
 			case simControlStruct::wallEnum::lennardJones:
-			interaction = calcMobileWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-			atomicAdd(&pEnergy[particleId], interaction);
-			atomicAdd(&wEnergy[wallId], interaction);
+			interaction = calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+			pEnergy[particleId]+= interaction;
+			wEnergy[wallId] += interaction;
 			break;
 			case simControlStruct::wallEnum::WCA:
-			interaction = calcMobileWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
-			atomicAdd(&pEnergy[particleId], interaction);
-			atomicAdd(&wEnergy[wallId], interaction);
+			interaction = calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[wallId*d_nDim]);
+			pEnergy[particleId]+= interaction;
+			wEnergy[wallId] += interaction;
 			break;
 			default:
 			break;
 			}
 		}
+	}
+}
+
+__global__ void kernelCalcWallArea(const double* wPos, double* aSector) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM];
+		long nextId = wallId + 1;
+		if(nextId > d_numWall - 1) {
+			nextId = 0;
+		}
+		getWallPos(wallId, wPos, thisPos);
+		getWallPos(nextId, wPos, nextPos);
+		aSector[wallId] = thisPos[0] * nextPos[1] - nextPos[0] * thisPos[1];
+	}
+}
+
+inline __device__ double calcAngle(const double* nSegment, const double* pSegment) {
+	auto midSine = nSegment[0] * pSegment[1] - nSegment[1] * pSegment[0];
+	auto midCosine = nSegment[0] * pSegment[0] + nSegment[1] * pSegment[1];
+	return atan2(midSine, midCosine);
+}
+
+// compute segment lengths and angles from wall monomers
+__global__ void kernelCalcWallShape(const double* wPos, double* wLength, double* wAngle) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
+		double delta[MAXDIM], nextSegment[MAXDIM], prevSegment[MAXDIM];
+		getWallPos(wallId, wPos, thisPos);
+		auto nextId = wallId + 1;
+		if(nextId > d_numWall - 1) {
+			nextId = 0;
+		}
+		auto prevId = wallId - 1;
+		if(prevId < 0) {
+			prevId = d_numWall - 1;
+		}
+		auto segmentLength = 0.;
+		for (long dim = 0; dim < d_nDim; dim++) {
+		delta[dim] = wPos[nextId * d_nDim + dim] - thisPos[dim];
+		nextPos[dim] = thisPos[dim] + delta[dim];
+		segmentLength += delta[dim] * delta[dim];
+		delta[dim] = wPos[prevId * d_nDim + dim] - thisPos[dim];
+		prevPos[dim] = thisPos[dim] + delta[dim];
+		}
+		wLength[wallId] = sqrt(segmentLength);
+		getSegment(nextPos, thisPos, nextSegment);
+		getSegment(thisPos, prevPos, prevSegment);
+		wAngle[wallId] = calcAngle(nextSegment, prevSegment);
+	}
+}
+
+inline __device__ double calcAreaForceEnergy(const double* nPos, const double* pPos, double* wForce) {
+	auto deltaArea = (d_wallArea / d_wallArea0) - 1.; // area variation
+	auto gradMultiple = d_ea * deltaArea / d_wallArea0;
+  	wForce[0] += 0.5 * gradMultiple * (pPos[1] - nPos[1]);
+  	wForce[1] += 0.5 * gradMultiple * (nPos[0] - pPos[0]);
+  	return (0.5 * d_ea * deltaArea * deltaArea);
+}
+
+inline __device__ double calcPerimeterForceEnergy(const double nLength, const double pLength, const double* tPos, const double* nPos, const double* pPos, double* wForce) {
+  	//compute length variations
+  	auto pDelta = (pLength / d_wallLength0) - 1.;
+  	auto nDelta = (nLength / d_wallLength0) - 1.;
+	// compute force
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	wForce[dim] += d_el * ((nDelta * (nPos[dim] - tPos[dim]) / (d_wallLength0 * nLength)) - (pDelta * (tPos[dim] - pPos[dim]) / (d_wallLength0 * pLength)));
+  	}
+  	return (0.5 * d_el * pDelta * pDelta);
+}
+
+inline __device__ double calcFENEPerimeterForceEnergy(const double nLength, const double pLength, const double* tPos, const double* nPos, const double* pPos, double* wForce) {
+	#pragma unroll (MAXDIM)
+  	for (long dim = 0; dim < d_nDim; dim++) {
+    	wForce[dim] += 2 * d_el * d_stiff * d_extSq * ((nLength / (d_extSq * d_wallLength0 * d_wallLength0 - nLength * nLength)) * (nPos[dim] - tPos[dim]) / nLength - (pLength / (d_extSq * d_wallLength0 * d_wallLength0 - pLength * pLength)) * (tPos[dim] - pPos[dim]) / pLength);
+  	}
+  	return d_el * d_stiff * d_extSq * log(1 - pLength * pLength / (d_extSq * d_wallLength0 * d_wallLength0));
+}
+
+inline __device__ double calcBendingForceEnergy(const double* prevSegment, const double* nextSegment, 
+												const double tAngleDelta, const double nAngleDelta, const double pAngleDelta, double* wForce) {
+	double preNormalSegment[MAXDIM], nextNormalSegment[MAXDIM];
+	// get normal segments
+	getNormalVector(prevSegment, preNormalSegment);
+	getNormalVector(nextSegment, nextNormalSegment);
+	// compute angle variations
+	auto prevVar = (tAngleDelta - pAngleDelta) / calcNormSq(prevSegment);
+	auto nextVar = (tAngleDelta - nAngleDelta) / calcNormSq(nextSegment);
+	// compute force
+	#pragma unroll (MAXDIM)
+	for (long dim = 0; dim < d_nDim; dim++) {
+		wForce[dim] += d_eb * (prevVar * preNormalSegment[dim] + nextVar * nextNormalSegment[dim]);
+	}
+	return (0.5 * d_eb * tAngleDelta * tAngleDelta);
+}
+
+// shape interaction for mobile wall
+__global__ void kernelCalcWallShapeForceEnergy(const double* wLength, const double* wAngle, const double* wPos, double* wForce, double* wEnergy) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
+		double nextSegment[MAXDIM], prevSegment[MAXDIM];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[wallId * d_nDim + dim] = 0.;
+		}
+		wEnergy[wallId] = 0.;
+		auto nextId = wallId + 1;
+		if(nextId > d_numWall - 1) {
+			nextId = 0;
+		}
+	  	auto prevId = wallId - 1;
+		if(prevId < 0) {
+			prevId = d_numWall - 1;
+		}
+		getWallPos(wallId, wPos, thisPos);
+	  	getWallPos(nextId, wPos, nextPos);
+	  	getWallPos(prevId, wPos, prevPos);
+		// area force
+		wEnergy[wallId] += calcAreaForceEnergy(nextPos, prevPos, &wForce[wallId*d_nDim]) / d_numWall;
+		// segment force
+		getSegment(nextPos, thisPos, nextSegment);
+		getSegment(thisPos, prevPos, prevSegment);
+	  	auto prevLength = calcNorm(prevSegment);
+	  	auto nextLength = calcNorm(nextSegment);
+	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, prevLength, thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
+		// bending force
+	  	auto prevAngleDelta = wAngle[prevId] - d_wallAngle0;
+	  	auto thisAngleDelta = wAngle[wallId] - d_wallAngle0;
+	 	auto nextAngleDelta = wAngle[nextId] - d_wallAngle0;
+		wEnergy[wallId] += calcBendingForceEnergy(prevSegment, nextSegment, thisAngleDelta, nextAngleDelta, prevAngleDelta, &wForce[wallId*d_nDim]);
 	}
 }
 
@@ -1663,13 +1617,13 @@ inline __device__ double calcParticleSegmentInteraction(const double* thisPos, c
 		auto cross = calcCross(thisPos, otherPos, previousPos);
 		auto absCross = fabs(cross);
 		auto sign = cross / absCross;
-		// this vertex
+		// current particle
 	  	atomicAdd(&thisForce[0], gradMultiple * sign * (previousPos[1] - otherPos[1]) / length);
 	  	atomicAdd(&thisForce[1], gradMultiple * sign * (otherPos[0] - previousPos[0]) / length);
-		// other vertex
+		// neighbor wall monomer
 	  	atomicAdd(&otherForce[0], gradMultiple * (sign * (thisPos[1] - previousPos[1]) + absCross * (previousPos[0] - otherPos[0]) / (length * length)) / length);
 	  	atomicAdd(&otherForce[1], gradMultiple * (sign * (previousPos[0] - thisPos[0]) + absCross * (previousPos[1] - otherPos[1]) / (length * length)) / length);
-		// previous vertex
+		// previous wall monomer
 	  	atomicAdd(&previousForce[0], gradMultiple * (sign * (otherPos[1] - thisPos[1]) - absCross * (previousPos[0] - otherPos[0]) / (length * length)) / length);
 	  	atomicAdd(&previousForce[1], gradMultiple * (sign * (thisPos[0] - otherPos[0]) - absCross * (previousPos[1] - otherPos[1]) / (length * length)) / length);
 	  	return epot;
@@ -1715,8 +1669,8 @@ __global__ void kernelCalcSmoothWallInteraction(const double* pRad, const double
 		// loop through wall monomer in wallNeighborList
 		long wallId = -1;
 		for (long wListId = 0; wListId < d_wallMaxNeighborListPtr[particleId]; wListId++) {
-			wallId = d_wallNeighborListPtr[particleId * d_wallMaxNeighbors + wListId];
-			if (extractWallNeighbor(wallId, wPos, wallPos)) {
+			wallId = d_wallNeighborListPtr[particleId * d_wallNeighborListSize + wListId];
+			if (extractWallNeighborPos(wallId, wPos, wallPos)) {
 				auto radSum = thisRad + d_wallRad;
 				// compute projection of vertexId on segment between otherId and previousId
 				auto prevId = getPreviousWallId(wallId);
@@ -2690,6 +2644,7 @@ __global__ void kernelCalcParticleDisplacement(const double* pPos, const double*
 __global__ void kernelCheckParticleDisplacement(const double* pPos, const double* pLastPos, int* flag, double cutoff) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		flag[particleId] = 0;
 		auto displacement = calcDistance(&pPos[particleId*d_nDim], &pLastPos[particleId*d_nDim]);
 		if(2 * displacement > cutoff) {
 			flag[particleId] = 1;
