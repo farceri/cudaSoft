@@ -11,6 +11,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <cstdlib>
 #include <iomanip>
 #include <math.h>
 #include <functional>
@@ -34,7 +35,7 @@ int main(int argc, char **argv) {
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = 1e02, driving = 2, damping = 1, tp = atof(argv[3]);
-  std::string outDir, currentDir, dirSample, energyFile, whichDynamics, wallDir;
+  std::string outDir, currentDir, dirSample, energyFile, wallDir, whichDynamics = "active/";
   std::string inDir = argv[1], potType = argv[7], particleType = argv[8], wallType = argv[9];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -47,19 +48,8 @@ int main(int argc, char **argv) {
   } else {
     cout << "Particles are set to be passive!" << endl;
   }
-  if(numParticles < 256) {
-    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
-  }
-  sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-  sp.setWallEnergyScale(ew);
-  if(wallType == "rigid") {
-    wallDir = "rigid/";
-    sp.setMobileType(simControlStruct::mobileEnum::rigid);
-  } else if(wallType == "mobile") {
-    wallDir = "mobile/";
-    sp.setMobileType(simControlStruct::mobileEnum::on);
-  } else {
-    cout << "WALLTYPE IS OFF!" << endl;
+  if(particleType == "vicsek") {
+    whichDynamics = "vicsek/";
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
@@ -67,19 +57,26 @@ int main(int argc, char **argv) {
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
+  } else if(potType == "none") {
+    sp.setPotentialType(simControlStruct::potentialEnum::none);
+    whichDynamics = whichDynamics + "points/";
   } else {
     cout << "Setting default harmonic potential" << endl;
   }
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  if(particleType == "vicsek") {
-    whichDynamics = "vicsek/" + wallDir;
-    dirSample = whichDynamics + "j1e02-tp" + argv[3] + "/";
+  sp.setWallEnergyScale(ew);
+  if(wallType == "rigid") {
+    whichDynamics = whichDynamics + "rigid/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
+  } else if(wallType == "mobile") {
+    whichDynamics = whichDynamics + "mobile/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::mobile);
   } else {
-    whichDynamics = "active/" + wallDir;
-    dirSample = whichDynamics + "tp" + argv[3] + "/";
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
+  dirSample = whichDynamics + "tp" + argv[3] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -163,9 +160,10 @@ int main(int argc, char **argv) {
   ioSP.saveParticlePacking(outDir);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
+  ioSP.saveParticleNeighbors(outDir);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
-  waveQ = 3.14;//sp.getSoftWaveNumber();
+  waveQ = sp.getSoftWaveNumber();
   // record simulation time
   float elapsed_time_ms = 0;
   cudaEvent_t start, stop;
@@ -194,7 +192,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          //ioSP.saveParticleNeighbors(outDir);
+          ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -218,7 +216,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        //ioSP.saveParticleNeighbors(currentDir);
+        ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
@@ -231,7 +229,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    //ioSP.saveParticleNeighbors(outDir);
+    ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

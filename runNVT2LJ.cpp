@@ -185,7 +185,6 @@ int main(int argc, char **argv) {
     if(step % saveEnergyFreq == 0) {
       ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
-      //ioSP.saveParticleFixedWallEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin 2LJ: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

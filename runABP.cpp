@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
-  bool initAngles = false, fixedbc = false, roundbc = true;
+  bool initAngles = false, squarebc = false, roundbc = true;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -43,15 +43,6 @@ int main(int argc, char **argv) {
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
-  if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
-    sp.setWallEnergyScale(ew);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-    sp.setWallEnergyScale(ew);
-  } else {
-    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
-  }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -65,13 +56,23 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   if(wallType == "reflect") {
-    whichDynamics = "active/reflect/";
-    sp.setWallType(simControlStruct::wallEnum::reflect);
+    whichDynamics = whichDynamics + "reflect/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
   } else if(wallType == "noise") {
-    whichDynamics = "active/noise/";
-    sp.setWallType(simControlStruct::wallEnum::reflectnoise);
+    whichDynamics = whichDynamics + "noise/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflectNoise);
+  } else if(wallType == "wall") {
+    whichDynamics = whichDynamics + "wall/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else {
-    whichDynamics = "active/wall/";
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+  }
+  if(squarebc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
+    sp.setWallEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
   }
   dirSample = whichDynamics + "tp" + argv[3] + "-f0" + argv[4] + "/";
   // set input and output

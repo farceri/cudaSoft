@@ -72,7 +72,7 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
   kernelUpdateParticleVel<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, pForce, timeStep);
 
-  if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
     double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
     const double* wForce = thrust::raw_pointer_cast(&(sp_->d_wallForce[0]));
     kernelUpdateWallVel<<<sp_->dimGrid, sp_->dimBlock>>>(wVel, wForce, timeStep);
@@ -84,7 +84,7 @@ void SoftParticleLangevin::updatePosition(double timeStep) {
 	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
   kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
 
-  if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
     double* wPos = thrust::raw_pointer_cast(&(sp_->d_wallPos[0]));
     const double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
     kernelUpdateWallPos<<<sp_->dimGrid, sp_->dimBlock>>>(wPos, wVel, timeStep);

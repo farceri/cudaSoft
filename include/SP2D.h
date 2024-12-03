@@ -24,11 +24,11 @@ using std::tuple;
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
   enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian, drivenLangevin} noiseType;
-  enum class geometryEnum {normal, leesEdwards, fixedWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
+  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile} boundaryType;
+  enum class geometryEnum {squareWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
-  enum class wallEnum {harmonic, lennardJones, WCA, reflect, reflectnoise} wallType;
-  enum class mobileEnum {on, rigid, off} mobileType;
+  enum class wallEnum {harmonic, lennardJones, WCA} wallType;
   enum class gravityEnum {on, off} gravityType;
   enum class alignEnum {additive, nonAdditive} alignType;
 };
@@ -206,6 +206,9 @@ public:
 
   void setNoiseType(simControlStruct::noiseEnum noiseType_);
 
+  void setBoundaryType(simControlStruct::boundaryEnum boundaryType_);
+	simControlStruct::boundaryEnum getBoundaryType();
+
   void setGeometryType(simControlStruct::geometryEnum geometryType_);
 	simControlStruct::geometryEnum getGeometryType();
 
@@ -217,9 +220,6 @@ public:
 
   void setWallType(simControlStruct::wallEnum wallType_);
 	simControlStruct::wallEnum getWallType();
-
-  void setMobileType(simControlStruct::mobileEnum mobileType_);
-	simControlStruct::mobileEnum getMobileType();
 
   void setGravityType(simControlStruct::gravityEnum gravityType_);
 	simControlStruct::gravityEnum getGravityType();
@@ -335,10 +335,6 @@ public:
 
   long getUpdateCount();
 
-  void checkParticleNeighbors();
-
-  void checkVicsekNeighbors();
-
   double getParticleMaxDisplacement();
 
   void checkParticleDisplacement();
@@ -346,6 +342,12 @@ public:
   void checkParticleMaxDisplacement();
 
   void checkParticleMaxDisplacement2();
+
+  void checkParticleNeighbors();
+
+  void checkVicsekNeighbors();
+
+  void checkWallNeighbors();
 
   double getSoftWaveNumber();
 
@@ -425,10 +427,6 @@ public:
 
   void calcVicsekAlignment();
 
-  void addParticleWallInteraction();
-
-  void calcParticleWallInteraction();
-
   void calcParticleFixedWallInteraction();
 
   void calcWallAreaAndPos();
@@ -437,7 +435,7 @@ public:
 
   void calcWallShapeForceEnergy();
   
-  void calcParticleMobileWallInteraction();
+  void calcParticleWallInteraction();
 
   void checkParticleInsideRoundWall();
 

@@ -175,15 +175,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles;
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
-      double wpot = sp_->getWallPotentialEnergy();
-      energyFile << "\t" << setprecision(precision) << wpot / sp_->numWall;
-      if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on) {
-        double wkin = sp_->getWallKineticEnergy();
-        energyFile << "\t" << setprecision(precision) << wkin / sp_->numWall;
-      }
-    }
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::fixedWall || sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
+    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::squareWall || sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
       std::tuple<double, double> wall = sp_->getWallPressure();
       energyFile << "\t" << setprecision(precision) << get<0>(wall);
       energyFile << "\t" << setprecision(precision) << get<1>(wall);
@@ -546,19 +538,42 @@ public:
     return numWall_;
   }
 
+  void readRigidWall(string dirName, long numWall_, long nDim_) {
+    sp_->initRigidWallVariables(numWall_);
+    sp_->initWallNeighbors(numWall_);
+    thrust::host_vector<double> wPos_(numWall_ * nDim_);
+    
+    wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
+    sp_->setWallPositions(wPos_);
+  }
+
+  void readMobileWall(string dirName, long numWall_, long nDim_) {
+    sp_->initMobileWallVariables(numWall_);
+    sp_->initWallNeighbors(numWall_);
+    thrust::host_vector<double> wLength_(numWall_);
+    thrust::host_vector<double> wAngle_(numWall_);
+    thrust::host_vector<double> wPos_(numWall_ * nDim_);
+    thrust::host_vector<double> wVel_(numWall_ * nDim_);
+    
+    wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
+    sp_->setWallPositions(wPos_);
+    wVel_ = read2DFile(dirName + "wallVel.dat", numWall_);
+    sp_->setWallVelocities(wVel_);
+  }
+
   void readWall(string dirName, long nDim_) {
     long numWall_ = readWallParams(dirName);
     if(numWall_ != 0) {
-      sp_->initMobileWallVariables(numWall_);
-      thrust::host_vector<double> wLength_(numWall_);
-      thrust::host_vector<double> wAngle_(numWall_);
-      thrust::host_vector<double> wPos_(numWall_ * nDim_);
-      thrust::host_vector<double> wVel_(numWall_ * nDim_);
-      
-      wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
-      sp_->setWallPositions(wPos_);
-      wVel_ = read2DFile(dirName + "wallVel.dat", numWall_);
-      sp_->setWallVelocities(wVel_);
+      switch (sp_->simControl.boundaryType) {
+        case simControlStruct::boundaryEnum::rigid:
+        readRigidWall(dirName, numWall_, nDim_);
+        break;
+        case simControlStruct::boundaryEnum::mobile:
+        readMobileWall(dirName, numWall_, nDim_);
+        break;
+        default:
+        break;
+      }
     } else {
       cout << "FileIO::readWall: numWall is zero! WARNING!" << endl;
     }
@@ -580,14 +595,17 @@ public:
     sp_->setParticleRadii(pRad_);
 
     // set box dimensions
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
-      double boxRadius_ = read0DFile(dirName + "boxSize.dat");
+    double boxRadius_ = 0.;
+    switch (sp_->simControl.geometryType) {
+      case simControlStruct::geometryEnum::roundWall:
+      boxRadius_ = read0DFile(dirName + "boxSize.dat");
       sp_->setBoxRadius(boxRadius_);
       boxRadius_ = sp_->getBoxRadius();
       if(nDim_ == 2) {
         cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " boxRadius: " << boxRadius_ << endl;
       }
-    } else {
+      break;
+      default:
       thrust::host_vector<double> boxSize_(nDim_);
       boxSize_ = read1DFile(dirName + "boxSize.dat", nDim_);
       sp_->setBoxSize(boxSize_);
@@ -597,6 +615,7 @@ public:
       } else if(nDim_ == 3) {
         cout << "FileIO::readParticlePackingFromDirectory: phi: " << sp_->getParticlePhi() << " box-Lx: " << boxSize_[0] << ", Ly: " << boxSize_[1] << ", Lz: " << boxSize_[2] << endl;
       }
+      break;
     }
     // set length scales
     sp_->setLengthScaleToOne();
@@ -659,10 +678,16 @@ public:
   }
 
   void saveWall(string dirName) {
-    //save1DFile(dirName + "wallLengths.dat", sp_->getWallLengths());
-    //save1DFile(dirName + "wallAngles.dat", sp_->getWallAngles());
     save2DFile(dirName + "wallPos.dat", sp_->getWallPositions(), sp_->nDim);
-    save2DFile(dirName + "wallVel.dat", sp_->getWallVelocities(), sp_->nDim);
+    switch (sp_->simControl.boundaryType) {
+      case simControlStruct::boundaryEnum::mobile:
+      //save1DFile(dirName + "wallLengths.dat", sp_->getWallLengths());
+      //save1DFile(dirName + "wallAngles.dat", sp_->getWallAngles());
+      save2DFile(dirName + "wallVel.dat", sp_->getWallVelocities(), sp_->nDim);
+      break;
+      default:
+      break;
+    }
   }
 
   void savePackingParams(string dirName) {
@@ -688,12 +713,16 @@ public:
   void saveParticlePacking(string dirName) {
     savePackingParams(dirName);
     // save vectors
+    double boxRadius_ = 0.;
     long nDim = sp_->getNDim();
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
-      double boxRadius_ = sp_->getBoxRadius();
+    switch (sp_->simControl.geometryType) {
+      case simControlStruct::geometryEnum::roundWall:
+      boxRadius_ = sp_->getBoxRadius();
       save0DFile(dirName + "boxSize.dat", boxRadius_);
-    } else {
+      break;
+      default:
       save1DFile(dirName + "boxSize.dat", sp_->getBoxSize());
+      break;
     }
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
@@ -707,7 +736,7 @@ public:
         cout << "FileIO::saveParticlePacking: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
       }
     }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
       saveWallParams(dirName);
       saveWall(dirName);
     }
@@ -762,7 +791,7 @@ public:
         save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
       }
     }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
       saveWall(dirName);
     }
   }
@@ -779,14 +808,13 @@ public:
   void saveParticleNeighbors(string dirName) {
     if(sp_->simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
       save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+        save2DIndexFile(dirName + "wallNeighbors.dat", sp_->getWallNeighbors(), sp_->wallNeighborListSize);
+      }
     }
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
-    }
-    if(sp_->simControl.mobileType == simControlStruct::mobileEnum::on || sp_->simControl.mobileType == simControlStruct::mobileEnum::rigid) {
-      save2DIndexFile(dirName + "wallNeighbors.dat", sp_->getWallNeighbors(), sp_->wallNeighborListSize);
-      save2DFile(dirName + "wallForces.dat", sp_->getWallForces(), sp_->nDim);
-    }
+    //if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    //  save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
+    //}
   }
 
   void saveLangevinParams(string dirName, double damping) {

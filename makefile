@@ -77,9 +77,9 @@ INC_DIR = include
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
-#EXE = runVicsek
+EXE = runVicsek
 #EXE = runABP
-EXE = runWall
+#EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE

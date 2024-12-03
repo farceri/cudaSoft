@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(fixedbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedWall);
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
     sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
