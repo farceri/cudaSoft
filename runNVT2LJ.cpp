@@ -28,10 +28,10 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, dampingDir = true, justRun = false;
+  bool readNH = false, dampingDir = true, justRun = false, conserve = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool readState = true, saveFinal = true, logSave = false, linSave = true, fixedSides = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -45,13 +45,19 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(dynType == "l1") {
+  if(dynType == "langevin1") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-  }
-  if(fixedSides == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setWallType(simControlStruct::wallEnum::WCA);
-    sp.setWallEnergyScale(ew);
+  } else if(dynType == "lang1con") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    cout << "Conserve momentum is true" << endl;
+    conserve = true;
+  } else if(dynType == "lang2con") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    cout << "Conserve momentum is true" << endl;
+    conserve = true;
+  } else {
+    dynType = "langevin2";
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -84,11 +90,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    if(dynType == "l1") {
-      outDir = inDir + "dynamics1/";
-    } else {
-      outDir = inDir + "dynamics2/";
-    }
+    outDir = inDir + dynType + "/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -181,7 +183,7 @@ int main(int argc, char **argv) {
   // run integrator
   while(step != maxStep) {
     //sp.resetLastVelocities();
-    sp.softParticleLangevinLoop();
+    sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
       ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);

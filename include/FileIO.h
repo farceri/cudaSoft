@@ -130,7 +130,7 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
     energyFile << setprecision(precision) << edamp / numParticles << "\t";
     energyFile << setprecision(precision) << enoise / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
@@ -140,18 +140,20 @@ public:
     } else {
       energyFile << "\t";
     }
-    energyFile << setprecision(precision) << heat << endl;
+    energyFile << setprecision(precision) << heat / numParticles << endl;
   }
 
   void saveEnergyAB(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
     double edamp = sp_->getDampingWork();
     double enoise = sp_->getNoiseWork();
-    double etot = epot + ekin + edamp + enoise;
+    double heat = edamp + enoise;
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
     energyFile << setprecision(precision) << edamp / numParticles << "\t";
     energyFile << setprecision(precision) << enoise / numParticles;
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
@@ -161,12 +163,13 @@ public:
     } else {
       energyFile << "\t";
     }
+    energyFile << setprecision(precision) << heat / numParticles << "\t";
     std::tuple<double, double, double, long> eab = sp_->getParticleWorkAB();
     long numParticlesAB = get<3>(eab);
     energyFile << setprecision(precision) << get<0>(eab) << "\t";
-    energyFile << setprecision(precision) << (get<1>(eab) + get<2>(eab)) << "\t";
-    energyFile << numParticlesAB << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << get<1>(eab) << "\t";
+    energyFile << setprecision(precision) << get<2>(eab) << "\t";
+    energyFile << numParticlesAB << endl;
   }
 
   void saveAlignEnergy(long step, double timeStep, long numParticles) {

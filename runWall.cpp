@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
   double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = 1e02, driving = 2, damping = 1, tp = atof(argv[3]);
+  double ea = 1e04*ec, el = 1e02*ec, eb = 10*ec;
   std::string outDir, currentDir, dirSample, energyFile, wallDir, whichDynamics = "active/";
   std::string inDir = argv[1], potType = argv[7], particleType = argv[8], wallType = argv[9];
   // initialize sp object
@@ -66,17 +67,25 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  sp.setWallEnergyScale(ew);
   if(wallType == "rigid") {
     whichDynamics = whichDynamics + "rigid/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
   } else if(wallType == "mobile") {
     whichDynamics = whichDynamics + "mobile/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::mobile);
-  } else {
+    sp.setWallShapeEnergyScales(ea, el, eb);
+  } else if(wallType == "reflect") {
+    whichDynamics = whichDynamics + "reflect/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
+  } else if(wallType == "fixed") {
+    whichDynamics = whichDynamics + "fixed/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
-    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-    cout << "Setting default fixed round wall" << endl;
+  } else {
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
+  }
+  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+    std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   dirSample = whichDynamics + "tp" + argv[3] + "/";
   // set input and output
@@ -161,8 +170,6 @@ int main(int argc, char **argv) {
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
-  ioSP.saveParticlePacking(outDir);
-  ioSP.saveParticleNeighbors(outDir);
   sp.calcParticleForceEnergy();
   sp.resetUpdateCount();
   waveQ = sp.getSoftWaveNumber();
@@ -185,6 +192,9 @@ int main(int argc, char **argv) {
           cout << " Twall: " << sp.getWallTemperature();
         }
         cout << " ISF: " << sp.getParticleISF(waveQ);
+        if(wallType == "mobile") {
+          cout << " A: " << sp.getWallArea() << " A0: " << sp.getWallArea0();
+        }
         updateCount = sp.getUpdateCount();
         if(step != 0 && updateCount > 0) {
           cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
@@ -194,7 +204,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -218,7 +228,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
@@ -231,7 +241,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

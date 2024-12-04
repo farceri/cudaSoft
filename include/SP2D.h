@@ -564,7 +564,7 @@ public:
   
   std::tuple<double, double, long> getParticleEnergyAB();
 
-  void calcParticleWorkAB();
+  void calcParticleHeatAB();
 
   std::tuple<double, double, double, long> getParticleWorkAB();
 
@@ -607,11 +607,11 @@ public:
   // Langevin integrators
   void initSoftParticleLangevin(double Temp, double gamma, bool readState);
 
-  void softParticleLangevinLoop();
+  void softParticleLangevinLoop(bool conserve = false);
 
-  void initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
+  void initSoftParticleLangevinSubset(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel);
 
-  void softParticleLangevinSubSetLoop();
+  void softParticleLangevinSubsetLoop();
 
   void initSoftParticleLangevinExtField(double Temp, double gamma, bool readState);
 

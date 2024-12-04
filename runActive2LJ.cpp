@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = true, activeDir = true, justRun = false;
+  bool readNH = true, activeDir = true, justRun = false, conserve = false;
   bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
@@ -45,9 +45,19 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  sp.setParticleType(simControlStruct::particleEnum::active);
-  if(dynType == "l1") {
+  if(dynType == "langevin1") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+  } else if(dynType == "lang1con") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    cout << "Conserve momentum is true" << endl;
+    conserve = true;
+  } else if(dynType == "lang2con") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    cout << "Conserve momentum is true" << endl;
+    conserve = true;
+  } else {
+    dynType = "langevin2";
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -84,7 +94,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "dynamics/";
+    outDir = inDir + dynType + "/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -186,7 +196,7 @@ int main(int argc, char **argv) {
   cudaEventRecord(start, 0);
   // run integrator
   while(step != maxStep) {
-    sp.softParticleLangevinLoop();
+    sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
       ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {

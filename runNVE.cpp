@@ -26,18 +26,21 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = false, alltoall = false, squarebc = false, roundbc = true, scaleVel = false;
+  bool readNH = false, alltoall = false, squarebc = false, roundbc = false, scaleVel = false;
   bool readWall = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = atof(argv[9]), ew = 10*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
-  double ea = 1e05*ec, el = 1e03*ec, eb = ec;
+  double ea = 1e04*ec, el = 1e02*ec, eb = 10*ec;
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, dirSample, whichDynamics = "nve";
   std::string inDir = argv[1], potType = argv[8], wallType = argv[10];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  if(numParticles < 256) {
+    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
+  }
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -52,6 +55,7 @@ int main(int argc, char **argv) {
   } else {
     whichDynamics = whichDynamics + "/";
     cout << "Setting default harmonic potential" << endl;
+    sp.setWallType(simControlStruct::wallEnum::harmonic);
   }
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
@@ -84,9 +88,6 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   dirSample = whichDynamics + "T" + argv[3] + "/";
-  if(alltoall == true) {
-    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
-  }
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
@@ -100,6 +101,7 @@ int main(int argc, char **argv) {
   } else {
     if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
+      readWall = true;
       inDir = inDir + dirSample;
       outDir = inDir;
       if(runDynamics == true) {
@@ -126,6 +128,7 @@ int main(int argc, char **argv) {
       if(readAndMakeNewDir == true) {
         scaleVel = true;
         readState = true;
+        readWall = true;
         outDir = inDir + "../../" + dirSample;
       } else {
         if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
@@ -207,12 +210,10 @@ int main(int argc, char **argv) {
             cout << " no updates" << endl;
           }
           sp.resetUpdateCount();
-        } else {
-          cout << endl;
-        }
+        } else cout << endl;
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleNeighbors(outDir);
+          //ioSP.saveParticleNeighbors(outDir);
         }
       }
     }
@@ -236,7 +237,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
-        ioSP.saveParticleNeighbors(currentDir);
+        //ioSP.saveParticleNeighbors(currentDir);
       }
     }
     step += 1;
@@ -249,7 +250,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleNeighbors(outDir);
+    //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
 

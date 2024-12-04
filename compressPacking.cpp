@@ -24,10 +24,10 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
-  bool fixedbc = false, roundbc = true, lj = false, wca = true, gforce = false, alltoall = false;
+  bool squarebc = false, roundbc = false, lj = false, wca = true, gforce = false, alltoall = false;
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
   double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-03, scaleFactor, prevEnergy = 0;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
-  if(fixedbc == true) {
+  if(squarebc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
     sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {

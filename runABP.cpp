@@ -55,6 +55,13 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
+  if(squarebc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
+    sp.setWallEnergyScale(ew);
+  } else if(roundbc == true) {
+    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setWallEnergyScale(ew);
+  }
   if(wallType == "reflect") {
     whichDynamics = whichDynamics + "reflect/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
@@ -66,13 +73,6 @@ int main(int argc, char **argv) {
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
-  }
-  if(squarebc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
-    sp.setWallEnergyScale(ew);
-  } else if(roundbc == true) {
-    sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
-    sp.setWallEnergyScale(ew);
   }
   dirSample = whichDynamics + "tp" + argv[3] + "-f0" + argv[4] + "/";
   // set input and output

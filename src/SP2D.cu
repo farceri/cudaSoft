@@ -306,7 +306,7 @@ void SP2D::setGeometryType(simControlStruct::geometryEnum geometryType_) {
   if(simControl.geometryType == simControlStruct::geometryEnum::squareWall) {
     d_wallForce.resize(numParticles * nDim);
     thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
-    cout << "SP2D::setGeometryType: geometryType: sqaureWall" << endl;
+    cout << "SP2D::setGeometryType: geometryType: squareWall" << endl;
   } else if(simControl.geometryType == simControlStruct::geometryEnum::fixedSides2D) {
     setBoundaryType(simControlStruct::boundaryEnum::fixed);
     d_wallForce.resize(numParticles * nDim);
@@ -2706,7 +2706,7 @@ std::tuple<double, double, long> SP2D::getParticleEnergyAB() {
   return std::make_tuple(epot, ekin, numParticlesAB);
 }
 
-void SP2D::calcParticleWorkAB() {
+void SP2D::calcParticleHeatAB() {
   thrust::fill(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
 	long *flagAB = thrust::raw_pointer_cast(&d_flagAB[0]);
 	const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
@@ -2766,9 +2766,9 @@ std::tuple<double, double, double, long> SP2D::getParticleWorkAB() {
   long numParticlesAB = thrust::reduce(d_flagAB.begin(), d_flagAB.end(), 0, thrust::plus<long>());
   double epot = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
   double ekin = 0.5 * thrust::reduce(d_squaredVelAB.begin(), d_squaredVelAB.end(), double(0), thrust::plus<double>());
-  calcParticleWorkAB();
-  double work = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
-  return std::make_tuple(epot, ekin, work, numParticlesAB);
+  calcParticleHeatAB();
+  double heat = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(epot, ekin, heat, numParticlesAB);
 }
 
 //************************* contacts and neighbors ***************************//
@@ -3048,12 +3048,15 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
   cout << " current temperature: " << setprecision(12) << getParticleTemperature() << endl;
 }
 
-void SP2D::softParticleLangevinLoop() {
+void SP2D::softParticleLangevinLoop(bool conserve) {
   this->sim_->integrate();
+  if(conserve == true) {
+    this->sim_->conserveMomentum();
+  }
 }
 
-void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
-  this->sim_ = new SoftParticleLangevinSubSet(this, SimConfig(Temp, 0, 0));
+void SP2D::initSoftParticleLangevinSubset(double Temp, double gamma, long firstIndex, double mass, bool readState, bool zeroOutMassiveVel) {
+  this->sim_ = new SoftParticleLangevinSubset(this, SimConfig(Temp, 0, 0));
   this->sim_->gamma = gamma;
   this->sim_->noise = sqrt(2. * Temp * gamma / dt);
   this->sim_->d_rand.resize(numParticles * nDim);
@@ -3074,7 +3077,7 @@ void SP2D::initSoftParticleLangevinSubSet(double Temp, double gamma, long firstI
   cout << "SP2D::initSoftParticleLangevinSubSet:: current temperature: " << setprecision(12) << getParticleTemperature() << " mass: " << this->sim_->mass << endl;
 }
 
-void SP2D::softParticleLangevinSubSetLoop() {
+void SP2D::softParticleLangevinSubsetLoop() {
   this->sim_->integrate();
 }
 

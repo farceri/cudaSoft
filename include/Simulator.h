@@ -37,7 +37,7 @@ public:
   double mass = 1;
   thrust::device_vector<double> d_rand;
   thrust::device_vector<double> d_rando;
-  thrust::device_vector<double> d_velSum; // for computing velocity drift
+  thrust::device_vector<double> d_velSum[MAXDIM]; // for computing velocity drift
 
   SimInterface() = default;
   SimInterface(SP2D * spPtr, SimConfig config):sp_(spPtr),config(config){}
@@ -92,11 +92,11 @@ public:
 };
 
 // Soft particle Langevin integrator with massive particles child of SoftParticleLangevin2
-class SoftParticleLangevinSubSet: public SoftParticleLangevin
+class SoftParticleLangevinSubset: public SoftParticleLangevin
 {
 public:
-  SoftParticleLangevinSubSet() = default;
-  SoftParticleLangevinSubSet(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
+  SoftParticleLangevinSubset() = default;
+  SoftParticleLangevinSubset(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
 
   virtual void updatePosition(double timeStep);
   virtual void updateVelocity(double timeStep);
