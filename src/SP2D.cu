@@ -1566,7 +1566,6 @@ void SP2D::setVicsekParams(double driving_, double taup_, double Jvicsek_, doubl
   }
   cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
   cudaMemcpyToSymbol(d_taup, &taup, sizeof(taup));
-  cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
   //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
@@ -1806,7 +1805,7 @@ void SP2D::addVicsekAlignment() {
     int s_nDim(nDim);
     double s_dt(dt);
     double s_driving(driving);
-    double s_gamma(this->sim_->gamma);
+    double s_Jvicsek(Jvicsek);
     // use this to be able to set taup to 0
     double amplitude = 0.;
     if(taup != 0) {
@@ -1822,7 +1821,7 @@ void SP2D::addVicsekAlignment() {
 
     auto updateVicsekAlignment2D = [=] __device__ (long pId) {
       // overdamped equation for the angle with vicsek alignment as torque
-      pAngle[pId] += randAngle[pId] + s_dt * pAlpha[pId] / s_gamma;
+      pAngle[pId] += randAngle[pId] + s_dt * s_Jvicsek * pAlpha[pId];
       pAngle[pId] = pAngle[pId] + PI;
       pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
       pAngle[pId] = pAngle[pId] - PI;

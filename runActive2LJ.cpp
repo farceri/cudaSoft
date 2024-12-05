@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = true, activeDir = true, justRun = false, conserve = false;
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
   // variables
   bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
@@ -45,6 +45,7 @@ int main(int argc, char **argv) {
   }
   // initialize sp object
 	SP2D sp(numParticles, nDim);
+  sp.setParticleType(simControlStruct::particleEnum::active);
   if(dynType == "langevin1") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
   } else if(dynType == "lang1con") {
@@ -111,13 +112,11 @@ int main(int argc, char **argv) {
           inDir = inDir + "damping" + argv[8] + "/";
           outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
         }
+        inDir =	outDir;
         if(logSave == true) {
-          inDir =	outDir;
-          outDir = outDir + "dynamics-log/";
-        }
-        if(linSave == true) {
-          inDir =	outDir;
-          outDir = outDir + "dynamics/";
+          outDir = outDir + dynType + "-log/";
+        } else {
+          outDir = outDir + dynType + "/";
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {
@@ -136,7 +135,7 @@ int main(int argc, char **argv) {
           outDir = inDir + "../../" + dirSample;
         }
       } else {
-        initAngles = true; // initialize from NVT
+        initAngles = true;
         if(activeDir == true) {
           if(std::experimental::filesystem::exists(inDir + dirSample) == false) {
             std::experimental::filesystem::create_directory(inDir + dirSample);
@@ -157,13 +156,9 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(initAngles == true) {
-      ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.initializeParticleAngles();
-    } else {
-      ioSP.readParticleState(inDir, numParticles, nDim);
-    }
+    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
   }
+  if(initAngles == true) sp.initializeParticleAngles();
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);

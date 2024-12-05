@@ -26,8 +26,8 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = false, alltoall = false, squarebc = false, roundbc = false, scaleVel = false;
-  bool readWall = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readNH = false, alltoall = false, squarebc = false, roundbc = true, scaleVel = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -101,7 +101,6 @@ int main(int argc, char **argv) {
   } else {
     if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
-      readWall = true;
       inDir = inDir + dirSample;
       outDir = inDir;
       if(runDynamics == true) {
@@ -128,7 +127,6 @@ int main(int argc, char **argv) {
       if(readAndMakeNewDir == true) {
         scaleVel = true;
         readState = true;
-        readWall = true;
         outDir = inDir + "../../" + dirSample;
       } else {
         if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
@@ -144,17 +142,8 @@ int main(int argc, char **argv) {
   }
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim);
-  }
-  if(readWall == true) {
-    ioSP.readWall(inDir, nDim);
-  } else {
-    sp.initWall();
-  }
-  currentDir = outDir + "/initial/";
-  std::experimental::filesystem::create_directory(currentDir);
-  ioSP.saveParticlePacking(currentDir);
+  if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim);
+  else sp.initWall();
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);

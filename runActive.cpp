@@ -139,13 +139,9 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(initAngles == true) {
-      ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.initializeParticleAngles();
-    } else {
-      ioSP.readParticleState(inDir, numParticles, nDim);
-    }
+    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
   }
+  if(initAngles == true) sp.initializeParticleAngles();
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);

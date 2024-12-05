@@ -41,7 +41,6 @@ void SoftParticleLangevin::injectKineticEnergy() {
   // generate random numbers between 0 and noise for thermal noise
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
   thrust::transform(index_sequence_begin, index_sequence_begin + sp_->numParticles * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude));
-  conserveMomentum();
 }
 
 void SoftParticleLangevin::updateThermalVel() {
@@ -549,7 +548,6 @@ void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
   thrust::transform(index_sequence_begin1, index_sequence_begin1 + sp_->num1 * sp_->nDim, sp_->d_particleVel.begin(), gaussNum(0.f,amplitude1));
   thrust::counting_iterator<long> index_sequence_begin2(lrand48());
   thrust::transform(index_sequence_begin2, index_sequence_begin2 + (sp_->numParticles - sp_->num1) * sp_->nDim, sp_->d_particleVel.begin() + sp_->num1 * sp_->nDim, gaussNum(0.f,amplitude2));
-  conserveMomentum();
 }
 
 void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {

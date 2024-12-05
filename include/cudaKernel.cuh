@@ -1025,7 +1025,7 @@ __global__ void kernelCalcVicsekAdditiveAlignment(const double* pAngle, double* 
 				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
 					auto deltaAngle = thisAngle - otherAngle;
 					checkAngleMinusPIPlusPI(deltaAngle);
-					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
+					pAlpha[particleId] -= sin(deltaAngle);
 				}
 			}
 		}
@@ -1046,7 +1046,7 @@ __global__ void kernelCalcVicsekNonAdditiveAlignment(const double* pAngle, doubl
 				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
 					auto deltaAngle = thisAngle - otherAngle;
 					checkAngleMinusPIPlusPI(deltaAngle);
-					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle) / d_vicsekMaxNeighborListPtr[particleId];
+					pAlpha[particleId] -= sin(deltaAngle) / d_vicsekMaxNeighborListPtr[particleId];
 				}
 			}
 		}

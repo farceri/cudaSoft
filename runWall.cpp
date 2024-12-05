@@ -27,8 +27,7 @@ int main(int argc, char **argv) {
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
-  bool readWall = false, initAngles = false;
+  bool readState = true, initAngles = false, saveFinal = true, logSave = false, linSave = true;
   // variables
   long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
@@ -91,7 +90,6 @@ int main(int argc, char **argv) {
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readWall = true;
     readState = true;
     inDir = inDir + dirSample;
     outDir = inDir;
@@ -112,7 +110,6 @@ int main(int argc, char **argv) {
     }
   } else {//start a new dyanmics
     if(readAndMakeNewDir == true) {
-      readWall = true;
       readState = true;
       outDir = inDir + "../../" + dirSample;
     } else {
@@ -133,9 +130,6 @@ int main(int argc, char **argv) {
     } else {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
-  }
-  if(readWall == true) {
-    ioSP.readWall(inDir, nDim);
   } else {
     sp.initWall();
   }

@@ -177,22 +177,31 @@ public:
     double ekin = sp_->getParticleKineticEnergy();
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles;
-    if(sp_->simControl.geometryType == simControlStruct::geometryEnum::squareWall || sp_->simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
-      std::tuple<double, double> wall = sp_->getWallPressure();
-      energyFile << "\t" << setprecision(precision) << get<0>(wall);
-      energyFile << "\t" << setprecision(precision) << get<1>(wall);
-    }
-    energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum();
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleAngularMomentum();
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       double velCorr = sp_->getNeighborVelocityCorrelation();
-      energyFile << "\t" << setprecision(precision) << velCorr << endl;
+      energyFile << "\t" << setprecision(precision) << velCorr;
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
       double velCorr = sp_->getVicsekVelocityCorrelation();
-      energyFile << "\t" << setprecision(precision) << velCorr << endl;
+      energyFile << "\t" << setprecision(precision) << velCorr;
     } else {
-      cout << endl;
+      energyFile << "\t";
     }
+    std::tuple<double, double> wall(0,0);
+    switch (sp_->simControl.boundaryType) {
+      case simControlStruct::boundaryEnum::rigid:
+      case simControlStruct::boundaryEnum::mobile:
+      case simControlStruct::boundaryEnum::fixed:
+      case simControlStruct::boundaryEnum::reflect:
+      wall = sp_->getWallPressure();
+      energyFile << "\t" << setprecision(precision) << get<0>(wall);
+      energyFile << "\t" << setprecision(precision) << get<1>(wall);
+      break;
+      default:
+      break;
+    }
+    energyFile << endl;
   }
 
   void saveStrainEnergy(long step, double timeStep, long numParticles, double strain) {
@@ -773,19 +782,25 @@ public:
     sp_->setParticleVelocities(particleVel_);
   }
 
-  void readParticleState(string dirName, long numParticles_, long nDim_) {
+  void readParticleState(string dirName, long numParticles_, long nDim_, bool initAngles = false) {
     readParticleVelocity(dirName, numParticles_, nDim_);
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      thrust::host_vector<double> particleAngle_(numParticles_);
-      if(nDim_ == 2) {
-        particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
-      } else if(nDim_ == 3) {
-        particleAngle_.resize(numParticles_ * nDim_);
-        particleAngle_ = read3DFile(dirName + "particleAngles.dat", numParticles_);
-      } else {
-        cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
+    if(initAngles == false) {
+      if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+        thrust::host_vector<double> particleAngle_(numParticles_);
+        if(nDim_ == 2) {
+          particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
+        } else if(nDim_ == 3) {
+          particleAngle_.resize(numParticles_ * nDim_);
+          particleAngle_ = read3DFile(dirName + "particleAngles.dat", numParticles_);
+        } else {
+          cout << "FileIO::readParticleState: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
+        }
+        sp_->setParticleAngles(particleAngle_);
       }
-      sp_->setParticleAngles(particleAngle_);
+    }
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+      readWallParams(dirName);
+      readWall(dirName, nDim_);
     }
   }
 

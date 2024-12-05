@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readWall = false, readNH = false, dampingDir = false, justRun = false;
+  bool readNH = false, dampingDir = false, justRun = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool squarebc = false, roundbc = true, fixedSides = false, conserve = false;
@@ -128,7 +128,6 @@ int main(int argc, char **argv) {
   } else {
     if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
-      readWall = true;
       inDir = inDir + dirSample;
       outDir = inDir;
       if(runDynamics == true) {
@@ -149,7 +148,6 @@ int main(int argc, char **argv) {
     } else {//start a new dyanmics
       if(readAndMakeNewDir == true) {
         readState = true;
-        readWall = true;
         if(dampingDir == true) outDir = inDir + "../" + dirSample;
         else outDir = inDir + "../../" + dirSample;
       } else {
@@ -171,7 +169,6 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim);
-  if(readWall == true) ioSP.readWall(inDir, nDim);
   else sp.initWall();
   // output file
   energyFile = outDir + "energy.dat";

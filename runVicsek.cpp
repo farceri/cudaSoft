@@ -26,16 +26,16 @@ int main(int argc, char **argv) {
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readState = false, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, squarebc = false, roundbc = true, additive = true;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 0, Rvicsek = 1.5, Jvicsek = atof(argv[3]), driving = 2, damping = atof(argv[10]), tp = atof(argv[4]);
-  std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "vicsek/";
-  std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
+  double ec = 1, timeStep = atof(argv[2]), timeUnit, forceUnit, alphaUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
+  double ew = 10*ec, Tinject = 2, driving = 2, Rvicsek = 1.5, Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = 1;
+  std::string outDir, currentDir, dirSample, energyFile, dampingDir, whichDynamics = "vicsek/";
+  std::string inDir = argv[1], potType = argv[8], wallType = argv[9], dynType = argv[10];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::vicsek);
@@ -43,7 +43,13 @@ int main(int argc, char **argv) {
     sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
     whichDynamics = "vicsek-na/";
   }
-  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+  if(dynType == "langevin") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    damping = atof(argv[11]);
+  } else {
+    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+    readState = true;
+  }
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -69,21 +75,28 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
     sp.setWallEnergyScale(ew);
   }
-  if(potType != "none") {
-    if(wallType == "reflect") {
-      whichDynamics = whichDynamics + "reflect/";
-      sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
-    } else if(wallType == "noise") {
-      whichDynamics = whichDynamics + "noise/";
-      sp.setBoundaryType(simControlStruct::boundaryEnum::reflectNoise);
-    } else if(wallType == "wall") {
-      whichDynamics = whichDynamics + "wall/";
-      sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
-    } else {
-      cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+  if(wallType == "reflect") {
+    whichDynamics = whichDynamics + "reflect/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
+  } else if(wallType == "noise") {
+    whichDynamics = whichDynamics + "noise/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflectNoise);
+  } else if(wallType == "fixed") {
+    whichDynamics = whichDynamics + "fixed/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+  } else {
+    cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+  }
+  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+    std::experimental::filesystem::create_directory(inDir + whichDynamics);
+  }
+  if(dynType == "langevin") {
+    whichDynamics = whichDynamics + dynType + argv[11] + "/";
+    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+      std::experimental::filesystem::create_directory(inDir + whichDynamics);
     }
   }
-  dirSample = whichDynamics + "beta" + argv[10] + "-tp" + argv[4] + "/";
+  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -110,7 +123,7 @@ int main(int argc, char **argv) {
       readState = true;
       outDir = inDir + "../../" + dirSample;
     } else {
-      initAngles = true; // initializing from NVT
+      initAngles = true;
       if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
         std::experimental::filesystem::create_directory(inDir + whichDynamics);
       }
@@ -121,12 +134,10 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(initAngles == true) {
-      ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.initializeParticleAngles();
-    } else {
-      ioSP.readParticleState(inDir, numParticles, nDim);
-    }
+    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
+  }
+  if(initAngles == true) {
+    sp.initializeParticleAngles();
   }
   // output file
   energyFile = outDir + "energy.dat";
@@ -134,16 +145,16 @@ int main(int argc, char **argv) {
   // initialization
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ec);
-  velUnit = sigma / timeUnit;
   alphaUnit = ec / (sigma * sigma);
-  driving = sqrt(2*damping*driving) / damping;
-  Jvicsek = Jvicsek * sigma / damping;
-  cout << "Units - time: " << timeUnit << " space: " << sigma << " velocity: " << velUnit << " time step: " << timeStep << endl;
+  forceUnit = ec / sigma;
+  driving = sqrt(2 * damping * driving);
+  Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
+  cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
-  cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep / damping << endl;
+  cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
-  driving *= velUnit;
+  driving *= forceUnit;
   damping /= timeUnit;
   Jvicsek *= alphaUnit;
   Rvicsek *= sigma;
@@ -173,13 +184,15 @@ int main(int argc, char **argv) {
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
-        updateCount = sp.getUpdateCount();
-        if(step != 0 && updateCount > 0) {
-          cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
-        } else {
-          cout << " no updates" << endl;
-        }
-        sp.resetUpdateCount();
+        if(sp.simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
+          updateCount = sp.getUpdateCount();
+          if(step != 0 && updateCount > 0) {
+            cout << " number of updates: " << updateCount << " frequency " << checkPointFreq / updateCount << endl;
+          } else {
+            cout << " no updates" << endl;
+          }
+          sp.resetUpdateCount();
+        } else cout << endl;
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           //ioSP.saveParticleNeighbors(outDir);

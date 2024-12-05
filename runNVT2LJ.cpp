@@ -106,13 +106,11 @@ int main(int argc, char **argv) {
         if(readNH == true) {
           outDir = outDir + "damping" + argv[6] + "/";
         }
+        inDir = outDir;
         if(logSave == true) {
-          inDir = outDir;
-          outDir = outDir + "dynamics-log/";
-        }
-        if(linSave == true) {
-          inDir = outDir;
-          outDir = outDir + "dynamics/";
+          outDir = outDir + dynType + "-log/";
+        } else {
+          outDir = outDir + dynType + "/";
         }
         if(std::experimental::filesystem::exists(outDir) == true) {
           //if(initialStep != 0) {

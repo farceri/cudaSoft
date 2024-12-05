@@ -32,14 +32,20 @@ int main(int argc, char **argv) {
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, timeStep = atof(argv[2]), alphaUnit, timeUnit, velUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 0, tp = atof(argv[3]), driving = atof(argv[4]), damping = 1;
+  double ec = 1, timeStep = atof(argv[2]), timeUnit, forceUnit, alphaUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
+  double ew = 10*ec, Tinject = 2, tp = atof(argv[3]), driving = atof(argv[4]), damping = 1;
   std::string outDir, currentDir, dirSample, energyFile, whichDynamics = "active/";
-  std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
+  std::string inDir = argv[1], potType = argv[8], wallType = argv[9], dynType = argv[10];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setParticleType(simControlStruct::particleEnum::active);
-  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+  if(dynType == "langevin") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    damping = atof(argv[11]);
+  } else {
+    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+    Tinject = 0.;
+  }
   if(numParticles < 256) {
     sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   }
@@ -73,6 +79,12 @@ int main(int argc, char **argv) {
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
+  }
+  if(dynType == "langevin") {
+    whichDynamics = whichDynamics + dynType + argv[11] + "/";
+    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+      std::experimental::filesystem::create_directory(inDir + whichDynamics);
+    }
   }
   dirSample = whichDynamics + "tp" + argv[3] + "-f0" + argv[4] + "/";
   // set input and output
@@ -112,27 +124,23 @@ int main(int argc, char **argv) {
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
-    if(initAngles == true) {
-      ioSP.readParticleVelocity(inDir, numParticles, nDim);
-      sp.initializeParticleAngles();
-    } else {
-      ioSP.readParticleState(inDir, numParticles, nDim);
-    }
+    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
   }
+  if(initAngles == true) sp.initializeParticleAngles();
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ec);
-  velUnit = sigma / timeUnit;
+  forceUnit = ec / sigma;
   alphaUnit = ec / (sigma * sigma);
-  driving = sqrt(2*damping*driving) / damping;
+  driving = sqrt(2 * damping * driving);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " velocity: " << velUnit << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
-  driving *= velUnit;
+  driving *= forceUnit;
   damping /= timeUnit;
   sp.setSelfPropulsionParams(driving, tp);
   ioSP.saveLangevinParams(outDir, damping);
