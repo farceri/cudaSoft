@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double ec = 1, timeStep = atof(argv[2]), timeUnit, forceUnit, alphaUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 2, driving = 2, Rvicsek = 1.5, Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = 1;
+  double ew = 10*ec, Tinject = 2, driving = 2, Rvicsek = 1.5, Jvicsek = 1e03, tp = atof(argv[4]), damping = 1;
   std::string outDir, currentDir, dirSample, energyFile, dampingDir, whichDynamics = "vicsek/";
   std::string inDir = argv[1], potType = argv[8], wallType = argv[9], dynType = argv[10];
   // initialize sp object
@@ -43,16 +43,7 @@ int main(int argc, char **argv) {
     sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
     whichDynamics = "vicsek-na/";
   }
-  if(dynType == "langevin") {
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-    damping = atof(argv[11]);
-  } else {
-    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
-    readState = true;
-  }
-  if(numParticles < 256) {
-    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
-  }
+  if(numParticles < 256) sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -91,12 +82,29 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   if(dynType == "langevin") {
+    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    Tinject = atof(argv[3]);
+    damping = atof(argv[11]);
+    tp = 0.;
     whichDynamics = whichDynamics + dynType + argv[11] + "/";
-    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-      std::experimental::filesystem::create_directory(inDir + whichDynamics);
-    }
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  } else if(dynType == "brownian") {
+    sp.setNoiseType(simControlStruct::noiseEnum::brownian);
+    Tinject = atof(argv[3]);
+    damping = atof(argv[11]);
+    tp = 0.;
+    whichDynamics = whichDynamics + dynType + argv[11] + "/";
+    dirSample = whichDynamics + "T" + argv[3] + "/";
+  } else {
+    Rvicsek = atof(argv[3]);
+    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+    readState = true;
+    cout << "Setting default overdamped brownian dynamics" << endl;
+    dirSample = whichDynamics + "R" + argv[3] + "-tp" + argv[4] + "/";
   }
-  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
+  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+    std::experimental::filesystem::create_directory(inDir + whichDynamics);
+  }
   // set input and output
   ioSPFile ioSP(&sp);
   if (readAndSaveSameDir == true) {//keep running the same dynamics
@@ -105,11 +113,8 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       outDir = outDir + "dynamics";
-      if(logSave == true) {
-        outDir = outDir + "-log/";
-      } else {
-        outDir = outDir + "/";
-      }
+      if(logSave == true) outDir = outDir + "-log/";
+      else outDir = outDir + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;
@@ -133,12 +138,8 @@ int main(int argc, char **argv) {
   }
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
-  }
-  if(initAngles == true) {
-    sp.initializeParticleAngles();
-  }
+  if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
+  if(initAngles == true) sp.initializeParticleAngles();
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
@@ -147,10 +148,11 @@ int main(int argc, char **argv) {
   timeUnit = sigma / sqrt(ec);
   alphaUnit = ec / (sigma * sigma);
   forceUnit = ec / sigma;
-  driving = sqrt(2 * damping * driving);
   Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
+  if(dynType == "langevin" || dynType == "brownian") driving = 2. * damping;
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
+  if(dynType == "langevin") cout << "Langevin - T: " << Tinject << " magnitude: " << sqrt(2 * damping * Tinject) << endl;
   cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;

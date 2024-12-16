@@ -1025,7 +1025,7 @@ __global__ void kernelCalcVicsekAdditiveAlignment(const double* pAngle, double* 
 				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
 					auto deltaAngle = thisAngle - otherAngle;
 					checkAngleMinusPIPlusPI(deltaAngle);
-					pAlpha[particleId] -= sin(deltaAngle);
+					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
 				}
 			}
 		}
@@ -1046,7 +1046,7 @@ __global__ void kernelCalcVicsekNonAdditiveAlignment(const double* pAngle, doubl
 				if (extractVicsekNeighborAngle(particleId, nListId, pAngle, otherAngle)) {
 					auto deltaAngle = thisAngle - otherAngle;
 					checkAngleMinusPIPlusPI(deltaAngle);
-					pAlpha[particleId] -= sin(deltaAngle) / d_vicsekMaxNeighborListPtr[particleId];
+					pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle) / d_vicsekMaxNeighborListPtr[particleId];
 				}
 			}
 		}
@@ -1418,6 +1418,20 @@ __global__ void kernelCalcAllToWallParticleInteraction(const double* pRad, const
 	}
 }
 
+__global__ void kernelCalcWallAngularAcceleration(const double* wPos, const double* wForce, double* mAlpha) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM];
+		getWallPos(wallId, wPos, thisPos);
+		auto distanceSq = 0.;
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			distanceSq += thisPos[dim] * thisPos[dim];
+		}
+		mAlpha[wallId] = (thisPos[0] * wForce[wallId * d_nDim + 1] - thisPos[1] * wForce[wallId * d_nDim]) / distanceSq;
+	}
+}
+
 __global__ void kernelCalcWallArea(const double* wPos, double* aSector) {
 	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (wallId < d_numWall) {
@@ -1476,24 +1490,16 @@ inline __device__ double calcAreaForceEnergy(const double* nPos, const double* p
   	return (0.5 * d_ea * deltaArea * deltaArea);
 }
 
-inline __device__ double calcPerimeterForceEnergy(const double nLength, const double pLength, const double* tPos, const double* nPos, const double* pPos, double* wForce) {
+inline __device__ double calcPerimeterForceEnergy(const double nLength, const double nLength0, const double pLength, const double pLength0, const double* tPos, const double* nPos, const double* pPos, double* wForce) {
   	//compute length variations
-  	auto pDelta = (pLength / d_wallLength0) - 1.;
-  	auto nDelta = (nLength / d_wallLength0) - 1.;
+  	auto pDelta = (pLength / nLength0) - 1.;
+  	auto nDelta = (nLength / pLength0) - 1.;
 	// compute force
 	#pragma unroll (MAXDIM)
   	for (long dim = 0; dim < d_nDim; dim++) {
-    	wForce[dim] += d_el * ((nDelta * (nPos[dim] - tPos[dim]) / (d_wallLength0 * nLength)) - (pDelta * (tPos[dim] - pPos[dim]) / (d_wallLength0 * pLength)));
+    	wForce[dim] += d_el * ((nDelta * (nPos[dim] - tPos[dim]) / (nLength0 * nLength)) - (pDelta * (tPos[dim] - pPos[dim]) / (pLength0 * pLength)));
   	}
   	return (0.5 * d_el * pDelta * pDelta);
-}
-
-inline __device__ double calcFENEPerimeterForceEnergy(const double nLength, const double pLength, const double* tPos, const double* nPos, const double* pPos, double* wForce) {
-	#pragma unroll (MAXDIM)
-  	for (long dim = 0; dim < d_nDim; dim++) {
-    	wForce[dim] += 2 * d_el * d_stiff * d_extSq * ((nLength / (d_extSq * d_wallLength0 * d_wallLength0 - nLength * nLength)) * (nPos[dim] - tPos[dim]) / nLength - (pLength / (d_extSq * d_wallLength0 * d_wallLength0 - pLength * pLength)) * (tPos[dim] - pPos[dim]) / pLength);
-  	}
-  	return d_el * d_stiff * d_extSq * log(1 - pLength * pLength / (d_extSq * d_wallLength0 * d_wallLength0));
 }
 
 inline __device__ double calcBendingForceEnergy(const double* prevSegment, const double* nextSegment, 
@@ -1541,7 +1547,44 @@ __global__ void kernelCalcWallShapeForceEnergy(const double* wLength, const doub
 		getSegment(thisPos, prevPos, prevSegment);
 	  	auto prevLength = calcNorm(prevSegment);
 	  	auto nextLength = calcNorm(nextSegment);
-	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, prevLength, thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
+	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, d_wallLength0, prevLength, d_wallLength0, thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
+		// bending force
+	  	auto prevAngleDelta = wAngle[prevId] - d_wallAngle0;
+	  	auto thisAngleDelta = wAngle[wallId] - d_wallAngle0;
+	 	auto nextAngleDelta = wAngle[nextId] - d_wallAngle0;
+		wEnergy[wallId] += calcBendingForceEnergy(prevSegment, nextSegment, thisAngleDelta, nextAngleDelta, prevAngleDelta, &wForce[wallId*d_nDim]);
+	}
+}
+
+// shape interaction for plastic wall
+__global__ void kernelCalcPlasticWallShapeForceEnergy(const double* wLength, const double* rLength, const double* wAngle, const double* wPos, double* wForce, double* wEnergy) {
+	long wallId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (wallId < d_numWall) {
+		double thisPos[MAXDIM], nextPos[MAXDIM], prevPos[MAXDIM];
+		double nextSegment[MAXDIM], prevSegment[MAXDIM];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[wallId * d_nDim + dim] = 0.;
+		}
+		wEnergy[wallId] = 0.;
+		auto nextId = wallId + 1;
+		if(nextId > d_numWall - 1) {
+			nextId = 0;
+		}
+	  	auto prevId = wallId - 1;
+		if(prevId < 0) {
+			prevId = d_numWall - 1;
+		}
+		getWallPos(wallId, wPos, thisPos);
+	  	getWallPos(nextId, wPos, nextPos);
+	  	getWallPos(prevId, wPos, prevPos);
+		// area force
+		wEnergy[wallId] += calcAreaForceEnergy(nextPos, prevPos, &wForce[wallId*d_nDim]) / d_numWall;
+		// segment force
+		getSegment(nextPos, thisPos, nextSegment);
+		getSegment(thisPos, prevPos, prevSegment);
+	  	auto prevLength = calcNorm(prevSegment);
+	  	auto nextLength = calcNorm(nextSegment);
+	  	wEnergy[wallId] += calcPerimeterForceEnergy(nextLength, rLength[wallId], prevLength, rLength[prevId], thisPos, nextPos, prevPos, &wForce[wallId*d_nDim]);
 		// bending force
 	  	auto prevAngleDelta = wAngle[prevId] - d_wallAngle0;
 	  	auto thisAngleDelta = wAngle[wallId] - d_wallAngle0;
@@ -1768,7 +1811,7 @@ __global__ void kernelReflectParticleFixedWall(const double* pRad, const double*
 		if(isWallx || isWally) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) * d_dt;
+				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -1803,7 +1846,7 @@ __global__ void kernelReflectParticleFixedSides2D(const double* pRad, const doub
 		if(isWall) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) * d_dt;
+				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -1838,7 +1881,7 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 		if(isWall) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) * d_dt;
+				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -1873,8 +1916,6 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
-				pAngle[particleId] = velAngle;
-				break;
 				case simControlStruct::particleEnum::vicsek:
 				pAngle[particleId] = velAngle;
 				break;
@@ -1883,7 +1924,7 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) * d_dt;
+				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 			// transform wallForce to polar coordinates and then assign to wForce
 			double radForce, thetaForce;
@@ -2817,6 +2858,23 @@ __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, cons
     	for (long dim = 0; dim < d_nDim; dim++) {
 			pVel[particleId * d_nDim + dim] += timeStep * pForce[particleId * d_nDim + dim];
 		}
+  	}
+}
+
+__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		pAngle[particleId] += timeStep * pOmega[particleId];
+		pAngle[particleId] = pAngle[particleId] + PI;
+		pAngle[particleId] = pAngle[particleId] - 2.0 * PI * floor(pAngle[particleId] / (2.0 * PI));
+		pAngle[particleId] = pAngle[particleId] - PI;
+  	}
+}
+
+__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep) {
+  	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+  	if (particleId < d_numParticles) {
+		pOmega[particleId] += timeStep * pAlpha[particleId];
   	}
 }
 

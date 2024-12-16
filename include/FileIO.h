@@ -550,6 +550,9 @@ public:
     double boxRadius_ = read0DFile(dirName + "boxSize.dat");
     sp_->setMobileWallParams(numWall_, wallRad_, wallArea0_);
     cout << "FileIO::readWallParams: wallRad: " << wallRad_ << " wallArea0: " << wallArea0_ << "numWall: " << numWall_ << endl;
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+      sp_->setPlasticVariables(1.);
+    }
     return numWall_;
   }
 
@@ -560,6 +563,10 @@ public:
     
     wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
     sp_->setWallPositions(wPos_);
+    
+    thrust::host_vector<double> wallDynamics_(3);
+    wallDynamics_ = read1DFile(dirName + "wallDynamics.dat", 3);
+    sp_->setWallAngleDynamics(wallDynamics_);
   }
 
   void readMobileWall(string dirName, long numWall_, long nDim_) {
@@ -757,6 +764,9 @@ public:
     if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
       saveWallParams(dirName);
       saveWall(dirName);
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+        saveWallDynamics(dirName);
+      }
     }
   }
 
@@ -782,7 +792,7 @@ public:
     sp_->setParticleVelocities(particleVel_);
   }
 
-  void readParticleState(string dirName, long numParticles_, long nDim_, bool initAngles = false) {
+  void readParticleState(string dirName, long numParticles_, long nDim_, bool initAngles = false, bool initWall = false) {
     readParticleVelocity(dirName, numParticles_, nDim_);
     if(initAngles == false) {
       if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
@@ -798,10 +808,22 @@ public:
         sp_->setParticleAngles(particleAngle_);
       }
     }
-    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
-      readWallParams(dirName);
-      readWall(dirName, nDim_);
+    if(initWall == false) {
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+        readWall(dirName, nDim_);
+      }
     }
+  }
+
+  void saveWallDynamics(string dirName) {
+    string fileParams = dirName + "wallDynamics.dat";
+    ofstream saveParams(fileParams.c_str());
+    openOutputFile(fileParams);
+    std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
+    saveParams << get<0>(angleDyn) << endl;
+    saveParams << get<1>(angleDyn) << endl;
+    saveParams << get<2>(angleDyn) << endl;
+    saveParams.close();
   }
 
   void saveParticleState(string dirName) {
@@ -815,8 +837,11 @@ public:
         save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
       }
     }
-    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile)  {
       saveWall(dirName);
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+        saveWallDynamics(dirName);
+      }
     }
   }
 

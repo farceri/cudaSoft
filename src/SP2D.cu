@@ -175,6 +175,13 @@ void SP2D::initWallVariables(long numWall_) {
   thrust::fill(d_wallPos.begin(), d_wallPos.end(), double(0));
   thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
   thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
+  if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    d_monomerAlpha.resize(numWall);
+    thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
+    wallAngle = 0.;
+    wallOmega = 0.;
+    wallAlpha = 0.;
+  }
 }
 
 void SP2D::initWallShapeVariables(long numWall_) {
@@ -188,6 +195,10 @@ void SP2D::initWallShapeVariables(long numWall_) {
   thrust::fill(d_areaSector.begin(), d_areaSector.end(), double(0));
   thrust::fill(d_wallVel.begin(), d_wallVel.end(), double(0));
   thrust::fill(d_sqWallVel.begin(), d_sqWallVel.end(), double(0));
+  if(simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+    d_restLength.resize(numWall_);
+    thrust::fill(d_restLength.begin(), d_restLength.end(), double(0));
+  }
 }
 
 void SP2D::initWallNeighbors(long numParticles_) {
@@ -260,8 +271,6 @@ void SP2D::setNoiseType(simControlStruct::noiseEnum noiseType_) {
     cout << "SP2D::setNoiseType: noiseType: brownian" << endl;
   } else if(simControl.noiseType == simControlStruct::noiseEnum::drivenBrownian) {
     cout << "SP2D::setNoiseType: noiseType: drivenBrownian" << endl;
-  } else if(simControl.noiseType == simControlStruct::noiseEnum::drivenLangevin) {
-    cout << "SP2D::setNoiseType: noiseType: drivenLangevin" << endl;
   } else {
     cout << "SP2D::setNoiseType: please specify valid particleType: langevin1, langevin2, drivenBrownian and drivenLangevin" << endl;
   }
@@ -290,8 +299,13 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
     setNeighborType(simControlStruct::neighborEnum::neighbor);
     setGeometryType(simControlStruct::geometryEnum::roundWall);
     cout << "SP2D::setBoundaryType: boundaryType: mobile" << endl;
+  } else if(simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+    setNeighborType(simControlStruct::neighborEnum::neighbor);
+    setGeometryType(simControlStruct::geometryEnum::roundWall);
+    lgamma = 1.;
+    cout << "SP2D::setBoundaryType: boundaryType: plastic" << endl;
   } else {
-    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, fixed, reflect, reflectNoise, rigid and mobile" << endl;
+    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile and plastic" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -711,6 +725,34 @@ double SP2D::getWallArea() {
 	return wallAreaFromDevice;
 }
 
+double SP2D::getWallAreaDeviation() {
+  double wallAreaFromDevice;
+  cudaMemcpyFromSymbol(&wallAreaFromDevice, d_wallArea, sizeof(d_wallArea));
+  return (wallAreaFromDevice - wallArea0) / wallArea0;
+
+}
+
+std::tuple<double, double, double> SP2D::getWallAngleDynamics() {
+  if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    return make_tuple(wallAngle, wallOmega, wallAlpha);
+  } else {
+    cout << "SP2D::getWallAngleDynamics only works for rigid boundary!" << endl;
+    return make_tuple(0, 0, 0);
+  }
+}
+
+void SP2D::setWallAngleDynamics(thrust::host_vector<double> wallDynamics_) {
+  if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    wallAngle = wallDynamics_[0];
+    wallOmega = wallDynamics_[1];
+    wallAlpha = wallDynamics_[2];
+    d_monomerAlpha.resize(numWall);
+    thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
+  } else {
+    cout << "SP2D::getWallAngleDynamics only works for rigid boundary!" << endl;
+  }
+}
+
 void SP2D::setParticleLengthScale() {
   rho0 = thrust::reduce(d_particleRad.begin(), d_particleRad.end(), double(0), thrust::plus<double>())/numParticles; // set dimensional factor
   cout << " lengthscale: " << rho0 << endl;
@@ -977,6 +1019,7 @@ double SP2D::getParticlePhi() {
     thrust::transform(d_particleRad.begin(), d_particleRad.end(), d_radSquared.begin(), square());
     switch (simControl.boundaryType) {
       case simControlStruct::boundaryEnum::mobile:
+      case simControlStruct::boundaryEnum::plastic:
       if(wallArea > 0.) {
         return thrust::reduce(d_radSquared.begin(), d_radSquared.end(), double(0), thrust::plus<double>()) * PI / wallArea;
       } else {
@@ -1171,6 +1214,7 @@ void SP2D::checkVicsekNeighbors() {
 double SP2D::getSoftWaveNumber() {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
     return PI / (2. * sqrt(wallArea * getParticlePhi() / (PI * numParticles)));
     break;
     default:
@@ -1179,7 +1223,7 @@ double SP2D::getSoftWaveNumber() {
       if(nDim == 2) {
         return PI / (2. * sqrt(boxRadius * boxRadius * getParticlePhi() / numParticles));
       } else {
-        cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rigid and mobile geometry is allowed!" << endl;
+        cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rigid, mobile and plastic geometry is allowed!" << endl;
         return 0;
       }
       break;
@@ -1487,6 +1531,11 @@ void SP2D::setMobileWallParams(long numWall_, double wallRad_, double wallArea0_
   checkDimGrid();
 }
 
+void SP2D::setPlasticVariables(double lgamma_) {
+  lgamma = lgamma_;
+    thrust::fill(d_restLength.begin(), d_restLength.end(), wallLength0);
+}
+
 // define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
 void SP2D::initMobileWall() {
   double circleLength = 2. * PI * boxRadius;
@@ -1501,17 +1550,21 @@ void SP2D::initMobileWall() {
   }
   wallArea0 = PI * boxRadius * boxRadius;
   setMobileWallParams(numWall, wallRad, wallArea0);
+  if(simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+    setPlasticVariables(1.);
+  }
   initWallShapeVariables(numWall);
   // increase boxRadius to track movement of boundary
   scaleBoxRadius(1.1);
 }
 
-void SP2D::initWall() {
+void SP2D::initializeWall() {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::rigid:
     initRigidWall();
     break;
     case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
     initMobileWall();
     break;
     default:
@@ -1566,6 +1619,7 @@ void SP2D::setVicsekParams(double driving_, double taup_, double Jvicsek_, doubl
   }
   cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
   cudaMemcpyToSymbol(d_taup, &taup, sizeof(taup));
+  cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
   //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
@@ -1805,7 +1859,6 @@ void SP2D::addVicsekAlignment() {
     int s_nDim(nDim);
     double s_dt(dt);
     double s_driving(driving);
-    double s_Jvicsek(Jvicsek);
     // use this to be able to set taup to 0
     double amplitude = 0.;
     if(taup != 0) {
@@ -1821,7 +1874,7 @@ void SP2D::addVicsekAlignment() {
 
     auto updateVicsekAlignment2D = [=] __device__ (long pId) {
       // overdamped equation for the angle with vicsek alignment as torque
-      pAngle[pId] += randAngle[pId] + s_dt * s_Jvicsek * pAlpha[pId];
+      pAngle[pId] += randAngle[pId] + s_dt * pAlpha[pId];
       pAngle[pId] = pAngle[pId] + PI;
       pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
       pAngle[pId] = pAngle[pId] - PI;
@@ -1900,6 +1953,17 @@ void SP2D::calcWallShapeForceEnergy() {
   kernelCalcWallShapeForceEnergy<<<dimGrid, dimBlock>>>(wLength, wAngle, wPos, wForce, wEnergy);
 }
 
+void SP2D::calcPlasticWallShapeForceEnergy() {
+  calcWallShape();
+  const double *wLength = thrust::raw_pointer_cast(&d_wallLength[0]);
+  const double *rLength = thrust::raw_pointer_cast(&d_restLength[0]);
+  const double *wAngle = thrust::raw_pointer_cast(&d_wallAngle[0]);
+  const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+	double *wEnergy = thrust::raw_pointer_cast(&d_wallEnergy[0]);
+  kernelCalcPlasticWallShapeForceEnergy<<<dimGrid, dimBlock>>>(wLength, rLength, wAngle, wPos, wForce, wEnergy);
+}
+
 void SP2D::calcParticleWallInteraction() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
@@ -1918,6 +1982,14 @@ void SP2D::calcParticleWallInteraction() {
     kernelCalcAllToWallParticleInteraction<<<dimGrid, dimBlock>>>(pRad, pPos, pForce, pEnergy, wPos, wForce, wEnergy);
     break;
   }
+}
+
+void SP2D::calcWallAngularAcceleration() {
+  const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+	double *mAlpha = thrust::raw_pointer_cast(&d_monomerAlpha[0]);
+  kernelCalcWallAngularAcceleration<<<dimGrid, dimBlock>>>(wPos, wForce, mAlpha);
+  wallAlpha = thrust::reduce(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0), plus<double>());
 }
 
 void SP2D::addParticleGravity() {
@@ -1954,10 +2026,17 @@ void SP2D::calcParticleForceEnergy() {
     thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
     thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
     calcParticleWallInteraction();
+    // transform particle-wall interaction into angular acceleration
+    calcWallAngularAcceleration();
     break;
     case simControlStruct::boundaryEnum::mobile:
     calcWallShapeForceEnergy();
     calcParticleWallInteraction();
+    break;
+    case simControlStruct::boundaryEnum::plastic:
+    calcPlasticWallShapeForceEnergy();
+    calcParticleWallInteraction();
+    break;
     default:
     break;
   }
@@ -2346,13 +2425,11 @@ std::tuple<double, double> SP2D::getWallPressure() {
   if(nDim == 2) {
     double boxLength = 0.;
     switch (simControl.geometryType) {
-      case simControlStruct::geometryEnum::squareWall:
-      boxLength = 2. * thrust::reduce(d_boxSize.begin(), d_boxSize.end(), double(0), thrust::plus<double>());
-      break;
       case simControlStruct::geometryEnum::roundWall:
       boxLength = 2. * PI * boxRadius;
       break;
       default:
+      boxLength = 2. * thrust::reduce(d_boxSize.begin(), d_boxSize.end(), double(0), thrust::plus<double>());
       break;
     }
     if(boxLength != 0.) {
@@ -2360,15 +2437,15 @@ std::tuple<double, double> SP2D::getWallPressure() {
       strided_range<Iterator> xWallForce(d_wallForce.begin(), d_wallForce.end(), 2);
       strided_range<Iterator> yWallForce(d_wallForce.begin() + 1, d_wallForce.end(), 2);
       double xForce = thrust::reduce(xWallForce.begin(), xWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
-      double yForce = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;    
+      double yForce = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
       return std::make_tuple(xForce, yForce);
     } else {
       return std::make_tuple(0, 0);
-      cout << "SP2D::getWallPressure: WORK IN PROGRESS, only written for squareWall and roundWall" << endl;
+      cout << "SP2D::getWallPressure: Warning! boxLength is zero!" << endl;
     }
   } else {
     return std::make_tuple(0, 0);
-    cout << "SP2D::getWallPressure: WORK IN PROGRESS, only written for 2D" << endl;
+    cout << "SP2D::getWallPressure: WORK IN PROGRESS, only works for 2D" << endl;
   }
 }
 
@@ -2439,6 +2516,10 @@ double SP2D::getParticleKineticEnergy() {
 double SP2D::getWallKineticEnergy() {
   thrust::transform(d_wallVel.begin(), d_wallVel.end(), d_sqWallVel.begin(), square());
   return 0.5 * thrust::reduce(d_sqWallVel.begin(), d_sqWallVel.end(), double(0), thrust::plus<double>());
+}
+
+double SP2D::getWallRotationalKineticEnergy() {
+  return numWall * boxRadius * boxRadius * wallOmega * wallOmega;
 }
 
 double SP2D::getDampingWork() {
@@ -2534,11 +2615,12 @@ double SP2D::getParticleEnergy() {
 
 double SP2D::getWallEnergy() {
   switch (simControl.boundaryType) {
-    case simControlStruct::boundaryEnum::rigid:
-    return getWallPotentialEnergy();
-    break;
     case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
     return getWallPotentialEnergy() + getWallKineticEnergy();
+    break;
+    case simControlStruct::boundaryEnum::rigid:
+    return getWallPotentialEnergy() + getWallRotationalKineticEnergy();
     break;
     default:
     return 0;
@@ -2829,6 +2911,7 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::rigid:
     case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
     calcWallNeighborList(cutDistance);
     break;
     default:
@@ -3029,10 +3112,6 @@ void SP2D::initSoftParticleLangevin(double Temp, double gamma, bool readState) {
     case simControlStruct::noiseEnum::drivenBrownian:
     this->sim_ = new SoftParticleDrivenBrownian(this, SimConfig(Temp, 0, 0));
     cout << "SP2D::initSoftParticleLangevin:: Driven Brownian integrator";
-    break;
-    case simControlStruct::noiseEnum::drivenLangevin:
-    this->sim_ = new SoftParticleDrivenLangevin(this, SimConfig(Temp, 0, 0));
-    cout << "SP2D::initSoftParticleLangevin:: Driven Langevin integrator";
     break;
   }
   this->sim_->gamma = gamma;

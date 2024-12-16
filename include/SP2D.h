@@ -23,8 +23,8 @@ using std::tuple;
 
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
-  enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian, drivenLangevin} noiseType;
-  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile} boundaryType;
+  enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian} noiseType;
+  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile, plastic} boundaryType;
   enum class geometryEnum {squareWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -114,6 +114,7 @@ public:
   thrust::device_vector<double> d_stress;
   // wall variables
   thrust::device_vector<double> d_wallLength;
+  thrust::device_vector<double> d_restLength;
   thrust::device_vector<double> d_wallAngle;
   thrust::device_vector<double> d_areaSector;
   thrust::device_vector<double> d_wallPos;
@@ -123,12 +124,20 @@ public:
   thrust::device_vector<double> d_sqWallVel;
   thrust::device_vector<long> d_wallCount;
   long numWall;
+  // mobile wall
   double wallRad;
   double wallArea;
   double wallArea0;
   double wallLength0;
   double wallAngle0;
   double ea, el, eb;
+  // plastic wall
+  double lgamma;
+  // rigid wall
+  double wallAngle;
+  double wallOmega;
+  double wallAlpha;
+  thrust::device_vector<double> d_monomerAlpha;
   // correlation variables
   thrust::device_vector<double> d_velCorr;
   thrust::device_vector<double> d_unitVel;
@@ -265,6 +274,11 @@ public:
 
   double getWallArea();
 
+  double getWallAreaDeviation();
+
+  std::tuple<double, double, double> getWallAngleDynamics();
+  void setWallAngleDynamics(thrust::host_vector<double> wallDynamics_);
+
   void setParticleLengthScale();
 
   void setLengthScaleToOne();
@@ -382,13 +396,15 @@ public:
 
   void setMobileWallParams(long numWall_, double wallRad_, double wallArea0_);
 
+  void setPlasticVariables(double lgamma_);
+
   void initRigidWall();
 
   void checkDimGrid();
 
   void initMobileWall();
 
-  void initWall();
+  void initializeWall();
 
   // force and energy
   void setEnergyCostant(double ec_);
@@ -442,8 +458,12 @@ public:
   void calcWallShape();
 
   void calcWallShapeForceEnergy();
+
+  void calcPlasticWallShapeForceEnergy();
   
   void calcParticleWallInteraction();
+
+  void calcWallAngularAcceleration();
 
   void checkParticleInsideRoundWall();
 
@@ -529,6 +549,8 @@ public:
   double getParticleKineticEnergy();
 
   double getWallKineticEnergy();
+
+  double getWallRotationalKineticEnergy();
 
   double getDampingWork();
 

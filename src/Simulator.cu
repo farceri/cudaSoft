@@ -15,6 +15,9 @@ using namespace std;
 // position updates
 __global__ void kernelUpdateParticlePos(double* pPos, const double* pVel, const double timeStep);
 __global__ void kernelUpdateParticleVel(double* pVel, const double* pForce, const double timeStep);
+// angle updates
+__global__ void kernelUpdateParticleAngle(double* pAngle, const double* pOmega, const double timeStep);
+__global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, const double timeStep);
 // wall updates
 __global__ void kernelUpdateWallPos(double* wPos, const double* wVel, const double timeStep);
 __global__ void kernelUpdateWallVel(double* wVel, const double* wForce, const double timeStep);
@@ -71,10 +74,14 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
 	const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
   kernelUpdateParticleVel<<<sp_->dimGrid, sp_->dimBlock>>>(pVel, pForce, timeStep);
 
-  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
     double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
     const double* wForce = thrust::raw_pointer_cast(&(sp_->d_wallForce[0]));
     kernelUpdateWallVel<<<sp_->dimGrid, sp_->dimBlock>>>(wVel, wForce, timeStep);
+  }
+
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    sp_->wallOmega += sp_->wallAlpha * timeStep;
   }
 }
 
@@ -83,10 +90,44 @@ void SoftParticleLangevin::updatePosition(double timeStep) {
 	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
   kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
 
-  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
     double* wPos = thrust::raw_pointer_cast(&(sp_->d_wallPos[0]));
     const double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
     kernelUpdateWallPos<<<sp_->dimGrid, sp_->dimBlock>>>(wPos, wVel, timeStep);
+    
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+      double s_dt(timeStep);
+      double s_el(sp_->el);
+      double s_lgamma(sp_->lgamma);
+      auto r = thrust::counting_iterator<long>(0);
+      const double *wLength = thrust::raw_pointer_cast(&(sp_->d_wallLength[0]));
+      double *rLength = thrust::raw_pointer_cast(&(sp_->d_restLength[0]));
+      auto addPlasticRelaxation = [=] __device__ (long wallId) {
+        rLength[wallId] -= s_dt * (rLength[wallId] - wLength[wallId]) * s_el / s_lgamma;
+      };
+
+      thrust::for_each(r, r + sp_->numWall, addPlasticRelaxation);
+    }
+  }
+  
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    sp_->wallAngle += sp_->wallOmega * timeStep;
+    // apply rotation to wall monomers
+    long s_nDim(sp_->nDim);
+    double s_wallAngle(sp_->wallAngle);
+    auto s = thrust::counting_iterator<long>(0);
+    double* wPos = thrust::raw_pointer_cast(&(sp_->d_wallPos[0]));
+    auto rotateWallMonomers = [=] __device__ (long wallId) {
+      double newPos[MAXDIM];
+			newPos[0] = wPos[wallId * s_nDim] * cos(s_wallAngle) - wPos[wallId * s_nDim + 1] * sin(s_wallAngle);
+			newPos[1] = wPos[wallId * s_nDim] * sin(s_wallAngle) + wPos[wallId * s_nDim + 1] * cos(s_wallAngle);
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        wPos[wallId * s_nDim + dim] = newPos[dim];
+      }
+    };
+
+    thrust::for_each(s, s + sp_->numWall, rotateWallMonomers);
   }
 }
 
@@ -108,35 +149,6 @@ void SoftParticleLangevin::conserveMomentum() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, subtractParticleDrift);
-}
-
-//************************* soft particle langevin with driving force ***************************//
-void SoftParticleDrivenLangevin::integrate() {
-  updateVelocity(0.5 * sp_->dt);
-  updatePosition(sp_->dt);
-  sp_->checkParticleNeighbors();
-  sp_->calcParticleForceEnergy();
-  updateThermalVel();
-  updateVelocity(0.5 * sp_->dt);
-  sp_->checkReflectiveWall();
-}
-
-void SoftParticleDrivenLangevin::updateThermalVel() {
-  // update thermal velocity
-  long s_nDim(sp_->nDim);
-  double s_gamma(gamma);
-  auto r = thrust::counting_iterator<long>(0);
-  const double *pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  double *pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
-
-  auto langevinAddDampingForces = [=] __device__ (long particleId) {
-    #pragma unroll (MAXDIM)
-		for (long dim = 0; dim < s_nDim; dim++) {
-      pForce[particleId * s_nDim + dim] -= s_gamma * pVel[particleId * s_nDim + dim];
-    }
-  };
-
-  thrust::for_each(r, r + sp_->numParticles, langevinAddDampingForces);
 }
 
 //************************* soft particle langevin ***************************//
@@ -492,7 +504,7 @@ void SoftParticleNoseHoover::integrate() {
 
 void SoftParticleNoseHoover::updateVelocity(double timeStep) {
   // update nose hoover damping
-  gamma += (sp_->dt / (2 * mass)) * (sp_->getParticleKineticEnergy() - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);
+  gamma += (timeStep / (2 * mass)) * (sp_->getParticleKineticEnergy() - (sp_->nDim * sp_->numParticles + 1) * config.Tinject / 2);
   double s_gamma(gamma);
   long s_nDim(sp_->nDim);
   double s_dt(timeStep);
@@ -553,8 +565,8 @@ void SoftParticleDoubleNoseHoover::injectKineticEnergy() {
 void SoftParticleDoubleNoseHoover::updateVelocity(double timeStep) {
   // update nose hoover damping
   std::tuple<double, double, double> ekins = sp_->getParticleKineticEnergy12();
-  gamma1 += (sp_->dt / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
-  gamma2 += (sp_->dt / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
+  gamma1 += (timeStep / (2 * mass)) * (get<0>(ekins) - (sp_->nDim * sp_->num1 + 1) * config.Tinject / 2);//T1
+  gamma2 += (timeStep / (2 * mass)) * (get<1>(ekins) - (sp_->nDim * (sp_->numParticles - sp_->num1) + 1) * config.driving / 2);//T2
   double s_gamma1(gamma1);
   double s_gamma2(gamma2);
   long s_nDim(sp_->nDim);
@@ -610,6 +622,7 @@ void SoftParticleDoubleNoseHoover::updateThermalVel() {
 void SoftParticleBrownian::integrate() {
   sp_->checkParticleNeighbors();
   sp_->calcParticleForceEnergy();
+  updateThermalVel();
   sp_->checkReflectiveWall();
   updatePosition(sp_->dt);
 }
@@ -635,12 +648,23 @@ void SoftParticleBrownian::updateThermalVel() {
   };
 
   thrust::for_each(r, r + sp_->numParticles, updateBrownianVel);
-}
 
-void SoftParticleBrownian::updatePosition(double timeStep) {
-	double* pPos = thrust::raw_pointer_cast(&(sp_->d_particlePos[0]));
-	const double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
-  kernelUpdateParticlePos<<<sp_->dimGrid, sp_->dimBlock>>>(pPos, pVel, timeStep);
+  // wall velocity update
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+    auto s = thrust::counting_iterator<long>(0);
+    double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
+    const double* wForce = thrust::raw_pointer_cast(&(sp_->d_wallForce[0]));
+
+    auto updateWallVelocity =  [=] __device__ (long wallId) {
+      wVel[wallId] = wForce[wallId] / s_gamma;
+    };
+
+    thrust::for_each(s, s + sp_->numWall, updateWallVelocity);
+  }
+
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    sp_->wallOmega += sp_->wallAlpha * sp_->dt;
+  }
 }
 
 //**************************** driven brownian integrator *****************************//
@@ -663,10 +687,27 @@ void SoftParticleDrivenBrownian::updateThermalVel() {
   auto updateActiveBrownianVel = [=] __device__ (long particleId) {
     #pragma unroll (MAXDIM)
 		for (long dim = 0; dim < s_nDim; dim++) {
-      // self-propulsion has already been added to the force
+      // active noise has already been added to the force
 		  pVel[particleId * s_nDim + dim] = pForce[particleId * s_nDim + dim] / s_gamma;
     }
   };
 
   thrust::for_each(r, r + sp_->numParticles, updateActiveBrownianVel);
+
+  // wall velocity update
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+    auto s = thrust::counting_iterator<long>(0);
+    double* wVel = thrust::raw_pointer_cast(&(sp_->d_wallVel[0]));
+    const double* wForce = thrust::raw_pointer_cast(&(sp_->d_wallForce[0]));
+
+    auto updateWallVelocity =  [=] __device__ (long wallId) {
+      wVel[wallId] = wForce[wallId] / s_gamma;
+    };
+
+    thrust::for_each(s, s + sp_->numWall, updateWallVelocity);
+  }
+
+  if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+    sp_->wallOmega += sp_->wallAlpha * sp_->dt;
+  }
 }

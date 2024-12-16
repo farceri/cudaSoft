@@ -68,17 +68,6 @@ public:
 };
 
 // Soft particle Langevin integrator child of SoftParticleLangevin
-class SoftParticleDrivenLangevin: public SoftParticleLangevin
-{
-public:
-  SoftParticleDrivenLangevin() = default;
-  SoftParticleDrivenLangevin(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
-
-  virtual void updateThermalVel();
-  virtual void integrate();
-};
-
-// Soft particle Langevin integrator child of SoftParticleLangevin
 class SoftParticleLangevin2: public SoftParticleLangevin
 {
 public:
@@ -212,7 +201,6 @@ public:
   SoftParticleBrownian() = default;
   SoftParticleBrownian(SP2D * spPtr, SimConfig config) : SoftParticleLangevin:: SoftParticleLangevin(spPtr, config){;}
 
-  virtual void updatePosition(double timeStep);
   virtual void updateThermalVel();
   virtual void integrate();
 };

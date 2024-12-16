@@ -44,11 +44,9 @@ int main(int argc, char **argv) {
     damping = atof(argv[11]);
   } else {
     sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
-    Tinject = 0.;
+    readState = true;
   }
-  if(numParticles < 256) {
-    sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
-  }
+  if(numParticles < 256) sp.setNeighborType(simControlStruct::neighborEnum::allToAll);
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
@@ -95,11 +93,8 @@ int main(int argc, char **argv) {
     outDir = inDir;
     if(runDynamics == true) {
       outDir = outDir + "dynamics";
-      if(logSave == true) {
-        outDir = outDir + "-log/";
-      } else {
-        outDir = outDir + "/";
-      }
+      if(logSave == true) outDir = outDir + "-log/";
+      else outDir = outDir + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
         //if(initialStep != 0) {
         inDir = outDir;

@@ -155,9 +155,7 @@ int main(int argc, char **argv) {
   }
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
-  if(readState == true) {
-    ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
-  }
+  if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim, initAngles);
   if(initAngles == true) sp.initializeParticleAngles();
   // output file
   energyFile = outDir + "energy.dat";
@@ -193,7 +191,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergyAB(step+initialStep, timeStep, numParticles);
+      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
