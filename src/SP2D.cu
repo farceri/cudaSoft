@@ -2519,7 +2519,7 @@ double SP2D::getWallKineticEnergy() {
 }
 
 double SP2D::getWallRotationalKineticEnergy() {
-  return numWall * boxRadius * boxRadius * wallOmega * wallOmega;
+  return 0.5 * boxRadius * boxRadius * wallOmega * wallOmega;
 }
 
 double SP2D::getDampingWork() {
@@ -2605,12 +2605,23 @@ double SP2D::getParticleTemperature() {
   return 2 * getParticleKineticEnergy() / (nDim * numParticles);
 }
 
-double SP2D::getWallTemperature() {
-  return 2 * getWallKineticEnergy() / (nDim * numWall);
-}
-
 double SP2D::getParticleEnergy() {
   return (getParticlePotentialEnergy() + getParticleKineticEnergy());
+}
+
+double SP2D::getWallTemperature() {
+  switch (simControl.boundaryType) {
+    case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
+    return 2 * getWallKineticEnergy() / (nDim * numWall);
+    break;
+    case simControlStruct::boundaryEnum::rigid:
+    return 2 * getWallRotationalKineticEnergy() / nDim;
+    break;
+    default:
+    return 0;
+    break;
+  }
 }
 
 double SP2D::getWallEnergy() {

@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = false, saveFinal = true, logSave = false, linSave = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readState = false, saveFinal = true, logSave = true, linSave = false;
   bool initAngles = false, squarebc = false, roundbc = true, additive = true;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;

@@ -81,7 +81,7 @@ void SoftParticleLangevin::updateVelocity(double timeStep) {
   }
 
   if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    sp_->wallOmega += sp_->wallAlpha * timeStep;
+    sp_->wallOmega += (sp_->wallAlpha - gamma * sp_->wallOmega) * timeStep;
   }
 }
 
@@ -663,7 +663,7 @@ void SoftParticleBrownian::updateThermalVel() {
   }
 
   if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    sp_->wallOmega += sp_->wallAlpha * sp_->dt;
+    sp_->wallOmega = sp_->wallAlpha / gamma;
   }
 }
 
@@ -708,6 +708,6 @@ void SoftParticleDrivenBrownian::updateThermalVel() {
   }
 
   if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    sp_->wallOmega += sp_->wallAlpha * sp_->dt;
+    sp_->wallOmega = sp_->wallAlpha / gamma;
   }
 }
