@@ -78,8 +78,8 @@ INC_DIR = include
 #EXE = runExternalField
 #EXE = runNPT
 #EXE = runABP
-#EXE = runVicsek
-EXE = runWall
+EXE = runVicsek
+#EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE

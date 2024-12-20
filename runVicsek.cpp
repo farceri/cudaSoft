@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readState = false, saveFinal = true, logSave = true, linSave = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readState = false, saveFinal = true, logSave = false, linSave = false;
   bool initAngles = false, squarebc = false, roundbc = true, additive = true;
   // variables
   long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
@@ -96,11 +96,13 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + dynType + argv[11] + "/";
     dirSample = whichDynamics + "T" + argv[3] + "/";
   } else {
-    Rvicsek = atof(argv[3]);
     sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+    Jvicsek = atof(argv[3]);
+    damping = atof(argv[11]);
+    whichDynamics = whichDynamics + "damping" + argv[11] + "/";
+    dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
     readState = true;
     cout << "Setting default overdamped brownian dynamics" << endl;
-    dirSample = whichDynamics + "R" + argv[3] + "-tp" + argv[4] + "/";
   }
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
@@ -149,11 +151,11 @@ int main(int argc, char **argv) {
   alphaUnit = ec / (sigma * sigma);
   forceUnit = ec / sigma;
   Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
-  if(dynType == "langevin" || dynType == "brownian") driving = 2. * damping;
+  driving = 2. * damping;
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
   if(dynType == "langevin") cout << "Langevin - T: " << Tinject << " magnitude: " << sqrt(2 * damping * Tinject) << endl;
-  cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
+  cout << "Vicsek - range: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
   driving *= forceUnit;
