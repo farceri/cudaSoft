@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = true, activeDir = true, justRun = false, conserve = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
+  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
   // variables
   bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
@@ -48,17 +48,17 @@ int main(int argc, char **argv) {
   sp.setParticleType(simControlStruct::particleEnum::active);
   if(dynType == "langevin1") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-  } else if(dynType == "lang1con") {
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-    cout << "Conserve momentum is true" << endl;
-    conserve = true;
-  } else if(dynType == "lang2con") {
+  } else if(dynType == "langevin2") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
-    cout << "Conserve momentum is true" << endl;
-    conserve = true;
   } else {
-    dynType = "langevin2";
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    conserve = true;
+    cout << "Conserve momentum is true" << endl;
+    if(dynType == "lang2con") {
+      sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    } else {
+      dynType = "lang1con";
+      sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    }
   }
   if(readNH == true) {
     whichDynamics = "nh";
@@ -84,12 +84,12 @@ int main(int argc, char **argv) {
   if(activeDir == true) {
     readNH = false;
     whichDynamics = "tp";
-    dirSample = whichDynamics + argv[4] + "-f0" + argv[5] + "/";
+    dirSample = whichDynamics + argv[4] + "-Ta" + argv[5] + "/";
   } else {
     if(readNH == true) {
       dirSample = whichDynamics + "T" + argv[3] + "/";
     } else {
-      dirSample = whichDynamics + "tp" + argv[4] + "-f0" + argv[5] + "/";
+      dirSample = whichDynamics + "tp" + argv[4] + "-Ta" + argv[5] + "/";
     }
   }
   ioSPFile ioSP(&sp);
@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
       if(runDynamics == true) {
         if(readNH == true) {
           inDir = inDir + "damping" + argv[8] + "/";
-          outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-f0" + argv[5] + "/";
+          outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-Ta" + argv[5] + "/";
         }
         inDir =	outDir;
         if(logSave == true) {
@@ -163,6 +163,7 @@ int main(int argc, char **argv) {
   // initialization
   sigma = sp.getMeanParticleSigma();
   damping = sqrt(inertiaOverDamping) / sigma;
+  driving = sqrt(2 * damping * driving);
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);

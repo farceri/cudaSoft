@@ -2552,6 +2552,13 @@ double SP2D::getNoiseWork() {
   double s_dt(dt);
   long s_nDim(nDim);
   double s_noise(this->sim_->noise);
+  switch (simControl.noiseType) {
+    case simControlStruct::noiseEnum::langevin2:
+    s_noise *= 0.5; // a factor of 2 comes out of the integration scheme for the second-order Langevin integrator
+    break;
+    default:
+    break;
+  }
   auto r = thrust::counting_iterator<long>(0);
 	const double* rand = thrust::raw_pointer_cast(&(this->sim_->d_rand[0]));
 	const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);

@@ -47,17 +47,17 @@ int main(int argc, char **argv) {
 	SP2D sp(numParticles, nDim);
   if(dynType == "langevin1") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-  } else if(dynType == "lang1con") {
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-    cout << "Conserve momentum is true" << endl;
-    conserve = true;
-  } else if(dynType == "lang2con") {
+  } else if(dynType == "langevin2") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
-    cout << "Conserve momentum is true" << endl;
-    conserve = true;
   } else {
-    dynType = "langevin2";
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    conserve = true;
+    cout << "Conserve momentum is true" << endl;
+    if(dynType == "lang2con") {
+      sp.setNoiseType(simControlStruct::noiseEnum::langevin2);
+    } else {
+      dynType = "lang1con";
+      sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
+    }
   }
   if(readNH == true) {
     whichDynamics = "nh";
