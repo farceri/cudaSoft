@@ -21,11 +21,6 @@ __global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, 
 // wall updates
 __global__ void kernelUpdateWallPos(double* wPos, const double* wVel, const double timeStep);
 __global__ void kernelUpdateWallVel(double* wVel, const double* wForce, const double timeStep);
-// momentum conservation
-__global__ void kernelSumParticleVelocity(double* pVel, double* velSum);
-__global__ void kernelSubtractParticleDrift(double* pVel, double* velSum);
-__global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, long firstId);
-__global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, long firstId);
 
 
 //************************* soft particle langevin ***************************//

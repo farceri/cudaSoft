@@ -5,6 +5,7 @@
 // FUNCTIONS FOR FIRE CLASS
 
 #include "../include/FIRE.h"
+#include "../include/defs.h"
 #include <thrust/reduce.h>
 #include <thrust/inner_product.h>
 #include <thrust/device_vector.h>
@@ -127,12 +128,12 @@ void FIRE::bendParticleVelocityTowardsForce() {
 		thrust::fill(sp_->d_particleVel.begin(), sp_->d_particleVel.end(), double(0));
 	} else {
 		double velForceNormRatio = sqrt(velNormSquared / forceNormSquared);
-		double f_a(a);
+		double func_a(a);
 		auto r = thrust::counting_iterator<long>(0);
 		double* pVel = thrust::raw_pointer_cast(&(sp_->d_particleVel[0]));
 		const double* pForce = thrust::raw_pointer_cast(&(sp_->d_particleForce[0]));
 		auto perDOFBendParticleVelocity = [=] __device__ (long i) {
-			pVel[i] = (1 - f_a) * pVel[i] + f_a * pForce[i] * velForceNormRatio;
+			pVel[i] = (1 - func_a) * pVel[i] + func_a * pForce[i] * velForceNormRatio;
 		};
 
 		thrust::for_each(r, r + sp_->d_particleVel.size(), perDOFBendParticleVelocity);

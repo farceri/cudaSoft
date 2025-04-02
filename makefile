@@ -73,12 +73,12 @@ INC_DIR = include
 #EXE = runNVT
 #EXE = runNVT2LJ
 #EXE = runActive
-EXE = runActive2LJ
+#EXE = runActive2LJ
 #EXE = runDoubleNH2LJ
 #EXE = runExternalField
 #EXE = runNPT
 #EXE = runABP
-#EXE = runVicsek
+EXE = runVicsek
 #EXE = runWall
 
 # mechanics
@@ -110,7 +110,7 @@ GENCODE_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 GENCODE_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
 GENCODE = $(GENCODE_SM60)
 
-# Link c++ and CUDA compiled object files to target executable:
+# Link C++ and CUDA compiled object files to target executable:
 $(EXE) : $(OBJS)
 	$(NVCC) $(GENCODE) $(OBJS) -o $@ $(CUDA_INC_DIR) $(CC_LIBS)
 #	$(NVCC) $(GENCODE) $(OBJS) -o $@ $(CUDA_INC_DIR) $(CUDA_LIB_DIR) $(CUDA_LINK_LIBS) $(CC_LIBS)

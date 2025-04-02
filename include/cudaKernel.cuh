@@ -418,6 +418,15 @@ inline __device__ bool extractVicsekNeighborAngle(const long particleId, const l
   	return false;
 }
 
+inline __device__ bool extractVicsekNeighborAngleFromVel(const long particleId, const long nListId, const double* pVel, double& otherAngle) {
+	auto otherId = d_vicsekNeighborListPtr[particleId*d_vicsekNeighborListSize + nListId];
+  	if ((particleId != otherId) && (otherId != -1)) {
+		otherAngle = atan2(pVel[otherId * d_nDim + 1], pVel[otherId * d_nDim]);
+    	return true;
+  	}
+  	return false;
+}
+
 inline __device__ bool extractVicsekNeighborVel(const long particleId, const long nListId, const double* pVel, double* otherVel) {
 	auto otherId = d_vicsekNeighborListPtr[particleId*d_vicsekNeighborListSize + nListId];
   	if ((particleId != otherId) && (otherId != -1)) {
@@ -1051,6 +1060,27 @@ __global__ void kernelCalcVicsekNonAdditiveAlignment(const double* pAngle, doubl
 			}
 		}
   	}
+}
+
+// particle-particle kuramoto / vicsek velocity interaction
+__global__ void kernelCalcVicsekVelocityAlignment(const double* pVel, double* pAlpha) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+	  auto otherAngle = 0.;
+	  // zero out the angular acceleration and get particle positions
+	  pAlpha[particleId] = 0.;
+	  auto thisAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+	  // interaction with neighbor particles
+	  if(d_vicsekMaxNeighborListPtr[particleId] > 0) {
+		  for (long nListId = 0; nListId < d_vicsekMaxNeighborListPtr[particleId]; nListId++) {
+			  if (extractVicsekNeighborAngleFromVel(particleId, nListId, pVel, otherAngle)) {
+				  auto deltaAngle = thisAngle - otherAngle;
+				  checkAngleMinusPIPlusPI(deltaAngle);
+				  pAlpha[particleId] -= d_Jvicsek * sin(deltaAngle);
+			  }
+		  }
+	  }
+	}
 }
 
 inline __device__ double calcWallContactInteraction(const double* thisPos, const double* wallPos, const double radSum, double* currentForce, double* wallForce) {
@@ -2876,46 +2906,6 @@ __global__ void kernelUpdateParticleOmega(double* pOmega, const double* pAlpha, 
   	if (particleId < d_numParticles) {
 		pOmega[particleId] += timeStep * pAlpha[particleId];
   	}
-}
-
-__global__ void kernelSumParticleVelocity(double* pVel, double* velSum) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (particleId < d_numParticles) {
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			velSum[dim] += pVel[particleId * d_nDim + dim];
-		}
-	}
-}
-
-__global__ void kernelSubtractParticleDrift(double* pVel, double* velSum) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (particleId < d_numParticles) {
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
-		}
-	}
-}
-
-__global__ void kernelSubsetSumParticleVelocity(double* pVel, double* velSum, long firstId) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (particleId < d_numParticles && particleId > firstId) {
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			velSum[dim] += pVel[particleId * d_nDim + dim];
-		}
-	}
-}
-
-__global__ void kernelSubsetSubtractParticleDrift(double* pVel, double* velSum, long firstId) {
-	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (particleId < d_numParticles && particleId > firstId) {
-		#pragma unroll (MAXDIM)
-		for (long dim = 0; dim < d_nDim; dim++) {
-			pVel[particleId * d_nDim + dim] -= velSum[dim]/d_numParticles;
-		}
-	}
 }
 
 __global__ void kernelUpdateWallPos(double* wPos, const double* wVel, const double timeStep) {

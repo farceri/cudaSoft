@@ -30,7 +30,7 @@ struct simControlStruct {
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
   enum class wallEnum {harmonic, lennardJones, WCA} wallType;
   enum class gravityEnum {on, off} gravityType;
-  enum class alignEnum {additive, nonAdditive} alignType;
+  enum class alignEnum {additive, nonAdditive, velAlign} alignType;
 };
 
 // pointer-to-member function call macro
@@ -103,7 +103,6 @@ public:
   thrust::device_vector<double> d_particlePos;
   thrust::device_vector<double> d_particleVel;
   thrust::device_vector<double> d_squaredVel;
-  thrust::device_vector<double> d_particleLastVel;
   thrust::device_vector<double> d_particleForce;
   thrust::device_vector<double> d_particleEnergy;
   thrust::device_vector<double> d_particleAngle;
@@ -313,8 +312,6 @@ public:
   void setInitialPositions();
 
   thrust::host_vector<double> getLastPositions();
-
-  void resetLastVelocities();
 
   void setParticleVelocities(thrust::host_vector<double> &particleVel_);
   thrust::host_vector<double> getParticleVelocities();

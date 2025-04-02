@@ -439,6 +439,8 @@ void SP2D::setAlignType(simControlStruct::alignEnum alignType_) {
     cout << "SP2D::setAlignType: alignType: additive" << endl;
   } else if(simControl.alignType == simControlStruct::alignEnum::nonAdditive) {
     cout << "SP2D::setAlignType: alignType: non additive" << endl;
+  } else if(simControl.alignType == simControlStruct::alignEnum::velAlign) {
+    cout << "SP2D::setAlignType: alignType: velocity" << endl;
   } else {
     cout << "SP2D::setAlignType: please specify valid alignType: additive or non additive" << endl;
   }
@@ -910,11 +912,6 @@ thrust::host_vector<double> SP2D::getLastPositions() {
   return lastPosFromDevice;
 }
 
-void SP2D::resetLastVelocities() {
-  cudaDeviceSynchronize();
-  d_particleLastVel = d_particleVel;
-}
-
 void SP2D::setParticleVelocities(thrust::host_vector<double> &particleVel_) {
   d_particleVel = particleVel_;
 }
@@ -1092,6 +1089,7 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
 
 // this function is called after particleDisplacement has been computed
 void SP2D::removeCOMDrift() {
+  getParticleMaxDisplacement();
   // compute drift on x
   thrust::device_vector<double> particleDisp_x(d_particleDisp.size() / 2);
   thrust::device_vector<long> idx(d_particleDisp.size() / 2);
@@ -1458,23 +1456,33 @@ void SP2D::scaleParticleVelocity(double scale) {
 
 // compute particle angles from velocity
 void SP2D::initializeParticleAngles() {
+  //thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  //thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleAngle.begin(), randNum(-PI, PI));
   long p_nDim(nDim);
-  auto r = thrust::counting_iterator<long>(0);
-  thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_particleAngle.begin(), randNum(-PI, PI));
-  if(nDim == 3) {
-      double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
-      const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double* pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  const double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
 
-      auto computeParticleAngle3D = [=] __device__ (long particleId) {
+  if(nDim == 2) {
+    auto r = thrust::counting_iterator<long>(0);
+
+    auto computeAngleFromVel2D = [=] __device__ (long particleId) {
+      pAngle[particleId] = atan2(pVel[particleId * p_nDim + 1], pVel[particleId * p_nDim]);
+    };
+
+    thrust::for_each(r, r + numParticles, computeAngleFromVel2D);
+  } 
+  else if(nDim == 3) {
+    auto s = thrust::counting_iterator<long>(0);
+
+    auto computeAngleFromVel3D = [=] __device__ (long particleId) {
       auto theta = acos(pVel[particleId * p_nDim + 2]);
-      auto phi = atan(pVel[particleId * p_nDim + 1] / pVel[particleId * p_nDim]);
+      auto phi = atan2(pVel[particleId * p_nDim + 1], pVel[particleId * p_nDim]);
       pAngle[particleId * p_nDim] = cos(theta) * cos(phi);
       pAngle[particleId * p_nDim + 1] = sin(theta) * cos(phi);
       pAngle[particleId * p_nDim + 2] = sin(phi);
     };
 
-    thrust::for_each(r, r + numParticles, computeParticleAngle3D);
+    thrust::for_each(s, s + numParticles, computeAngleFromVel3D);
   }
 }
 
@@ -1898,6 +1906,10 @@ void SP2D::calcVicsekAlignment() {
     break;
     case simControlStruct::alignEnum::nonAdditive:
     kernelCalcVicsekNonAdditiveAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
+    break;
+    case simControlStruct::alignEnum::velAlign:
+    const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+    kernelCalcVicsekVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
     break;
   }
 }
@@ -3316,13 +3328,13 @@ void SP2D::softParticleNVEDoubleRescaleLoop() {
   this->sim_->integrate();
 }
 
+//************************* Nose-Hoover integrator ***************************//
 void SP2D::getNoseHooverParams(double &mass, double &damping) {
   mass = this->sim_->mass;
   damping = this->sim_->gamma;
   //cout << "SP2D::getNoseHooverParams:: damping: " << this->sim_->gamma << endl;
 }
 
-//************************* Nose-Hoover integrator ***************************//
 void SP2D::initSoftParticleNoseHoover(double Temp, double mass, double gamma, bool readState) {
   this->sim_ = new SoftParticleNoseHoover(this, SimConfig(Temp, 0, 0));
   this->sim_->mass = mass;
