@@ -139,8 +139,9 @@ public:
   thrust::device_vector<double> d_monomerAlpha;
   // correlation variables
   thrust::device_vector<double> d_velCorr;
+  thrust::device_vector<double> d_unitPos;
   thrust::device_vector<double> d_unitVel;
-  thrust::device_vector<double> d_vortexParam;
+  thrust::device_vector<double> d_unitVelPos;
   thrust::device_vector<double> d_angMom;
   // two-type particles variables
   thrust::device_vector<long> d_flagAB;
@@ -474,9 +475,9 @@ public:
 
   void calcParticleForceEnergy();
 
-  double getVicsekOrderParameter();
+  std::tuple<double, double, double> getVicsekOrderParameters();
 
-  double getVicsekVortexParameter();
+  double getVicsekHigherOrderParameter(double order_);
 
   double getVicsekVelocityCorrelation();
 

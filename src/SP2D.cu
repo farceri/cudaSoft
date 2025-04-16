@@ -254,6 +254,12 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
     d_angMom.resize(numParticles);
     thrust::fill(d_angMom.begin(), d_angMom.end(), double(0));
+    d_unitPos.resize(numParticles * nDim);
+    thrust::fill(d_unitPos.begin(), d_unitPos.end(), double(0));
+    d_unitVel.resize(numParticles * nDim);
+    thrust::fill(d_unitVel.begin(), d_unitVel.end(), double(0));
+    d_unitVelPos.resize(numParticles * nDim);
+    thrust::fill(d_unitVelPos.begin(), d_unitVelPos.end(), double(0));
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
@@ -2122,19 +2128,46 @@ void SP2D::reflectParticleOnWallWithNoise() {
 	}
 }
 
-double SP2D::getVicsekOrderParameter() {
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
-  kernelCalcUnitVelocity<<<dimGrid, dimBlock>>>(pVel, unitVel);
-  return fabs(thrust::reduce(d_unitVel.begin(), d_unitVel.end(), double(0), thrust::plus<double>())) / numParticles;
-}
-
-double SP2D::getVicsekVortexParameter() {
+std::tuple<double, double, double> SP2D::getVicsekOrderParameters() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *vortexParam = thrust::raw_pointer_cast(&d_vortexParam[0]);
-  kernelCalcVortexParameters<<<dimGrid, dimBlock>>>(pPos, pVel, vortexParam);
-  return fabs(thrust::reduce(d_vortexParam.begin(), d_vortexParam.end(), double(0), thrust::plus<double>()) / numParticles);
+  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
+  double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
+  double *unitVelPos = thrust::raw_pointer_cast(&d_unitVelPos[0]);
+  kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos);
+  // compute phase order parameters
+  typedef thrust::device_vector<double>::iterator Iterator;
+  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
+  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
+  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param1 = sqrt(realField * realField + imagField * imagField);
+  // compute velocity order parameters
+  strided_range<Iterator> unitVel_re(d_unitVel.begin(), d_unitVel.end(), 2);
+  strided_range<Iterator> unitVel_im(d_unitVel.begin() + 1, d_unitVel.end(), 2);
+  realField = thrust::reduce(unitVel_re.begin(), unitVel_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  imagField = thrust::reduce(unitVel_im.begin(), unitVel_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param2 = sqrt(realField * realField + imagField * imagField);
+  // compute velocity-position order parameters
+  strided_range<Iterator> unitVelPos_re(d_unitVelPos.begin(), d_unitVelPos.end(), 2);
+  strided_range<Iterator> unitVelPos_im(d_unitVelPos.begin() + 1, d_unitVelPos.end(), 2);
+  realField = thrust::reduce(unitVelPos_re.begin(), unitVelPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  imagField = thrust::reduce(unitVelPos_im.begin(), unitVelPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param3 = sqrt(realField * realField + imagField * imagField);
+  return std::make_tuple(param1, param2, param3);
+}
+
+double SP2D::getVicsekHigherOrderParameter(double order_) {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
+  kernelCalcHigherOrderUnitVel<<<dimGrid, dimBlock>>>(pPos, unitPos, order_);
+  // compute phase order parameters
+  typedef thrust::device_vector<double>::iterator Iterator;
+  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
+  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
+  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  return sqrt(realField * realField + imagField * imagField);
 }
 
 double SP2D::getVicsekVelocityCorrelation() {

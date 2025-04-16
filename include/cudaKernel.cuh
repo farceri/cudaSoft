@@ -2762,15 +2762,33 @@ __global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
   	}
 }
 
-// vicsek average unit velocity
-__global__ void kernelCalcUnitVelocity(const double* pVel, double* unitVel) {
+// unit position, velocity and velocity-position vectors
+__global__ void kernelCalcUnitPosVel(const double* pPos, const double* pVel, double* unitPos, double* unitVel, double* unitVelPos) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
-		// compute unit vector magnitude
+		// compute position unit vector
+		auto posAngle = atan2(pPos[particleId * d_nDim + 1], pPos[particleId * d_nDim]);
+		unitPos[particleId * d_nDim] = cos(posAngle);
+		unitPos[particleId * d_nDim + 1] = sin(posAngle);
+		// compute position unit vector
 		auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 		unitVel[particleId * d_nDim] = cos(velAngle);
 		unitVel[particleId * d_nDim + 1] = sin(velAngle);
+		// compute cos(velAngle - posAngle) and sin(velAngle - posAngle)
+		unitVelPos[particleId * d_nDim] = cos(velAngle) * cos(posAngle) + sin(velAngle) * sin(posAngle);
+		unitVelPos[particleId * d_nDim + 1] = sin(velAngle) * cos(posAngle) - cos(velAngle) * sin(posAngle);
   	}
+}
+
+// higher order unit velocity vectors
+__global__ void kernelCalcHigherOrderUnitVel(const double* pPos, double* unitPos, double order) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+	  // compute position unit vector
+	  auto posAngle = atan2(pPos[particleId * d_nDim + 1], pPos[particleId * d_nDim]);
+	  unitPos[particleId * d_nDim] = cos(order * posAngle);
+	  unitPos[particleId * d_nDim + 1] = sin(order * posAngle);
+	}
 }
 
 // vorticity parameter

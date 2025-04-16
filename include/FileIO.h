@@ -172,36 +172,32 @@ public:
     energyFile << numParticlesAB << endl;
   }
 
-  void saveAlignEnergy(long step, double timeStep, long numParticles) {
+  void saveAlignEnergy(long step, double timeStep, long numParticles, double order=0.f) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << sp_->getParticleAngularMomentum();
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
-      double velCorr = sp_->getNeighborVelocityCorrelation();
-      energyFile << "\t" << setprecision(precision) << velCorr;
-    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double velCorr = sp_->getVicsekVelocityCorrelation();
-      energyFile << "\t" << setprecision(precision) << velCorr;
-    } else {
-      energyFile << "\t";
-    }
-    std::tuple<double, double> wall(0,0);
-    switch (sp_->simControl.boundaryType) {
-      case simControlStruct::boundaryEnum::rigid:
-      case simControlStruct::boundaryEnum::mobile:
-      case simControlStruct::boundaryEnum::fixed:
-      case simControlStruct::boundaryEnum::reflect:
-      wall = sp_->getWallPressure();
+    // check for wall pressure
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::reflect) {
+      std::tuple<double, double> wall = sp_->getWallPressure();
       energyFile << "\t" << setprecision(precision) << get<0>(wall);
       energyFile << "\t" << setprecision(precision) << get<1>(wall);
-      break;
-      default:
-      break;
     }
-    energyFile << endl;
+    // check for alignment
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      energyFile << "\t" << setprecision(precision) << sp_->getNeighborVelocityCorrelation();
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      std::tuple<double, double, double> orderParams = sp_->getVicsekOrderParameters();
+      energyFile << "\t" << setprecision(precision) << get<0>(orderParams);
+      energyFile << "\t" << setprecision(precision) << get<1>(orderParams);
+      energyFile << "\t" << setprecision(precision) << get<2>(orderParams);
+      if(order != 0.f) {
+        energyFile << "\t" << setprecision(precision) << sp_->getVicsekHigherOrderParameter(order);
+      }
+      energyFile << "\t" << setprecision(precision) << sp_->getVicsekVelocityCorrelation();
+    }
+    energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum() << endl;
   }
 
   void saveStrainEnergy(long step, double timeStep, long numParticles, double strain) {

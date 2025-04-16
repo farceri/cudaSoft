@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool readState = false, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, squarebc = false, roundbc = true, maxRvicsek = false;
   // input variables
@@ -52,8 +52,10 @@ int main(int argc, char **argv) {
   } else if(alignType == "vel") {
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
     whichDynamics = "vicsek-vel/";
+    whichDynamics = "vicsek/";
   } else {
     sp.setAlignType(simControlStruct::alignEnum::additive);
+    if(alignType == "force") whichDynamics = "vicsek-force/";
   }
 
   // set potential type
@@ -131,7 +133,7 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      outDir = outDir + "dynamics";
+      outDir = outDir + "dynamics-vel";
       if(logSave == true) outDir = outDir + "-log/";
       else outDir = outDir + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
