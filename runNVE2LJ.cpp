@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false, doubleT = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]), updateCount = 0;
   long step, maxStep = atof(argv[4]), initialStep = atol(argv[5]), checkPointFreq = int(maxStep / 10);
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
@@ -52,6 +52,7 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + argv[11] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+    sp.setEnergyCostant(ec);
   } else if(potType == "ljwca") {
     whichDynamics = whichDynamics + "-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
@@ -73,7 +74,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "dynamics/";
+    outDir = inDir + "test/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -182,8 +183,8 @@ int main(int argc, char **argv) {
       if(doubleT == true) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles, num1);
       } else {
-        ioSP.saveSimpleEnergyAB(step+initialStep, timeStep, numParticles);
-        //ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
+        //ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveSimplePressureEnergy(step+initialStep, timeStep, numParticles);
       }
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;

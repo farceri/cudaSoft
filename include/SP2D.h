@@ -75,6 +75,8 @@ public:
   double driving, taup;
   // Vicsek velocity interaction parameters
   double Jvicsek, Rvicsek;
+  // Reflection noise
+  double angleAmplitude;
   // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
@@ -416,6 +418,8 @@ public:
   void setVicsekParams(double driving_, double taup_, double Jvicsek_, double Rvicsek_);
   void getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, double &Rvicsek_);
 
+  void setReflectionNoise(double angleAmplitude_);
+
   void setAdhesionParams(double l1_, double l2_);
 
   void setLJcutoff(double LJcutoff_);
@@ -516,6 +520,8 @@ public:
 
   double getParticlePressure();
 
+  double getParticleTotalPressure();
+
   void calcParticleActiveStressTensor();
 
   double getParticleActivePressure();
@@ -528,7 +534,7 @@ public:
 
   std::tuple<double, double, double> getParticleStressComponents();
 
-  double getParticleWallPressure();
+  std::tuple<double, double> computeWallPressure();
 
   std::tuple<double, double> getWallPressure();
 

@@ -53,10 +53,10 @@ SP2D::SP2D(long nParticles, long dim) {
 	simControl.particleType = simControlStruct::particleEnum::passive;
 	simControl.noiseType = simControlStruct::noiseEnum::langevin2;
 	simControl.boundaryType = simControlStruct::boundaryEnum::pbc;
-	simControl.geometryType = simControlStruct::geometryEnum::squareWall; // this type is incompatible with pbc and leesEdwards
+	simControl.geometryType = simControlStruct::geometryEnum::squareWall;
 	simControl.neighborType = simControlStruct::neighborEnum::neighbor;
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
-	simControl.wallType = simControlStruct::wallEnum::WCA; // this type is incompatible with pbc and leesEdwards
+	simControl.wallType = simControlStruct::wallEnum::harmonic;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
 	simControl.alignType = simControlStruct::alignEnum::additive;
 	syncSimControlToDevice();
@@ -78,6 +78,7 @@ SP2D::SP2D(long nParticles, long dim) {
   ea = 1e05;
   el = 1;
   eb = 1;
+  angleAmplitude = 0.0;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -375,16 +376,15 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     setBoundaryType(simControlStruct::boundaryEnum::reflect);
     cout << "SP2D::setPotentialType: potentialType: none" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
-    setWallType(simControlStruct::wallEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: harmonic" << " wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
     cout << "SP2D::setPotentialType: potentialType: lennardJones" << " wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
     cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
+    setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: WCA" << " default wallType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
-    setWallType(simControlStruct::wallEnum::harmonic);
     cout << "SP2D::setPotentialType: potentialType: adhesive" << " wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
     cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " wallType: lennardJones" << endl;
@@ -1645,6 +1645,11 @@ void SP2D::getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, do
   //cout << "SP2D::getVicsekParams:: driving: " << driving_ << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
 }
 
+void SP2D::setReflectionNoise(double angleAmplitude_) {
+  angleAmplitude = angleAmplitude_;
+  //cout << "SP2D::setReflectionNoise:: angleAmplitude: " << angleAmplitude << endl;
+}
+
 void SP2D::setAdhesionParams(double l1_, double l2_) {
   l1 = l1_;
   l2 = l2_;
@@ -2112,16 +2117,19 @@ void SP2D::reflectParticleOnWall() {
 void SP2D::reflectParticleOnWallWithNoise() {
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
-  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randomAngle.begin(), randNum(-PI,PI));
+  thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randomAngle.begin(), wrappedGaussNum(0.f,1.f));
+  thrust::transform(d_randomAngle.begin(), d_randomAngle.end(), thrust::make_constant_iterator(angleAmplitude), d_randomAngle.begin(), thrust::multiplies<double>());
   const double *randAngle = thrust::raw_pointer_cast(&d_randomAngle[0]);
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::squareWall:
-    kernelReflectParticleFixedWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
+    kernelReflectParticleFixedWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, randAngle, wForce);
     break;
 		case simControlStruct::geometryEnum::roundWall:
-    kernelReflectParticleRoundWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, randAngle, pVel);
+    kernelReflectParticleRoundWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, randAngle, wForce);
     break;
     default:
     break;
@@ -2391,7 +2399,28 @@ double SP2D::getParticlePressure() {
     volume *= d_boxSize[dim];
     stress += d_stress[dim * nDim + dim];
   }
-  return stress / (nDim * volume);
+  stress /= nDim;
+  // add kinetic stress
+  stress += getParticleKineticEnergy();
+  stress /= volume;
+  return stress;
+}
+
+double SP2D::getParticleTotalPressure() {
+  calcParticleStressTensor();
+  double volume = 1.0;
+  double stress = 0.0;
+  for (long dim = 0; dim < nDim; dim++) {
+    volume *= d_boxSize[dim];
+    stress += d_stress[dim * nDim + dim];
+  }
+  // add non conservative stress
+  stress += getParticleWork();
+  stress /= nDim;
+  // add kinetic stress
+  stress += getParticleKineticEnergy();
+  stress /= volume;
+  return stress;
 }
 
 void SP2D::calcParticleActiveStressTensor() {
@@ -2444,26 +2473,37 @@ std::tuple<double, double, double> SP2D::getParticleStressComponents() {
    return std::make_tuple(stress_xx, stress_yy, stress_xy);
 }
 
-double SP2D::getParticleWallPressure() {
-  thrust::device_vector<double> d_wallStress(d_particleRad.size());
+// TODO: add roundWall geometry
+std::tuple<double, double> SP2D::computeWallPressure() {
+  thrust::device_vector<double> d_wallStress(d_particleForce.size());
+  thrust::fill(d_wallStress.begin(), d_wallStress.end(), double(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *wallStress = thrust::raw_pointer_cast(&d_wallStress[0]);
+  double boxLength = 0.;
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::squareWall:
     kernelCalcWallStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    boxLength = 2. * thrust::reduce(d_boxSize.begin(), d_boxSize.end(), double(0), thrust::plus<double>());
 		break;
 		case simControlStruct::geometryEnum::fixedSides2D:
     kernelCalcSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
+    boxLength = 2. * d_boxSize[1];
     break;
     default:
     break;
 	}
-  double length = 0.0;
-  for (long dim = 0; dim < nDim; dim++) {
-    length += 2 * d_boxSize[dim];
+  if(boxLength != 0.) {
+    typedef thrust::device_vector<double>::iterator Iterator;
+    strided_range<Iterator> xWallStress(d_wallStress.begin(), d_wallStress.end(), 2);
+    strided_range<Iterator> yWallStress(d_wallStress.begin() + 1, d_wallStress.end(), 2);
+    double xPressure = thrust::reduce(xWallStress.begin(), xWallStress.end(), double(0), thrust::plus<double>()) / boxLength;
+    double yPressure = thrust::reduce(yWallStress.begin(), yWallStress.end(), double(0), thrust::plus<double>()) / boxLength;
+    return std::make_tuple(xPressure, yPressure);
+  } else {
+    cout << "SP2D::computeWallPressure: Warning! boxLength is zero!" << endl;
+    return std::make_tuple(0, 0);
   }
-	return thrust::reduce(d_wallStress.begin(), d_wallStress.end(), double(0), thrust::plus<double>()) / length;
 }
 
 std::tuple<double, double> SP2D::getWallPressure() {
@@ -2485,12 +2525,12 @@ std::tuple<double, double> SP2D::getWallPressure() {
       double yForce = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
       return std::make_tuple(xForce, yForce);
     } else {
-      return std::make_tuple(0, 0);
       cout << "SP2D::getWallPressure: Warning! boxLength is zero!" << endl;
+      return std::make_tuple(0, 0);
     }
   } else {
-    return std::make_tuple(0, 0);
     cout << "SP2D::getWallPressure: WORK IN PROGRESS, only works for 2D" << endl;
+    return std::make_tuple(0, 0);
   }
 }
 

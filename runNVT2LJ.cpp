@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + argv[11] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+    sp.setEnergyCostant(ec);
   } else {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
@@ -183,8 +184,8 @@ int main(int argc, char **argv) {
     //sp.resetLastVelocities();
     sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
-      //ioSP.saveParticleWallEnergy(step+initialStep, timeStep, numParticles, range);
+      //ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Langevin 2LJ: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

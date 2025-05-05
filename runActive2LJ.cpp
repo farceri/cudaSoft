@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
   bool readNH = true, activeDir = true, justRun = false, conserve = false;
-  bool readAndMakeNewDir = true, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -77,6 +77,8 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + argv[13] + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+    ec = sqrt(ea * eb);
+    sp.setEnergyCostant(ec);
   } else {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
@@ -192,7 +194,8 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      //ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

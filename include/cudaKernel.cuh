@@ -1965,10 +1965,10 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 	}
 }
 
-__global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+__global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, double* pVel, const double* randAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM];
+		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -1978,7 +1978,14 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			default:
 			break;
 		}
+		// save previous velocity to compute momentum exchange across wall
+		getParticleVel(particleId, pVel, thisVel);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[particleId*d_nDim + dim] = 0.;
+		}
+		bool isWallx = false;
 		if(thisPos[0] < thisRad) {
+			isWallx = true;
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
@@ -1986,6 +1993,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
+			isWallx = true;
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = -PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
@@ -1993,7 +2001,9 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
+		bool isWally = false;
 		if(thisPos[1] < thisRad) {
+			isWally = true;
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = -0.5 * PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
@@ -2001,6 +2011,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			isWally = true;
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = 0.5 * PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
@@ -2008,13 +2019,19 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
+		if(isWallx || isWally) {
+		// compute momentum exchange and assign it to wForce
+			for (long dim = 0; dim < d_nDim; dim++) {
+				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+			}
+		}
 	}
 }
 
-__global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, const double* pPos, const double* randAngle, double* pVel) {
+__global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, const double* pPos, double* pVel, double* pAngle, const double* randAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM];
+		double thisPos[MAXDIM], wallForce[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2027,12 +2044,37 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 		// check if particle is far from the origin more than the box radius R minus the particle radius
 		double thisR, thisTheta;
 		cartesianToPolar(thisPos, thisR, thisTheta);
+		// save previous velocity to compute momentum exchange across wall
+		getParticleVel(particleId, pVel, thisVel);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[particleId*d_nDim + dim] = 0.;
+			wallForce[dim] = 0.;
+		}
 		if((d_boxRadius - thisR) < thisRad) {
 			// add Gaussian noise to the angle of reflection
 			auto reflectAngle = thisTheta + randAngle[particleId];
+			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
+			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::vicsek:
+				pAngle[particleId] = velAngle;
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
+			for (long dim = 0; dim < d_nDim; dim++) {
+				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+			}
+			// transform wallForce to polar coordinates and then assign to wForce
+			double radForce, thetaForce;
+			cartesianToPolar(wallForce, radForce, thetaForce);
+			wForce[particleId * d_nDim] = radForce;
+			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
@@ -2119,38 +2161,28 @@ __global__ void kernelCalcActiveStress(const double* pAngle, const double* pVel,
 }
 
 inline __device__ void calcWallStress(const double* thisPos, const double* wallPos, const double radSum, double* force) {
-  	auto distanceSq = 0.0;
-	auto gradMultiple = 0.0;
+  	auto distanceSq = 0.;
+	auto gradMultiple = 0.;
 	double ratio, ratio6, ratio12, forceShift;
 	double delta[MAXDIM];
 	for (long dim = 0; dim < d_nDim; dim++) {
-		force[dim] = 0.0;
 		delta[dim] = thisPos[dim] - wallPos[dim];
 		distanceSq += delta[dim] * delta[dim];
 	}
 	auto distance = sqrt(distanceSq);
 	auto overlap = 1 - distance / radSum;
-	switch (d_simControl.potentialType) {
-		case simControlStruct::potentialEnum::harmonic:
-		overlap = 1 - distance / radSum;
+	switch (d_simControl.wallType) {
+		case simControlStruct::wallEnum::harmonic:
 		if(overlap > 0) {
-			gradMultiple = d_ew * overlap / radSum;
+			gradMultiple = d_ec * overlap / radSum;
 		}
 		break;
-		case simControlStruct::potentialEnum::adhesive:
-		overlap = 1 - distance / radSum;
-		if (distance < (1 + d_l1) * radSum) {
-			gradMultiple = d_ew * overlap / radSum;
-		} else if ((distance >= (1 + d_l1) * radSum) && (distance < (1 + d_l2) * radSum)) {
-			gradMultiple = -(d_ew * d_l1 / (d_l2 - d_l1)) * (overlap + d_l2) / radSum;
-		}
-		break;
-		case simControlStruct::potentialEnum::WCA:
+		case simControlStruct::wallEnum::WCA:
 		ratio = radSum / distance;
 		ratio6 = pow(ratio, 6);
 		ratio12 = ratio6 * ratio6;
 		if (distance < (WCAcut * radSum)) {
-			gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance;
+			gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance;
 		}
 		break;
 		default:
@@ -2159,13 +2191,15 @@ inline __device__ void calcWallStress(const double* thisPos, const double* wallP
 		ratio12 = ratio6 * ratio6;
 		if (distance < (d_LJcutoff * radSum)) {
 			forceShift =  d_LJfshift / radSum;//calcLJForceShift(radSum);
-			gradMultiple = 24 * d_ew * (2 * ratio12 - ratio6) / distance - forceShift;
+			gradMultiple = 24 * d_ec * (2 * ratio12 - ratio6) / distance - forceShift;
 		}
 		break;
 	}
-	#pragma unroll (MAXDIM)
-	for (long dim = 0; dim < d_nDim; dim++) {
-		force[dim] = gradMultiple * delta[dim] / distance;
+	if (gradMultiple > 0) {
+		#pragma unroll (MAXDIM)
+		for (long dim = 0; dim < d_nDim; dim++) {
+			force[dim] = gradMultiple * delta[dim] / distance;
+		}
 	}
 }
 
@@ -2175,16 +2209,16 @@ __global__ void kernelCalcWallStress(const double* pRad, const double* pPos, dou
 		double thisPos[MAXDIM], wallPos[MAXDIM], force[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
     	auto radSum = pRad[particleId];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wallPos[dim] = 0;
+			force[dim] = 0;
+		}
 		auto range = 0.0;
-		wallStress[particleId] = 0;
-		switch (d_simControl.potentialType) {
-			case simControlStruct::potentialEnum::harmonic:
+		switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			range = radSum;
 			break;
-			case simControlStruct::potentialEnum::adhesive:
-			range = (1 + d_l2) * radSum;
-			break;
-			case simControlStruct::potentialEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			range = WCAcut * radSum;
 			break;
 			default:
@@ -2196,23 +2230,23 @@ __global__ void kernelCalcWallStress(const double* pRad, const double* pPos, dou
 			wallPos[0] = 0;
 			wallPos[1] = thisPos[1];
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[0];
+			wallStress[particleId * d_nDim] += force[0];
 		} else if((d_boxSizePtr[0] - thisPos[0]) < range) {
 			wallPos[0] = d_boxSizePtr[0];
 			wallPos[1] = thisPos[1];
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[0];
+			wallStress[particleId * d_nDim] += force[0];
 		}
 		if(thisPos[1] < range) {
 			wallPos[0] = thisPos[0];
 			wallPos[1] = 0;
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[1];
+			wallStress[particleId * d_nDim + 1] += force[1];
 		} else if((d_boxSizePtr[1] - thisPos[1]) < range) {
 			wallPos[0] = thisPos[0];
 			wallPos[1] = d_boxSizePtr[1];
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[1];
+			wallStress[particleId * d_nDim + 1] += force[1];
 		}
 	}
 }
@@ -2223,16 +2257,16 @@ __global__ void kernelCalcSides2DStress(const double* pRad, const double* pPos, 
 		double thisPos[MAXDIM], wallPos[MAXDIM], force[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
     	auto radSum = pRad[particleId];
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wallPos[dim] = 0;
+			force[dim] = 0;
+		}
 		auto range = 0.0;
-		wallStress[particleId] = 0;
-		switch (d_simControl.potentialType) {
-			case simControlStruct::potentialEnum::harmonic:
+		switch (d_simControl.wallType) {
+			case simControlStruct::wallEnum::harmonic:
 			range = radSum;
 			break;
-			case simControlStruct::potentialEnum::adhesive:
-			range = (1 + d_l2) * radSum;
-			break;
-			case simControlStruct::potentialEnum::WCA:
+			case simControlStruct::wallEnum::WCA:
 			range = WCAcut * radSum;
 			break;
 			default:
@@ -2244,12 +2278,12 @@ __global__ void kernelCalcSides2DStress(const double* pRad, const double* pPos, 
 			wallPos[0] = thisPos[0];
 			wallPos[1] = 0;
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[1];
+			wallStress[particleId + d_nDim + 1] += force[1];
 		} else if((d_boxSizePtr[1] - thisPos[1]) < range) {
 			wallPos[0] = thisPos[0];
 			wallPos[1] = d_boxSizePtr[1];
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId] += force[1];
+			wallStress[particleId + d_nDim + 1] += force[1];
 		}
 	}
 }
