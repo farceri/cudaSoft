@@ -23,12 +23,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false, justRun = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false, doubleT = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
   long numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]), updateCount = 0;
   long step, maxStep = atof(argv[4]), initialStep = atol(argv[5]), checkPointFreq = int(maxStep / 10);
   long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "test/";
+    outDir = inDir + "test-dt" + argv[2] + "/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -205,6 +205,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
+          ioSP.saveParticleForces(outDir);
           //ioSP.saveParticleNeighbors(outDir);
           if(nDim == 3) {
             ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
@@ -245,6 +246,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
+    ioSP.saveParticleForces(outDir);
     //ioSP.saveParticleNeighbors(outDir);
     if(nDim == 3) {
       ioSP.saveDumpPacking(outDir, numParticles, nDim, step);

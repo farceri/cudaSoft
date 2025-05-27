@@ -27,27 +27,39 @@ int main(int argc, char **argv) {
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = false, initAngles = false, initWall = false, saveFinal = true, logSave = false, linSave = true;
-  // variables
-  long maxStep = atof(argv[5]), initialStep = atof(argv[6]), numParticles = atol(argv[7]), nDim = 2;
+  bool readState = false, saveFinal = true, logSave = false, linSave = true, justRun = true;
+  bool initAngles = false, initWall = false;
+  // input variables
+  double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
+  long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
+  std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11];
+  // step variables
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, timeStep = atof(argv[2]), timeUnit, forceUnit, alphaUnit, sigma, LJcut = 4, cutDistance, cutoff = 0.5, waveQ;
-  double ew = 10*ec, Tinject = 1e-01, Rvicsek = 1.5, Jvicsek = atof(argv[3]), driving = 2, damping = 1, tp = atof(argv[4]);
+  // force and noise variables
+  double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
+  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
   double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec;
-  std::string outDir, currentDir, dirSample, energyFile, wallDir, whichDynamics = "active/";
-  std::string inDir = argv[1], potType = argv[8], particleType = argv[9], wallType = argv[10], dynType = argv[11];
+  std::string outDir, currentDir, dirSample, energyFile, wallDyn, wallDir, whichDynamics = "active/";
+
   // initialize sp object
 	SP2D sp(numParticles, nDim);
-  if(particleType == "vicsek") {
-    whichDynamics = "vicsek/";
-    sp.setParticleType(simControlStruct::particleEnum::vicsek);
-  } else if(particleType == "active") {
-    sp.setParticleType(simControlStruct::particleEnum::active);
-  } else {
-    cout << "Particles are set to be passive!" << endl;
-  }
   sp.setEnergyCostant(ec);
+  sp.setParticleType(simControlStruct::particleEnum::vicsek);
+
+  // set alignment type
+  if(alignType == "nonAdd") {
+    sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
+    whichDynamics = "vicsek-na/";
+  } else if(alignType == "vel") {
+    sp.setAlignType(simControlStruct::alignEnum::velAlign);
+    whichDynamics = "vicsek-vel/";
+    whichDynamics = "vicsek/";
+  } else {
+    sp.setAlignType(simControlStruct::alignEnum::additive);
+    if(alignType == "force") whichDynamics = "vicsek-force/";
+  }
+
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     sp.setLJcutoff(LJcut);
@@ -62,22 +74,29 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
+  sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+  sp.setWallEnergyScale(ew);
   if(wallType == "rigid") {
     whichDynamics = whichDynamics + "rigid/";
+    wallDyn = "rigid";
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
   } else if(wallType == "mobile") {
+    wallDyn = "mobile";
     whichDynamics = whichDynamics + "mobile/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::mobile);
     sp.setWallShapeEnergyScales(ea, el, eb);
   } else if(wallType == "plastic") {
     whichDynamics = whichDynamics + "plastic/";
+    wallDyn = "plastic";
     sp.setBoundaryType(simControlStruct::boundaryEnum::plastic);
     sp.setWallShapeEnergyScales(ea, el, eb);
   }else if(wallType == "reflect") {
     whichDynamics = whichDynamics + "reflect/";
+    wallDyn = "reflect";
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
   } else if(wallType == "fixed") {
     whichDynamics = whichDynamics + "fixed/";
+    wallDyn = "fixed";
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
@@ -86,51 +105,57 @@ int main(int argc, char **argv) {
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  if(dynType == "langevin") {
-    sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
-    damping = atof(argv[12]);
-    whichDynamics = whichDynamics + dynType + argv[12] + "/";
-  } else {
-    sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
-    readState = true;
-    cout << "Setting default overdamped brownian dynamics" << endl;
-  }
+  sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
+  whichDynamics = whichDynamics + "damping" + argv[5] + "/";
+  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
+  readState = true;
+  cout << "Setting default overdamped brownian dynamics" << endl;
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
-  if(particleType == "vicsek") dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
-  else dirSample = whichDynamics + "tp" + argv[4] + "/";
   // set input and output
   ioSPFile ioSP(&sp);
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      outDir = outDir + "dynamics";
-      if(logSave == true) outDir = outDir + "-log/";
-      else outDir = outDir + "/";
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        //if(initialStep != 0) {
-        inDir = outDir;
-        //}
-      } else {
-        std::experimental::filesystem::create_directory(outDir);
+  if (justRun == true) {
+    outDir = inDir + wallDyn + "/";
+    if(std::experimental::filesystem::exists(outDir) == false) {
+      std::experimental::filesystem::create_directory(outDir);
+    }
+    if (readAndSaveSameDir == false) {
+      if(wallType == "mobile" || wallType == "rough") {
+        initWall = true; // initializing from NVT
       }
     }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
+  } else {
+    if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
-      outDir = inDir + "../../" + dirSample;
-    } else {
-      initAngles = true; // initializing from NVT
-      initWall = true;
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
+      inDir = inDir + dirSample;
+      outDir = inDir;
+      if(runDynamics == true) {
+        outDir = outDir + "dynamics";
+        if(logSave == true) outDir = outDir + "-log/";
+        else outDir = outDir + "/";
+        if(std::experimental::filesystem::exists(outDir) == true) {
+          //if(initialStep != 0) {
+          inDir = outDir;
+          //}
+        } else {
+          std::experimental::filesystem::create_directory(outDir);
+        }
       }
-      outDir = inDir + dirSample;
+    } else {//start a new dyanmics
+      if(readAndMakeNewDir == true) {
+        readState = true;
+        outDir = inDir + "../../" + dirSample;
+      } else {
+        initAngles = true; // initializing from NVT
+        initWall = true;
+        if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+          std::experimental::filesystem::create_directory(inDir + whichDynamics);
+        }
+        outDir = inDir + dirSample;
+      }
+      std::experimental::filesystem::create_directory(outDir);
     }
-    std::experimental::filesystem::create_directory(outDir);
   }
   cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
@@ -140,30 +165,27 @@ int main(int argc, char **argv) {
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
+
   // initialization
   sigma = sp.getMeanParticleSigma();
   timeUnit = sigma / sqrt(ec);
-  forceUnit = ec / sigma;
   alphaUnit = ec / (sigma * sigma);
+  forceUnit = ec / sigma;
   Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
-  if(dynType == "langevin") driving = 2. * damping;
+  driving = 2. * damping; // this is necessary to keep the temperature equal to input value, es. 2
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
-  if(particleType == "vicsek") {
-    cout << "Vicsek - radius: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
-  }
+  cout << "Vicsek - range: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
   driving *= forceUnit;
   damping /= timeUnit;
-  if(particleType == "vicsek") {
-    Jvicsek *= alphaUnit;
-    Rvicsek *= sigma;
-    sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
-  } else sp.setSelfPropulsionParams(driving, tp);
-  if(wallType == "plastic") sp.setPlasticVariables(damping);
+  Jvicsek *= alphaUnit;
+  Rvicsek *= sigma;
+  sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
   ioSP.saveLangevinParams(outDir, damping);
-  // initialize simulation
+
+  // initialize integration scheme
   sp.initSoftParticleLangevin(Tinject, damping, readState);
   cutDistance = sp.setDisplacementCutoff(cutoff);
   sp.calcParticleNeighbors(cutDistance);
@@ -176,6 +198,7 @@ int main(int argc, char **argv) {
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+
   // run integrator
   while(step != maxStep) {
     sp.softParticleLangevinLoop();

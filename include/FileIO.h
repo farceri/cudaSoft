@@ -872,11 +872,14 @@ public:
     saveParams.close();
   }
 
+  void saveParticleForces(string dirName) {
+    save2DFile(dirName + "particleForce.dat", sp_->getParticleForces(), sp_->nDim);
+  }
+
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
     if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      //save2DFile(dirName + "particleForce.dat", sp_->getParticleForces(), sp_->nDim);
       if(sp_->nDim == 2) {
         save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
       } else {

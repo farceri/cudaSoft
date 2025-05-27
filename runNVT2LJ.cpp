@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
   bool readNH = false, dampingDir = true, justRun = false, conserve = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
-  long numParticles = atol(argv[7]), nDim = atol(argv[8]), maxStep = atof(argv[4]), num1 = atol(argv[9]);
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  long maxStep = atof(argv[4]), numParticles = atol(argv[7]), nDim = atol(argv[8]), num1 = atol(argv[9]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
       sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
     }
   }
+  dynType = "test-dt";
+  dynType = dynType + argv[2];
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -201,6 +203,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
+          ioSP.saveParticleForces(outDir);
         }
       }
     }
@@ -238,6 +241,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
+    ioSP.saveParticleForces(outDir);
     //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();

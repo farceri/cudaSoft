@@ -12,7 +12,7 @@ CUDA_ROOT_DIR=/usr/lib/x86_64-linux-gnu
 ## CC COMPILER OPTIONS ##
 
 # CC compiler options:
-CC=/usr/bin/g++
+CC=/usr/bin/g++-11
 #CC=/gpfs/loomis/apps/avx/software/GCCcore/10.2.0/bin/g++
 CC_FLAGS= -O3
 CC_LIBS= -lstdc++fs
@@ -24,7 +24,7 @@ CC_LIBS= -lstdc++fs
 # NVCC compiler options:
 NVCC=/usr/bin/nvcc
 #NVCC=nvcc
-NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr #-G
+NVCC_FLAGS= -O3 -Wno-deprecated-gpu-targets --expt-extended-lambda --expt-relaxed-constexpr -ccbin /usr/bin/g++-11 #-G
 NVCC_LIBS=
 
 LFLAGS= -lm -Wno-deprecated-gpu-targets
@@ -78,8 +78,8 @@ INC_DIR = include
 #EXE = runExternalField
 #EXE = runNPT
 #EXE = runABP
-EXE = runVicsek
-#EXE = runWall
+#EXE = runVicsek
+EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE
@@ -108,6 +108,7 @@ OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simula
 # Compiler-specific flags:
 GENCODE_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 GENCODE_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
+
 GENCODE = $(GENCODE_SM60)
 
 # Link C++ and CUDA compiled object files to target executable:
