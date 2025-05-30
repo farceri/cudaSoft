@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   bool readNH = true, activeDir = true, justRun = false, conserve = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
-  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
       sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
     }
   }
-  dynType = "test-dt";
+  dynType = "dynamics-dt";
   dynType = dynType + argv[2];
   if(readNH == true) {
     whichDynamics = "nh";
