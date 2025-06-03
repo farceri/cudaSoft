@@ -414,7 +414,8 @@ public:
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
     // check for wall pressure
-    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::reflect) {
+    if(sp_->simControl.boundaryType != simControlStruct::boundaryEnum::pbc &&
+       sp_->simControl.boundaryType != simControlStruct::boundaryEnum::leesEdwards) {
       std::tuple<double, double> wall = sp_->getWallPressure();
       energyFile << "\t" << setprecision(precision) << get<0>(wall);
       energyFile << "\t" << setprecision(precision) << get<1>(wall);

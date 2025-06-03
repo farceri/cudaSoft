@@ -233,7 +233,7 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 			break;
 		}
 		break;
-		default: // reflect, reflectNoise, rigid and mobile
+		default: // reflect, reflectNoise, rough, rigid, mobile and plastic
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];
@@ -307,7 +307,7 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 			break;
 		}
 		break;
-		default: // reflect, reflectNoise, rigid and mobile
+		default: // reflect, reflectNoise, rough, rigid, mobile and plastic
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
 			delta = thisVec[dim] - otherVec[dim];

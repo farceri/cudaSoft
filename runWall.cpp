@@ -76,7 +76,19 @@ int main(int argc, char **argv) {
   }
   sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
   sp.setWallEnergyScale(ew);
-  if(wallType == "rigid") {
+  if(wallType == "reflect") {
+    whichDynamics = whichDynamics + "reflect/";
+    wallDyn = "reflect";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
+  } else if(wallType == "fixed") {
+    whichDynamics = whichDynamics + "fixed/";
+    wallDyn = "fixed";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+  } else if(wallType == "rough") {
+    whichDynamics = whichDynamics + "rough/";
+    wallDyn = "rough";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::rough);
+  } else if(wallType == "rough") {
     whichDynamics = whichDynamics + "rigid/";
     wallDyn = "rigid";
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
@@ -90,14 +102,6 @@ int main(int argc, char **argv) {
     wallDyn = "plastic";
     sp.setBoundaryType(simControlStruct::boundaryEnum::plastic);
     sp.setWallShapeEnergyScales(ea, el, eb);
-  }else if(wallType == "reflect") {
-    whichDynamics = whichDynamics + "reflect/";
-    wallDyn = "reflect";
-    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
-  } else if(wallType == "fixed") {
-    whichDynamics = whichDynamics + "fixed/";
-    wallDyn = "fixed";
-    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
     sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
@@ -121,7 +125,7 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
     if (readAndSaveSameDir == false) {
-      if(wallType == "mobile" || wallType == "rough") {
+      if(wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
         initWall = true; // initializing from NVT
       }
     }

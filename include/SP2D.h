@@ -24,7 +24,7 @@ using std::tuple;
 struct simControlStruct {
   enum class particleEnum {passive, active, vicsek} particleType;
   enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian} noiseType;
-  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile, plastic} boundaryType;
+  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rough, rigid, mobile, plastic} boundaryType;
   enum class geometryEnum {squareWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;

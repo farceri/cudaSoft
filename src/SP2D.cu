@@ -298,6 +298,10 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
     d_randomAngle.resize(numParticles);
     thrust::fill(d_randomAngle.begin(), d_randomAngle.end(), double(0));
     cout << "SP2D::setBoundaryType: boundaryType: reflectnoise" << endl;
+  } else if(simControl.boundaryType == simControlStruct::boundaryEnum::rough) {
+    setNeighborType(simControlStruct::neighborEnum::neighbor);
+    setGeometryType(simControlStruct::geometryEnum::roundWall);
+    cout << "SP2D::setBoundaryType: boundaryType: rough" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
     setNeighborType(simControlStruct::neighborEnum::neighbor);
     setGeometryType(simControlStruct::geometryEnum::roundWall);
@@ -312,7 +316,7 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
     lgamma = 1.;
     cout << "SP2D::setBoundaryType: boundaryType: plastic" << endl;
   } else {
-    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, fixed, reflect, reflectNoise, rigid, mobile and plastic" << endl;
+    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, fixed, reflect, reflectNoise, rough, rigid, mobile and plastic" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1227,7 +1231,7 @@ double SP2D::getSoftWaveNumber() {
       if(nDim == 2) {
         return PI / (2. * sqrt(boxRadius * boxRadius * getParticlePhi() / numParticles));
       } else {
-        cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rigid, mobile and plastic geometry is allowed!" << endl;
+        cout << "SP2D::getSoftWaveNumber: only dimensions 2 in roundWall, rough, rigid, mobile and plastic geometry is allowed!" << endl;
         return 0;
       }
       break;
@@ -1574,6 +1578,7 @@ void SP2D::initMobileWall() {
 
 void SP2D::initializeWall() {
   switch (simControl.boundaryType) {
+    case simControlStruct::boundaryEnum::rough:
     case simControlStruct::boundaryEnum::rigid:
     initRigidWall();
     break;
@@ -2044,6 +2049,15 @@ void SP2D::calcParticleForceEnergy() {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::fixed:
     calcParticleFixedWallInteraction();
+    break;
+    case simControlStruct::boundaryEnum::rough:
+    // Setting wallForce and wallEnergy to zero here and in the next case 
+    // is necessary because calcParticleWallInteraction does not reset them
+    // since it is used in combination with the deformable wall force functions
+    // which do reset the wall forces and energies.
+    thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
+    thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
+    calcParticleWallInteraction();
     break;
     case simControlStruct::boundaryEnum::rigid:
     thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
@@ -2725,6 +2739,9 @@ double SP2D::getWallEnergy() {
     case simControlStruct::boundaryEnum::rigid:
     return getWallPotentialEnergy() + getWallRotationalKineticEnergy();
     break;
+    case simControlStruct::boundaryEnum::rough:
+    return getWallPotentialEnergy();
+    break;
     default:
     return 0;
     break;
@@ -3012,6 +3029,7 @@ void SP2D::calcParticleNeighborList(double cutDistance) {
 		kernelCalcParticleNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, cutDistance);
 	}
   switch (simControl.boundaryType) {
+    case simControlStruct::boundaryEnum::rough:
     case simControlStruct::boundaryEnum::rigid:
     case simControlStruct::boundaryEnum::mobile:
     case simControlStruct::boundaryEnum::plastic:
