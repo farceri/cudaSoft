@@ -106,16 +106,17 @@ void SoftParticleLangevin::updatePosition(double timeStep) {
   }
   
   if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    sp_->wallAngle += sp_->wallOmega * timeStep;
+    double deltaAngle = sp_->wallOmega * timeStep;
+    sp_->wallAngle += deltaAngle;
     // apply rotation to wall monomers
     long s_nDim(sp_->nDim);
-    double s_wallAngle(sp_->wallAngle);
+    //double s_wallAngle(sp_->wallAngle);
     auto s = thrust::counting_iterator<long>(0);
     double* wPos = thrust::raw_pointer_cast(&(sp_->d_wallPos[0]));
     auto rotateWallMonomers = [=] __device__ (long wallId) {
       double newPos[MAXDIM];
-			newPos[0] = wPos[wallId * s_nDim] * cos(s_wallAngle) - wPos[wallId * s_nDim + 1] * sin(s_wallAngle);
-			newPos[1] = wPos[wallId * s_nDim] * sin(s_wallAngle) + wPos[wallId * s_nDim + 1] * cos(s_wallAngle);
+			newPos[0] = wPos[wallId * s_nDim] * cos(deltaAngle) - wPos[wallId * s_nDim + 1] * sin(deltaAngle);
+			newPos[1] = wPos[wallId * s_nDim] * sin(deltaAngle) + wPos[wallId * s_nDim + 1] * cos(deltaAngle);
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         wPos[wallId * s_nDim + dim] = newPos[dim];

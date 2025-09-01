@@ -28,12 +28,12 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = true, activeDir = true, justRun = false, conserve = false;
+  bool readNH = true, activeDir = true, justRun = false, conserve = false, profile = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   // variables
   bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
-  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2), saveEnergyFreq = int(linFreq / 10);
   long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), waveQ;
   double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
@@ -60,8 +60,8 @@ int main(int argc, char **argv) {
       sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
     }
   }
-  dynType = "dynamics-dt";
-  dynType = dynType + argv[2];
+  //dynType = "test";
+  //dynType = dynType + argv[2];
   if(readNH == true) {
     whichDynamics = "nh";
   }
@@ -82,6 +82,7 @@ int main(int argc, char **argv) {
     ec = sqrt(ea * eb);
     sp.setEnergyCostant(ec);
   } else {
+    cout << potType << " is not a valid potential type" << endl;
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
   }
@@ -192,6 +193,7 @@ int main(int argc, char **argv) {
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+  if(profile == true) sp.define2DStressGrid(2.5); // set bin size for stress profile
   // run integrator
   while(step != maxStep) {
     sp.softParticleLangevinLoop(conserve);
@@ -214,6 +216,7 @@ int main(int argc, char **argv) {
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
           ioSP.saveParticleForces(outDir);
+          if(profile == true) ioSP.save2DStressProfile(outDir);
           //ioSP.saveParticleNeighbors(outDir);
         }
       }
@@ -230,6 +233,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        if(profile == true) ioSP.save2DStressProfile(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
       }
     }
@@ -238,6 +242,7 @@ int main(int argc, char **argv) {
         currentDir = outDir + "/t" + std::to_string(initialStep + step) + "/";
         std::experimental::filesystem::create_directory(currentDir);
         ioSP.saveParticleState(currentDir);
+        if(profile == true) ioSP.save2DStressProfile(currentDir);
         //ioSP.saveParticleNeighbors(currentDir);
       }
     }
@@ -252,6 +257,7 @@ int main(int argc, char **argv) {
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
     ioSP.saveParticleForces(outDir);
+    if(profile == true) ioSP.save2DStressProfile(outDir);
     //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();

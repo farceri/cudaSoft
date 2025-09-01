@@ -69,6 +69,10 @@ __constant__ double d_eb;
 __constant__ double d_el;
 __constant__ double d_stiff = 1;
 __constant__ double d_extSq = 1;
+// Stress profile bin size
+__constant__ double d_binSize;
+__constant__ long d_nBinsX;
+__constant__ long d_nBinsY;
 // Gravity
 __constant__ double d_gravity;
 __constant__ double d_ew; // wall
@@ -350,8 +354,7 @@ inline __device__ void getWallPos(const long wId, const double* wPos, double* tW
 inline __device__ void getPBCParticlePos(const long pId, const double* pPos, double* tPos) {
 	#pragma unroll (MAXDIM)
   	for (long dim = 0; dim < d_nDim; dim++) {
-		tPos[dim] = pPos[pId * d_nDim + dim];
-		tPos[dim] -= floor(tPos[dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
+		tPos[dim] = pPos[pId * d_nDim + dim] - floor(pPos[pId * d_nDim + dim] / d_boxSizePtr[dim]) * d_boxSizePtr[dim];
 	}
 }
 
@@ -1327,17 +1330,15 @@ __global__ void kernelCalcParticleSidesInteraction3D(const double* pRad, const d
 __global__ void kernelCalcParticleRoundWallInteraction(const double* pRad, const double* pPos, double* pForce, double* pEnergy, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], wallPos[MAXDIM], wallForce[MAXDIM];
+		double thisPos[MAXDIM], wallPos[MAXDIM];
 		// we don't zero out the force and the energy because this function always
 		// gets called after the particle-particle interaction is computed
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		auto radSum = thisRad;
 		for (long dim = 0; dim < d_nDim; dim++) {
-			wForce[particleId*d_nDim + dim] = 0.;
-			wallForce[dim] = 0.;
+			wForce[particleId * d_nDim + dim] = 0.;
 		}
-		auto interaction = 0.;
 		// check if particle is far from the origin more than the box radius R minus the particle radius
 		double thisR, thisTheta;
 		cartesianToPolar(thisPos, thisR, thisTheta);
@@ -1346,25 +1347,17 @@ __global__ void kernelCalcParticleRoundWallInteraction(const double* pRad, const
 			wallPos[1] = d_boxRadius * sin(thisTheta);
 			switch (d_simControl.wallType) {
 			case simControlStruct::wallEnum::harmonic:
-			interaction = calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], wallForce);
+			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
 			break;
 			case simControlStruct::wallEnum::lennardJones:
-			interaction = calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], wallForce);
+			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
 			break;
 			case simControlStruct::wallEnum::WCA:
-			interaction = calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], wallForce);
+			pEnergy[particleId] += calcWallWCAInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
 			break;
 			default:
 			break;
 			}
-		}
-		if(interaction != 0.) {
-			pEnergy[particleId] += interaction;
-			// transform wallForce to polar coordinates and then assign to wForce
-			double radForce, thetaForce;
-			cartesianToPolar(wallForce, radForce, thetaForce);
-			wForce[particleId * d_nDim] = radForce;
-			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
@@ -1454,8 +1447,10 @@ __global__ void kernelCalcWallAngularAcceleration(const double* wPos, const doub
 		double thisPos[MAXDIM];
 		getWallPos(wallId, wPos, thisPos);
 		auto distanceSq = 0.;
+		mAlpha[wallId] = 0.;
 		#pragma unroll (MAXDIM)
 		for (long dim = 0; dim < d_nDim; dim++) {
+			// distance from the origin
 			distanceSq += thisPos[dim] * thisPos[dim];
 		}
 		mAlpha[wallId] = (thisPos[0] * wForce[wallId * d_nDim + 1] - thisPos[1] * wForce[wallId * d_nDim]) / distanceSq;
@@ -2031,7 +2026,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, const double* pPos, double* pVel, double* pAngle, const double* randAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], wallForce[MAXDIM], thisVel[MAXDIM];
+		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2116,7 +2111,7 @@ __global__ void kernelCalcFlowVelocity(const double* pPos, const double* sHeight
 	}
 }
 
-__global__ void kernelCalcStressTensor(const double* pRad, const double* pPos, const double* pVel, double* pStress) {
+__global__ void kernelCalcStressTensor(const double* pRad, const double* pPos, double* pStress) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double otherRad, thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], force[MAXDIM];
@@ -2143,6 +2138,48 @@ __global__ void kernelCalcStressTensor(const double* pRad, const double* pPos, c
 					// cross terms
 					pStress[1] += delta[0] * force[1];
 					pStress[2] += delta[1] * force[0];
+				}
+			}
+		}
+	}
+}
+
+__global__ void kernelCalc2DStressProfile(const double* pRad, const double* pPos, const double* pVel, double* pKinStress, double* pConfStress) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		// Get bin index
+		double pbcPos[MAXDIM];
+		getPBCParticlePos(particleId, pPos, pbcPos);
+		long binX = long(pbcPos[0] / d_binSize);
+		long binY = long(pbcPos[1] / d_binSize);
+
+		if ((binX < 0 || binX >= d_nBinsX) || (binY < 0 || binY >= d_nBinsY)) {
+			//printf("Bin outside of range %ld %ld %ld %ld\n", binX, binY, d_nBinsX, d_nBinsY);
+			return;
+		}
+    	int baseIndex = 2 * (binY * d_nBinsX + binX); // 2 components: xx, yy
+
+		// kinetic stress
+		atomicAdd(&pKinStress[baseIndex], pVel[particleId * d_nDim] * pVel[particleId * d_nDim]);
+		atomicAdd(&pKinStress[baseIndex + 1], pVel[particleId * d_nDim + 1] * pVel[particleId * d_nDim + 1]);
+		//if (particleId == 0) printf("kinetic stress: %lf %lf\n", pKinStress[baseIndex], pKinStress[baseIndex + 1]);
+
+		// configurational stress
+		double thisPos[MAXDIM], otherPos[MAXDIM], delta[MAXDIM], force[MAXDIM];
+		double otherRad, thisRad = pRad[particleId];
+		getParticlePos(particleId, pPos, thisPos);
+		for (long nListId = 0; nListId < d_partMaxNeighborListPtr[particleId]; nListId++) {
+			long otherId = d_partNeighborListPtr[particleId*d_partNeighborListSize + nListId];
+			if(extractParticleNeighbor(particleId, nListId, pPos, pRad, otherPos, otherRad)) {
+				auto radSum = thisRad + otherRad;
+				auto gradMultiple = calcGradMultiple(particleId, otherId, thisPos, otherPos, radSum);
+				if(gradMultiple != 0.0) {
+					auto distance = calcDeltaAndDistance(thisPos, otherPos, delta);
+					for (long dim = 0; dim < d_nDim; dim++) {
+						force[dim] = gradMultiple * delta[dim] / distance;
+					}
+					atomicAdd(&pConfStress[baseIndex], delta[0] * force[0]);
+					atomicAdd(&pConfStress[baseIndex + 1], delta[1] * force[1]);
 				}
 			}
 		}
@@ -2981,4 +3018,4 @@ __global__ void kernelUpdateWallVel(double* wVel, const double* wForce, const do
 }
 
 
-#endif /* DPM2DKERNEL_CUH_ */
+#endif /* KERNEL_CUH_ */

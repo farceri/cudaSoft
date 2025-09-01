@@ -99,6 +99,11 @@ public:
   double cutoff, cutDistance, rcut;
   long updateCount;
   bool shift;
+  // stress profile bin size
+  double binSize, gridSize;
+  long nBinsX, nBinsY;
+  thrust::device_vector<double> d_confStress;
+  thrust::device_vector<double> d_kinStress;
 
   // dynamical particle variables
   thrust::device_vector<double> d_particleRad;
@@ -301,10 +306,13 @@ public:
 
   double getMaxParticleSigma();
 
-  void setPBC();
-
   void setParticlePositions(thrust::host_vector<double> &particlePos_);
   void setPBCParticlePositions(thrust::host_vector<double> &particlePos_);
+
+  void setPBC();
+
+  void shrinkRadialCoordinates(double scale_);
+  
   thrust::host_vector<double> getParticlePositions();
   thrust::host_vector<double> getPBCParticlePositions();
 
@@ -393,6 +401,8 @@ public:
   void initializeParticleAngles();
 
   void setWallShapeEnergyScales(double ea_, double el_, double eb_);
+
+  void setRigidWallParams(long numWall_, double wallRad_);
 
   void setMobileWallParams(long numWall_, double wallRad_, double wallArea0_);
 
@@ -518,6 +528,12 @@ public:
 
   void calcParticleStressTensor();
 
+  void define2DStressGrid(double binSize_ = 2.5);
+
+  void calc2DStressProfile();
+  
+  thrust::host_vector<double> get2DStressProfile();
+
   double getParticlePressure();
 
   double getParticleTotalPressure();
@@ -535,6 +551,12 @@ public:
   std::tuple<double, double, double> getParticleStressComponents();
 
   std::tuple<double, double> computeWallPressure();
+
+  void convertFixedWallForceToRadial();
+
+  void convertRoughWallForceToRadial();
+
+  void convertMobileWallForceToRadial();
 
   std::tuple<double, double> getWallPressure();
 

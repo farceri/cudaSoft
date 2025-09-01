@@ -28,18 +28,19 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "damping" directory for all the previous options: dampingDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = false, dampingDir = true, justRun = false, conserve = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  // variables
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
-  long maxStep = atof(argv[4]), numParticles = atol(argv[7]), nDim = atol(argv[8]), num1 = atol(argv[9]);
-  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double damping, inertiaOverDamping = atof(argv[6]), sigma, forceUnit, timeUnit, range = 3;
-  double ew = 1e-03, LJcut = 4, cutDistance, cutoff = 0.5, waveQ, Tinject = atof(argv[3]);
-  double ec = 1, ea = atof(argv[11]), eb = ea, eab = 0.5, timeStep = atof(argv[2]);
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1];
-  std::string dynType = argv[12], dirSample, whichDynamics = "langevin";
+  bool dampingDir = true, conserve = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
+  bool readNH = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), inertiaOverDamping = atof(argv[9]);
+  long maxStep = atof(argv[4]), initialStep = atol(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]);
+  std::string inDir = argv[1], potType = argv[10], dynType = argv[11];
+  // other variables
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2), saveEnergyFreq = linFreq;
+  long step = 0, updateCount = 0, firstDecade = 0, multiple = 1, saveFreq = 1;
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, sigma, timeUnit, forceUnit, damping;
+  double ec = 1, ew = ec, ea = 2, eb = ea, eab = 0.5, range = 3;
+  std::string energyFile, outDir, currentDir, dirSample, whichDynamics = "langevin";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -59,26 +60,24 @@ int main(int argc, char **argv) {
       sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
     }
   }
-  dynType = "test-dt";
-  dynType = dynType + argv[2];
   if(readNH == true) {
     whichDynamics = "nh";
   }
-  if(potType == "ljwca") {
-    whichDynamics = "langevin-ljwca/";
+  if(potType == "2lj") {
+    whichDynamics = whichDynamics + "-2lj/";
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+    sp.setEnergyCostant(ec);
+  } else if(potType == "ljwca") {
+    whichDynamics = whichDynamics + "-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
-    whichDynamics = "langevin-ljmp/";
+    whichDynamics = whichDynamics + "-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-  } else if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[11] + "/";
-    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
-    sp.setEnergyCostant(ec);
   } else {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
@@ -86,13 +85,14 @@ int main(int argc, char **argv) {
   if(dampingDir == true) {
     readNH = false;
     whichDynamics = "damping";
-    dirSample = whichDynamics + argv[6] + "/";
+    dirSample = whichDynamics + argv[9] + "/";
   } else {
     dirSample = whichDynamics + "T" + argv[3] + "/";
   }
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
+    //outDir = inDir + "test-dt" + argv[2] + "/";
     outDir = inDir + dynType + "/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
@@ -107,7 +107,7 @@ int main(int argc, char **argv) {
       outDir = inDir;
       if(runDynamics == true) {
         if(readNH == true) {
-          outDir = outDir + "damping" + argv[6] + "/";
+          outDir = outDir + "damping" + argv[9] + "/";
         }
         inDir = outDir;
         if(logSave == true) {
@@ -187,9 +187,9 @@ int main(int argc, char **argv) {
     sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
       //ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
-      ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.savePressureEnergyAB(step+initialStep, timeStep, numParticles, false);
       if(step % checkPointFreq == 0) {
-        cout << "Langevin 2LJ: current step: " << step + initialStep;
+        cout << "Langevin: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " W/N: " << sp.getParticleWork() / numParticles;
         cout << " T: " << sp.getParticleTemperature();

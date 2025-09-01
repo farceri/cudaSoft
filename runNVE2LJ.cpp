@@ -27,14 +27,18 @@ int main(int argc, char **argv) {
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = true, alltoall = false, fixedbc = false, scaleVel = false, doubleT = false;
+  bool readNH = true, alltoall = false, fixedbc = false, scaleVel = true, doubleT = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = false;
-  long numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]), updateCount = 0;
-  long step, maxStep = atof(argv[4]), initialStep = atol(argv[5]), checkPointFreq = int(maxStep / 10);
-  long linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10), firstDecade = 0, multiple = 1, saveFreq = 1;
-  double ec = 1, ew = ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = atof(argv[11]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), Tinject2 = atof(argv[9]), range = 3;
-  std::string outDir, potType = argv[10], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nve";
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), Tinject2 = atof(argv[9]);
+  long maxStep = atof(argv[4]), initialStep = atol(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]);
+  std::string inDir = argv[1], potType = argv[10];
+  // other variables
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 5), saveEnergyFreq = linFreq;
+  long step, updateCount = 0, firstDecade = 0, multiple = 1, saveFreq = 1;
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, sigma, timeUnit;
+  double ec = 1, ew = ec, ea = 2, eb = ea, eab = 0.5, range = 3;
+  std::string energyFile, outDir, currentDir, dirSample, whichDynamics = "nve";
   std::tuple<double, double, double> Temps;
   if(nDim == 3) {
     LJcut = 2.5;
@@ -49,7 +53,7 @@ int main(int argc, char **argv) {
     whichDynamics = "nh";
   }
   if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[11] + "/";
+    whichDynamics = whichDynamics + "-2lj/";
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
     sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
     sp.setEnergyCostant(ec);
@@ -74,7 +78,13 @@ int main(int argc, char **argv) {
   ioSPFile ioSP(&sp);
   // set input and output
   if(justRun == true) {
-    outDir = inDir + "test-dt" + argv[2] + "/";
+    //outDir = inDir + "test-dt" + argv[2] + "/";
+    //outDir = inDir + "shuffle/";
+    if(scaleVel == true) {
+      outDir = inDir + "nve-rescale/";
+    } else {
+      outDir = inDir + "nve/";
+    }
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
@@ -184,7 +194,7 @@ int main(int argc, char **argv) {
         ioSP.saveParticleDoubleEnergy(step+initialStep, timeStep, numParticles, num1);
       } else {
         //ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
-        ioSP.saveSimplePressureEnergy(step+initialStep, timeStep, numParticles);
+        ioSP.saveSimplePressureEnergyAB(step+initialStep, timeStep, numParticles, false);
       }
       if(step % checkPointFreq == 0) {
         cout << "NVE: current step: " << step;
@@ -205,7 +215,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleForces(outDir);
+          //ioSP.saveParticleForces(outDir);
           //ioSP.saveParticleNeighbors(outDir);
           if(nDim == 3) {
             ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
@@ -246,7 +256,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleForces(outDir);
+    //ioSP.saveParticleForces(outDir);
     //ioSP.saveParticleNeighbors(outDir);
     if(nDim == 3) {
       ioSP.saveDumpPacking(outDir, numParticles, nDim, step);

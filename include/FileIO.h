@@ -24,6 +24,7 @@ public:
   ofstream energyFile;
   ofstream memoryFile;
   ofstream corrFile;
+  ofstream wallFile;
   SP2D * sp_;
 
   ioSPFile() = default;
@@ -62,6 +63,22 @@ public:
       cerr << "ioSPFile::openEnergyFile: error: could not open input file " << fileName << endl;
       exit(1);
     }
+  }
+
+  void closeEnergyFile() {
+    energyFile.close();
+  }
+
+  void openWallFile(string fileName) {
+    wallFile = ofstream(fileName.c_str());
+    if (!wallFile.is_open()) {
+      cerr << "ioSPFile::openWallFile: error: could not open input file " << fileName << endl;
+      exit(1);
+    }
+  }
+
+  void closeWallFile() {
+    wallFile.close();
   }
 
   void openMemoryFile(string fileName) {
@@ -120,12 +137,35 @@ public:
     energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     energyFile << setprecision(precision) << epot / numParticles << "\t";
     energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    std::tuple<double, double, long> eab = sp_->getParticleEnergyAB();
+    long numParticlesAB = get<2>(eab);
+    energyFile << setprecision(precision) << get<0>(eab) << "\t";
+    energyFile << setprecision(precision) << get<1>(eab) << "\t";
+    energyFile << numParticlesAB << endl;
+  }
+
+  void saveSimplePressureEnergyAB(long step, double timeStep, long numParticles, bool wallPressure = false) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    energyFile << step << "\t" << step * timeStep << "\t";
+    energyFile << setprecision(precision) << epot << "\t";
+    energyFile << setprecision(precision) << ekin << "\t";
+    energyFile << setprecision(precision) << etot << "\t";
     std::tuple<double, double, long> eab = sp_->getParticleEnergyAB();
     long numParticlesAB = get<2>(eab);
     energyFile << setprecision(precision) << get<0>(eab) << "\t";
     energyFile << setprecision(precision) << get<1>(eab) << "\t";
     energyFile << numParticlesAB << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << endl;
+    energyFile << setprecision(precision) << sp_->getParticlePressure();
+    if(wallPressure == true) {
+      std::tuple<double, double> wallPressure = sp_->computeWallPressure();
+      energyFile << "\t" << setprecision(precision) << get<0>(wallPressure);
+      energyFile << "\t" << setprecision(precision) << get<1>(wallPressure) << endl;
+    } else {
+      energyFile << endl;
+    }
   }
 
   void saveStrainSimpleEnergy(long step, double timeStep, long numParticles, double strain) {
@@ -200,32 +240,6 @@ public:
     }
   }
 
-  void saveWallEnergy(long step, double timeStep, long numParticles) {
-    double epot = sp_->getParticlePotentialEnergy();
-    double ekin = sp_->getParticleKineticEnergy();
-    double etot = epot + ekin;
-    double edamp = sp_->getDampingWork();
-    double enoise = sp_->getNoiseWork();
-    double heat = edamp + enoise;
-    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
-    energyFile << setprecision(precision) << epot / numParticles << "\t";
-    energyFile << setprecision(precision) << ekin / numParticles << "\t";
-    energyFile << setprecision(precision) << etot / numParticles << "\t";
-    energyFile << setprecision(precision) << edamp / numParticles << "\t";
-    energyFile << setprecision(precision) << enoise / numParticles;
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
-      double eactive = sp_->getSelfPropulsionWork();
-      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
-      heat += eactive;
-    } else {
-      energyFile << "\t";
-    }
-    energyFile << setprecision(precision) << heat / numParticles << "\t";
-    std::tuple<double, double> wallPressure = sp_->computeWallPressure();
-    energyFile << setprecision(precision) << get<0>(wallPressure) << "\t";
-    energyFile << setprecision(precision) << get<1>(wallPressure) << endl;
-  }
-
   void saveEnergyAB(long step, double timeStep, long numParticles) {
     double epot = sp_->getParticlePotentialEnergy();
     double ekin = sp_->getParticleKineticEnergy();
@@ -253,6 +267,68 @@ public:
     energyFile << setprecision(precision) << get<1>(eab) << "\t";
     energyFile << setprecision(precision) << get<2>(eab) << "\t";
     energyFile << numParticlesAB << endl;
+  }
+
+  void savePressureEnergyAB(long step, double timeStep, long numParticles, bool wallPressure = false) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    double edamp = sp_->getDampingWork();
+    double enoise = sp_->getNoiseWork();
+    double heat = edamp + enoise;
+    energyFile << step << "\t" << step * timeStep << "\t";
+    energyFile << setprecision(precision) << epot << "\t";
+    energyFile << setprecision(precision) << ekin << "\t";
+    energyFile << setprecision(precision) << etot << "\t";
+    energyFile << setprecision(precision) << edamp << "\t";
+    energyFile << setprecision(precision) << enoise;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive << "\t";
+      heat += eactive;
+    } else {
+      energyFile << "\t";
+    }
+    energyFile << setprecision(precision) << heat << "\t";
+    std::tuple<double, double, long> eab = sp_->getParticleEnergyAB();
+    long numParticlesAB = get<2>(eab);
+    energyFile << setprecision(precision) << get<0>(eab) << "\t";
+    energyFile << setprecision(precision) << get<1>(eab) << "\t";
+    energyFile << numParticlesAB << "\t";
+    energyFile << setprecision(precision) << sp_->getParticleTotalPressure();
+    if(wallPressure == true) {
+      std::tuple<double, double> wallPressure = sp_->computeWallPressure();
+      energyFile << "\t" << setprecision(precision) << get<0>(wallPressure);
+      energyFile << "\t" << setprecision(precision) << get<1>(wallPressure) << endl;
+    } else {
+      energyFile << endl;
+    }
+  }
+
+  void saveWallEnergy(long step, double timeStep, long numParticles) {
+    double epot = sp_->getParticlePotentialEnergy();
+    double ekin = sp_->getParticleKineticEnergy();
+    double etot = epot + ekin;
+    double edamp = sp_->getDampingWork();
+    double enoise = sp_->getNoiseWork();
+    double heat = edamp + enoise;
+    energyFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    energyFile << setprecision(precision) << epot / numParticles << "\t";
+    energyFile << setprecision(precision) << ekin / numParticles << "\t";
+    energyFile << setprecision(precision) << etot / numParticles << "\t";
+    energyFile << setprecision(precision) << edamp / numParticles << "\t";
+    energyFile << setprecision(precision) << enoise / numParticles;
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
+      double eactive = sp_->getSelfPropulsionWork();
+      energyFile << "\t" << setprecision(precision) << eactive / numParticles << "\t";
+      heat += eactive;
+    } else {
+      energyFile << "\t";
+    }
+    energyFile << setprecision(precision) << heat / numParticles << "\t";
+    std::tuple<double, double> wallPressure = sp_->computeWallPressure();
+    energyFile << setprecision(precision) << get<0>(wallPressure) << "\t";
+    energyFile << setprecision(precision) << get<1>(wallPressure) << endl;
   }
 
   void saveStrainEnergy(long step, double timeStep, long numParticles, double strain) {
@@ -436,8 +512,16 @@ public:
     energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum() << endl;
   }
 
-  void closeEnergyFile() {
-    energyFile.close();
+  void saveWallDynamics(long step, double timeStep) {
+    std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
+    wallFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
+    wallFile << setprecision(precision) << get<0>(angleDyn) << "\t";
+    wallFile << setprecision(precision) << get<1>(angleDyn) << "\t";
+    wallFile << setprecision(precision) << get<2>(angleDyn) << endl;
+  }
+
+  void save2DStressProfile(string dirName) {
+    save2DFile(dirName + "stressProfile.dat", sp_->get2DStressProfile(), 5);
   }
 
   thrust::host_vector<double> read1DIndexFile(string fileName, long numRows) {
@@ -572,7 +656,73 @@ public:
     return boxSize_;
   }
 
-  long readWallParams(string dirName) {
+  long readRoughWallParams(string dirName) {
+    string fileParams = dirName + "wallParams.dat";
+    ifstream readParams(fileParams.c_str());
+    if (!readParams.is_open()) {
+      cout << "Error: Unable to open file " << fileParams << " - setting default values" << endl;
+      return 0;
+    }
+    string paramName;
+    double paramValue;
+    long numWall_ = 0;
+    double wallRad_ = 0.;
+    while (readParams >> paramName >> paramValue) {
+      if(paramName == "numWall") {
+        numWall_ = paramValue;
+      } else if(paramName == "wallRad") {
+        wallRad_ = paramValue;
+      }
+    }
+    readParams.close();
+    sp_->initWallVariables(numWall_);
+    sp_->initWallNeighbors(numWall_);
+    // read wall angle dynamics
+    sp_->setRigidWallParams(numWall_, wallRad_);
+    cout << "FileIO::readRoughWallParams numWall: " << numWall_ << " wallRad: " << wallRad_ << endl;
+    return numWall_;
+  }
+
+  long readRigidWallParams(string dirName) {
+    string fileParams = dirName + "wallParams.dat";
+    ifstream readParams(fileParams.c_str());
+    if (!readParams.is_open()) {
+      cout << "Error: Unable to open file " << fileParams << " - setting default values" << endl;
+      return 0;
+    }
+    string paramName;
+    double paramValue;
+    long numWall_ = 0;
+    double wallRad_ = 0.;
+    double wallAngle_ = 0.;
+    double wallOmega_ = 0.;
+    double wallAlpha_ = 0.;
+    while (readParams >> paramName >> paramValue) {
+      if(paramName == "numWall") {
+        numWall_ = paramValue;
+      } else if(paramName == "wallRad") {
+        wallRad_ = paramValue;
+      } else if(paramName == "wallAngle") {
+        wallAngle_ = paramValue;
+      } else if(paramName == "wallOmega") {
+        wallOmega_ = paramValue;
+      }
+    }
+    readParams.close();
+    sp_->initWallVariables(numWall_);
+    sp_->initWallNeighbors(numWall_);
+    // read wall angle dynamics
+    sp_->setRigidWallParams(numWall_, wallRad_);
+    thrust::host_vector<double> wallDynamics_(3);
+    wallDynamics_[0] = wallAngle_;
+    wallDynamics_[1] = wallOmega_;
+    wallDynamics_[2] = 0.;
+    sp_->setWallAngleDynamics(wallDynamics_);
+    cout << "FileIO::readRigidWallParams numWall: " << numWall_ << " wallRad: " << wallRad_ << " wallAngle: " << wallAngle_ << " wallOmega: " << wallOmega_ << endl;
+    return numWall_;
+  }
+
+  long readMobileWallParams(string dirName) {
     string fileParams = dirName + "wallParams.dat";
     ifstream readParams(fileParams.c_str());
     if (!readParams.is_open()) {
@@ -584,6 +734,8 @@ public:
     long numWall_ = 0;
     double wallRad_ = 0.;
     double wallArea0_ = 0.;
+    double wallAngle_ = 0.;
+    double wallOmega_ = 0.;
     while (readParams >> paramName >> paramValue) {
       if(paramName == "numWall") {
         numWall_ = paramValue;
@@ -594,9 +746,12 @@ public:
       }
     }
     readParams.close();
-    double boxRadius_ = read0DFile(dirName + "boxSize.dat");
+    sp_->initWallVariables(numWall_);
+    sp_->initWallShapeVariables(numWall_);
+    sp_->initWallNeighbors(numWall_);
+    // read wall shape parameters
     sp_->setMobileWallParams(numWall_, wallRad_, wallArea0_);
-    cout << "FileIO::readWallParams: wallRad: " << wallRad_ << " wallArea0: " << wallArea0_ << "numWall: " << numWall_ << endl;
+    cout << "FileIO::readMobileWallParams numWall: " << numWall_ << " wallRad: " << wallRad_ << " wallArea0: " << wallArea0_ << endl;
     if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
       sp_->setPlasticVariables(1.);
     }
@@ -604,22 +759,13 @@ public:
   }
 
   void readRigidWall(string dirName, long numWall_, long nDim_) {
-    sp_->initWallVariables(numWall_);
-    sp_->initWallNeighbors(numWall_);
     thrust::host_vector<double> wPos_(numWall_ * nDim_);
     
     wPos_ = read2DFile(dirName + "wallPos.dat", numWall_);
     sp_->setWallPositions(wPos_);
-    
-    thrust::host_vector<double> wallDynamics_(3);
-    wallDynamics_ = read1DFile(dirName + "wallDynamics.dat", 3);
-    sp_->setWallAngleDynamics(wallDynamics_);
   }
 
   void readMobileWall(string dirName, long numWall_, long nDim_) {
-    sp_->initWallVariables(numWall_);
-    sp_->initWallShapeVariables(numWall_);
-    sp_->initWallNeighbors(numWall_);
     thrust::host_vector<double> wLength_(numWall_);
     thrust::host_vector<double> wAngle_(numWall_);
     thrust::host_vector<double> wPos_(numWall_ * nDim_);
@@ -632,20 +778,29 @@ public:
   }
 
   void readWall(string dirName, long nDim_) {
-    long numWall_ = readWallParams(dirName);
-    if(numWall_ != 0) {
-      switch (sp_->simControl.boundaryType) {
-        case simControlStruct::boundaryEnum::rigid:
-        readRigidWall(dirName, numWall_, nDim_);
-        break;
-        case simControlStruct::boundaryEnum::mobile:
-        readMobileWall(dirName, numWall_, nDim_);
-        break;
-        default:
-        break;
-      }
-    } else {
-      cout << "FileIO::readWall: numWall is zero! WARNING!" << endl;
+    long numWall_ = 0;
+    switch (sp_->simControl.boundaryType) {
+      case simControlStruct::boundaryEnum::rough:
+      numWall_ = readRoughWallParams(dirName);
+      readRigidWall(dirName, numWall_, nDim_);
+      break;
+      case simControlStruct::boundaryEnum::rigid:
+      numWall_ = readRigidWallParams(dirName);
+      readRigidWall(dirName, numWall_, nDim_);
+      break;
+      case simControlStruct::boundaryEnum::mobile:
+      numWall_ = readMobileWallParams(dirName);
+      readMobileWall(dirName, numWall_, nDim_);
+      break;
+      case simControlStruct::boundaryEnum::plastic:
+      numWall_ = readMobileWallParams(dirName);
+      readMobileWall(dirName, numWall_, nDim_);
+      break;
+      default:
+      break;
+    }
+    if (numWall_ == 0) {
+      cout << "FileIO::readWall: no wall parameters found in " << dirName << endl;
     }
   }
 
@@ -744,8 +899,15 @@ public:
     saveParams << "numWall" << "\t" << numWall << endl;
     double wallRad = sp_->getWallRad();
     saveParams << "wallRad" << "\t" << wallRad << endl;
-    double wallArea0 = sp_->getWallArea0();
-    saveParams << "wallArea0" << "\t" << wallArea0 << endl;
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
+      std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
+      saveParams << "wallAngle" << "\t" << get<0>(angleDyn) << endl;
+      saveParams << "wallOmega" << "\t" << get<1>(angleDyn) << endl;
+      saveParams << "wallAlpha" << "\t" << get<2>(angleDyn) << endl;
+    } else if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
+      double wallArea0 = sp_->getWallArea0();
+      saveParams << "wallArea0" << "\t" << wallArea0 << endl;
+    }
     saveParams.close();
   }
 
@@ -808,12 +970,13 @@ public:
         cout << "FileIO::saveParticlePacking: only dimensions 2 and 3 are allowed for particleAngles!" << endl;
       }
     }
-    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rough ||
+       sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
       saveWallParams(dirName);
       saveWall(dirName);
-      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-        saveWallDynamics(dirName);
-      }
+    }
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rough) {
+      saveWallParams(dirName);
     }
   }
 
@@ -856,21 +1019,12 @@ public:
       }
     }
     if(initWall == false) {
-      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rough ||
+        sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
         readWall(dirName, nDim_);
+        cout << "FileIO::readParticleState: wall read from " << dirName << endl;
       }
     }
-  }
-
-  void saveWallDynamics(string dirName) {
-    string fileParams = dirName + "wallDynamics.dat";
-    ofstream saveParams(fileParams.c_str());
-    openOutputFile(fileParams);
-    std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
-    saveParams << get<0>(angleDyn) << endl;
-    saveParams << get<1>(angleDyn) << endl;
-    saveParams << get<2>(angleDyn) << endl;
-    saveParams.close();
   }
 
   void saveParticleForces(string dirName) {
@@ -880,18 +1034,16 @@ public:
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      if(sp_->nDim == 2) {
-        save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
-      } else {
-        save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
-      }
-    }
-    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile)  {
+    //if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    //  if(sp_->nDim == 2) {
+    //    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
+    //  } else {
+    //    save2DFile(dirName + "particleAngles.dat", sp_->getParticleAngles(), sp_->nDim);
+    //  }
+    //}
+    if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rough || 
+      sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
       saveWall(dirName);
-      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-        saveWallDynamics(dirName);
-      }
     }
   }
 
@@ -907,7 +1059,8 @@ public:
   void saveParticleNeighbors(string dirName) {
     if(sp_->simControl.neighborType == simControlStruct::neighborEnum::neighbor) {
       save2DIndexFile(dirName + "particleNeighbors.dat", sp_->getParticleNeighbors(), sp_->partNeighborListSize);
-      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile) {
+      if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid ||
+        sp_->simControl.boundaryType == simControlStruct::boundaryEnum::mobile || sp_->simControl.boundaryType == simControlStruct::boundaryEnum::plastic) {
         save2DIndexFile(dirName + "wallNeighbors.dat", sp_->getWallNeighbors(), sp_->wallNeighborListSize);
         save2DFile(dirName + "wallForce.dat", sp_->getWallForces(), sp_->nDim);
       }

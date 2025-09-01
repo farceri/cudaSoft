@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = false, saveFinal = true, logSave = false, linSave = true, justRun = true;
-  bool initAngles = false, initWall = false;
+  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
+  bool readState = false, saveFinal = true, logSave = false, linSave = true;
+  bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables
   double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
   double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
-  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec;
-  std::string outDir, currentDir, dirSample, energyFile, wallDyn, wallDir, whichDynamics = "active/";
+  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, scale = atof(argv[12]);
+  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "active/";
 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -53,8 +53,7 @@ int main(int argc, char **argv) {
     whichDynamics = "vicsek-na/";
   } else if(alignType == "vel") {
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    whichDynamics = "vicsek-vel/";
-    whichDynamics = "vicsek/";
+    whichDynamics = "/";
   } else {
     sp.setAlignType(simControlStruct::alignEnum::additive);
     if(alignType == "force") whichDynamics = "vicsek-force/";
@@ -71,8 +70,10 @@ int main(int argc, char **argv) {
   } else {
     cout << "Setting default harmonic potential" << endl;
   }
-  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-    std::experimental::filesystem::create_directory(inDir + whichDynamics);
+  if(justRun == false) {
+    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+      std::experimental::filesystem::create_directory(inDir + whichDynamics);
+    }
   }
   sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
   sp.setWallEnergyScale(ew);
@@ -88,7 +89,7 @@ int main(int argc, char **argv) {
     whichDynamics = whichDynamics + "rough/";
     wallDyn = "rough";
     sp.setBoundaryType(simControlStruct::boundaryEnum::rough);
-  } else if(wallType == "rough") {
+  } else if(wallType == "rigid") {
     whichDynamics = whichDynamics + "rigid/";
     wallDyn = "rigid";
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
@@ -120,13 +121,25 @@ int main(int argc, char **argv) {
   // set input and output
   ioSPFile ioSP(&sp);
   if (justRun == true) {
-    outDir = inDir + wallDyn + "/";
+    outDir = inDir + wallDyn + "/"; // "long/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
     if (readAndSaveSameDir == false) {
       if(wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
         initWall = true; // initializing from NVT
+        scaleRadial = true; // scale radial coordinates
+      }
+    } else {
+      readState = true;
+      inDir = inDir + wallType + "/"; // "long/";
+      outDir = outDir + "dynamics";
+      if(logSave == true) outDir = outDir + "-log/";
+      else outDir = outDir + "/";
+      if(std::experimental::filesystem::exists(outDir) == true) {
+        inDir = outDir;
+      } else {
+        std::experimental::filesystem::create_directory(outDir);
       }
     }
   } else {
@@ -166,9 +179,15 @@ int main(int argc, char **argv) {
   if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim, initAngles, initWall);
   if(initAngles == true) sp.initializeParticleAngles();
   if(initWall == true) sp.initializeWall();
+  if(scaleRadial == true) sp.shrinkRadialCoordinates(scale);
   // output file
   energyFile = outDir + "energy.dat";
   ioSP.openEnergyFile(energyFile);
+  if(wallType == "rigid") {
+    // output wall file
+    wallFile = outDir + "wallDynamics.dat";
+    ioSP.openWallFile(wallFile);
+  }
 
   // initialization
   sigma = sp.getMeanParticleSigma();
@@ -208,6 +227,9 @@ int main(int argc, char **argv) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
       ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles);
+      if(wallType == "rigid") {
+        ioSP.saveWallDynamics(step+initialStep, timeStep);
+      }
       if(step % checkPointFreq == 0) {
         cout << "Vicsek: current step: " << step + initialStep;
         cout << " E/N: " << sp.getTotalEnergy() / numParticles;
@@ -266,6 +288,7 @@ int main(int argc, char **argv) {
     //ioSP.saveParticleNeighbors(outDir);
   }
   ioSP.closeEnergyFile();
+  if(wallType == "rigid") ioSP.closeWallFile();
 
   return 0;
 }

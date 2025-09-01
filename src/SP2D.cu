@@ -177,8 +177,9 @@ void SP2D::initWallVariables(long numWall_) {
   thrust::fill(d_wallForce.begin(), d_wallForce.end(), double(0));
   thrust::fill(d_wallEnergy.begin(), d_wallEnergy.end(), double(0));
   if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    d_monomerAlpha.resize(numWall);
+    d_monomerAlpha.resize(numWall_);
     thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
+    cout << "SP2D::initWallVariables: boundaryType: rigid" << endl;
     wallAngle = 0.;
     wallOmega = 0.;
     wallAlpha = 0.;
@@ -380,22 +381,27 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
     setBoundaryType(simControlStruct::boundaryEnum::reflect);
     cout << "SP2D::setPotentialType: potentialType: none" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::harmonic) {
-    cout << "SP2D::setPotentialType: potentialType: harmonic" << " wallType: harmonic" << endl;
+    cout << "SP2D::setPotentialType: potentialType: harmonic" << " set wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::lennardJones) {
-    cout << "SP2D::setPotentialType: potentialType: lennardJones" << " wallType: lennardJones" << endl;
+    setWallType(simControlStruct::wallEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: lennardJones" << " set wallType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::Mie) {
-    cout << "SP2D::setPotentialType: potentialType: Mie" << endl;
+    setWallType(simControlStruct::wallEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: Mie" << " set wallType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
     setWallType(simControlStruct::wallEnum::WCA);
-    cout << "SP2D::setPotentialType: potentialType: WCA" << " default wallType: WCA" << endl;
+    cout << "SP2D::setPotentialType: potentialType: WCA" << " set wallType: WCA" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
-    cout << "SP2D::setPotentialType: potentialType: adhesive" << " wallType: harmonic" << endl;
+    cout << "SP2D::setPotentialType: potentialType: adhesive" << " set wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
-    cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " wallType: lennardJones" << endl;
+    setWallType(simControlStruct::wallEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: doubleLJ" << " set wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJMinusPlus) {
-    cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << " wallType: lennardJones" << endl;
+    setWallType(simControlStruct::wallEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: LJMinusPlus" << " set wallType: lennardJones" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::LJWCA) {
-    cout << "SP2D::setPotentialType: potentialType: LJWCA" << " wallType: lennardJones" << endl;
+    setWallType(simControlStruct::wallEnum::WCA);
+    cout << "SP2D::setPotentialType: potentialType: LJWCA" << " set wallType: lennardJones" << endl;
   } else {
     cout << "SP2D::setPotentialType: please specify valid potentialType: none, harmonic, lennardJones, WCA, adhesive, doubleLJ, LJMinusPlus and LJWCA" << endl;
   }
@@ -870,6 +876,39 @@ void SP2D::setPBC() {
   kernelCheckParticlePBC<<<dimGrid, dimBlock>>>(pPosPBC, pPos);
   // copy to device
   d_particlePos = d_particlePosPBC;
+}
+
+void SP2D::shrinkRadialCoordinates(double scale_) {
+  // convert cartesian coordinates to polar coordinates
+  // and multiply radial coordinate by a scalar factor
+  if (simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
+    if(scale_ >= 1) {
+      cout << "SP2D::shrinkRadialCoordinates: scale must be between 0 and 1!" << endl;
+      return;
+    } else {
+      auto r = thrust::counting_iterator<long>(0);
+      double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+      double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+      double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+      auto scaleRadialCoordinate = [=] __device__ (long particleId) {
+        double x = pPos[particleId * d_nDim];
+        double y = pPos[particleId * d_nDim + 1];
+        double radial = sqrt(x * x + y * y);
+        if (radial > 0) {
+          double theta = atan2(y, x);
+          radial *= scale_;
+          pPos[particleId * d_nDim] = radial * cos(theta);
+          pPos[particleId * d_nDim + 1] = radial * sin(theta);
+        }
+      };
+
+      thrust::for_each(r, r + numParticles, scaleRadialCoordinate);
+      cout << "SP2D::shrinkRadialCoordinates: scale: " << scale_ << endl;
+    }
+  } else {
+    cout << "SP2D::scaleRadialCoordinates: only works for roundWall geometry!" << endl;
+  }
 }
 
 void SP2D::setPBCParticlePositions(thrust::host_vector<double> &particlePos_) {
@@ -1531,6 +1570,14 @@ void SP2D::checkDimGrid() {
       cout << "cudaMemcpyToSymbol Error: "<< cudaGetErrorString(err) << endl;
     }
   }
+}
+
+void SP2D::setRigidWallParams(long numWall_, double wallRad_) {
+  numWall = numWall_;
+  wallRad = wallRad_;
+  cudaMemcpyToSymbol(d_numWall, &numWall, sizeof(numWall));
+  cudaMemcpyToSymbol(d_wallRad, &wallRad, sizeof(wallRad));
+  checkDimGrid();
 }
 
 void SP2D::setMobileWallParams(long numWall_, double wallRad_, double wallArea0_) {
@@ -2400,9 +2447,70 @@ void SP2D::calcParticleStressTensor() {
   thrust::fill(d_stress.begin(), d_stress.end(), double(0));
   const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *pStress = thrust::raw_pointer_cast(&d_stress[0]);
-  kernelCalcStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pStress);
+  kernelCalcStressTensor<<<dimGrid, dimBlock>>>(pRad, pPos, pStress);
+}
+
+void SP2D::define2DStressGrid(double binSize_) {
+  binSize = binSize_ * getMeanParticleSigma();
+  cudaMemcpyToSymbol(d_binSize, &binSize, sizeof(binSize));
+
+  nBinsX = long(d_boxSize[0] / binSize);
+  nBinsY = long(d_boxSize[1] / binSize);
+  cudaMemcpyToSymbol(d_nBinsX, &nBinsX, sizeof(nBinsX));
+  cudaMemcpyToSymbol(d_nBinsY, &nBinsY, sizeof(nBinsY));
+  // 2 components per bin: xx and yy
+  gridSize = nBinsX * nBinsY * 2;
+
+  d_kinStress.resize(gridSize);
+  d_confStress.resize(gridSize);
+  cout << "SP2D::define2DStressGrid: nBinsX: " << nBinsX << " nBinsY: " << nBinsY << " gridSize: " << gridSize << endl;
+}
+
+void SP2D::calc2DStressProfile() {
+  thrust::fill(d_kinStress.begin(), d_kinStress.end(), double(0));
+  thrust::fill(d_confStress.begin(), d_confStress.end(), double(0));
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double* pKinStress = thrust::raw_pointer_cast(&d_kinStress[0]);
+  double* pConfStress = thrust::raw_pointer_cast(&d_confStress[0]);
+  kernelCalc2DStressProfile<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pKinStress, pConfStress);
+}
+
+thrust::host_vector<double> SP2D::get2DStressProfile() {
+  calc2DStressProfile();
+  // average over vertical grid
+  thrust::host_vector<double> kinStress = d_kinStress;
+  thrust::host_vector<double> confStress = d_confStress;
+
+  std::vector<double> avgKinStressX(nBinsX * 2, 0.0); // 2 is for xx and yy components
+  std::vector<double> avgConfStressX(nBinsX * 2, 0.0); // 2 is for xx and yy components
+
+  for (long x = 0; x < nBinsX; ++x) {
+    for (long y = 0; y < nBinsY; ++y) {
+        long idx = 2 * (y * nBinsX + x);
+        avgKinStressX[2 * x] += kinStress[idx]; // xx
+        avgKinStressX[2 * x + 1] += kinStress[idx + 1]; // yy
+        avgConfStressX[2 * x] += confStress[idx]; // xx
+        avgConfStressX[2 * x + 1] += confStress[idx + 1]; // yy
+      }
+    avgKinStressX[2 * x] /= nBinsY;
+    avgKinStressX[2 * x + 1] /= nBinsY;
+    avgConfStressX[2 * x] /= nBinsY;
+    avgConfStressX[2 * x + 1] /= nBinsY;
+  }
+  // Create 5-column host vector: [x_bin_center, kin_xx, kin_yy, conf_xx, conf_yy]
+  thrust::host_vector<double> stressProfile(nBinsX * 5);
+  for (long x = 0; x < nBinsX; ++x) {
+    double binCenter = (x + 0.5) * binSize;
+    stressProfile[5 * x]     = binCenter;
+    stressProfile[5 * x + 1] = avgKinStressX[2 * x];       // kinetic xx
+    stressProfile[5 * x + 2] = avgKinStressX[2 * x + 1];   // kinetic yy
+    stressProfile[5 * x + 3] = avgConfStressX[2 * x];      // config xx
+    stressProfile[5 * x + 4] = avgConfStressX[2 * x + 1];  // config yy
+  }
+  return stressProfile;
 }
 
 double SP2D::getParticlePressure() {
@@ -2520,12 +2628,94 @@ std::tuple<double, double> SP2D::computeWallPressure() {
   }
 }
 
+void SP2D::convertFixedWallForceToRadial() {
+  // convert wallForce from cartesian to polar coordinates
+  auto r = thrust::counting_iterator<long>(0);
+  double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+
+  // wallForce in fixed wall boundary is defined in the particle coordinate system
+  auto convertFixedWallForce = [=] __device__ (long particleId) {
+    if(wForce[particleId * d_nDim] != 0. && wForce[particleId * d_nDim + 1] != 0.) {
+      double x = pPos[particleId * d_nDim];
+      double y = pPos[particleId * d_nDim + 1];
+      double theta = atan2(y, x);
+      double force_rad = cos(theta) * wForce[particleId * d_nDim] + sin(theta) * wForce[particleId * d_nDim + 1];
+      double force_tan = -sin(theta) * wForce[particleId * d_nDim] + cos(theta) * wForce[particleId * d_nDim + 1];
+      wForce[particleId * d_nDim] = force_rad;
+      wForce[particleId * d_nDim + 1] = force_tan;
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, convertFixedWallForce);
+}
+
+void SP2D::convertRoughWallForceToRadial() {
+  // convert wallForce from cartesian to polar coordinates
+  auto r = thrust::counting_iterator<long>(0);
+  double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
+  double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+
+  auto convertRoughWallForce = [=] __device__ (long wallId) {
+    double x = wPos[wallId * d_nDim];
+    double y = wPos[wallId * d_nDim + 1];
+    double theta = atan2(y, x);
+    double force_rad = cos(theta) * wForce[wallId * d_nDim] + sin(theta) * wForce[wallId * d_nDim + 1];
+    double force_tan = -sin(theta) * wForce[wallId * d_nDim] + cos(theta) * wForce[wallId * d_nDim + 1];
+    wForce[wallId * d_nDim] = force_rad;
+    wForce[wallId * d_nDim + 1] = force_tan;
+  };
+
+  thrust::for_each(r, r + numWall, convertRoughWallForce);
+}
+
+void SP2D::convertMobileWallForceToRadial() {
+  // first compute wall center of mass
+  typedef thrust::device_vector<double>::iterator Iterator;
+  strided_range<Iterator> xWallPos(d_wallPos.begin(), d_wallPos.end(), 2);
+  strided_range<Iterator> yWallPos(d_wallPos.begin() + 1, d_wallPos.end(), 2);
+  double xWall = thrust::reduce(xWallPos.begin(), xWallPos.end(), double(0), thrust::plus<double>()) / numWall;
+  double yWall = thrust::reduce(yWallPos.begin(), yWallPos.end(), double(0), thrust::plus<double>()) / numWall;
+
+  // convert wallForce from cartesian to polar coordinates
+  auto r = thrust::counting_iterator<long>(0);
+  double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
+  double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+
+  auto convertMobileWallForce = [=] __device__ (long wallId) {
+    double x = wPos[wallId * d_nDim] - xWall; // assumes boxSize is much bigger than wall size
+    double y = wPos[wallId * d_nDim + 1] - yWall;
+    double theta = atan2(y, x);
+    double force_rad = cos(theta) * wForce[wallId * d_nDim] + sin(theta) * wForce[wallId * d_nDim + 1];
+    double force_tan = -sin(theta) * wForce[wallId * d_nDim] + cos(theta) * wForce[wallId * d_nDim + 1];
+    wForce[wallId * d_nDim] = force_rad;
+    wForce[wallId * d_nDim + 1] = force_tan;
+  };
+
+  thrust::for_each(r, r + numWall, convertMobileWallForce);
+}
+
 std::tuple<double, double> SP2D::getWallPressure() {
   if(nDim == 2) {
     double boxLength = 0.;
     switch (simControl.geometryType) {
       case simControlStruct::geometryEnum::roundWall:
       boxLength = 2. * PI * boxRadius;
+      switch (simControl.boundaryType) {
+        case simControlStruct::boundaryEnum::fixed:
+        convertFixedWallForceToRadial();
+        break;
+        case simControlStruct::boundaryEnum::rough:
+        case simControlStruct::boundaryEnum::rigid:
+        convertRoughWallForceToRadial();
+        break;
+        case simControlStruct::boundaryEnum::mobile:
+        case simControlStruct::boundaryEnum::plastic:
+        convertMobileWallForceToRadial();
+        boxLength = thrust::reduce(d_wallLength.begin(), d_wallLength.end(), double(0), thrust::plus<double>());
+        default:
+        break;
+      }
       break;
       default:
       boxLength = 2. * thrust::reduce(d_boxSize.begin(), d_boxSize.end(), double(0), thrust::plus<double>());
@@ -2732,15 +2922,16 @@ double SP2D::getWallTemperature() {
 
 double SP2D::getWallEnergy() {
   switch (simControl.boundaryType) {
-    case simControlStruct::boundaryEnum::mobile:
-    case simControlStruct::boundaryEnum::plastic:
-    return getWallPotentialEnergy() + getWallKineticEnergy();
+    case simControlStruct::boundaryEnum::fixed:
+    case simControlStruct::boundaryEnum::rough:
+    return getWallPotentialEnergy();
     break;
     case simControlStruct::boundaryEnum::rigid:
     return getWallPotentialEnergy() + getWallRotationalKineticEnergy();
     break;
-    case simControlStruct::boundaryEnum::rough:
-    return getWallPotentialEnergy();
+    case simControlStruct::boundaryEnum::mobile:
+    case simControlStruct::boundaryEnum::plastic:
+    return getWallPotentialEnergy() + getWallKineticEnergy();
     break;
     default:
     return 0;

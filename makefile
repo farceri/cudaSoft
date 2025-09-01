@@ -3,8 +3,8 @@
 ## USER SPECIFIC DIRECTORIES ##
 
 # CUDA directory:
-CUDA_ROOT_DIR=/usr/lib/x86_64-linux-gnu
 #CUDA_ROOT_DIR=/usr/local/cuda-12.2
+CUDA_ROOT_DIR=/usr/lib/x86_64-linux-gnu
 #CUDA_ROOT_DIR=/gpfs/loomis/apps/avx/software/CUDAcore/11.3.1
 
 ##########################################################
@@ -67,7 +67,7 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-#EXE = runNVE2LJ
+EXE = runNVE2LJ
 #EXE = runNH
 #EXE = runNH2LJ
 #EXE = runNVT
@@ -79,7 +79,7 @@ INC_DIR = include
 #EXE = runNPT
 #EXE = runABP
 #EXE = runVicsek
-EXE = runWall
+#EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE
@@ -106,10 +106,10 @@ OBJS = $(OBJ_DIR)/$(EXE).o $(OBJ_DIR)/SP2D.o $(OBJ_DIR)/FIRE.o $(OBJ_DIR)/Simula
 ## Compile ##
 
 # Compiler-specific flags:
-GENCODE_SM30 = -gencode=arch=compute_30,code=\"sm_30,compute_30\"
 GENCODE_SM60 = -gencode=arch=compute_60,code=\"sm_60,compute_60\"
+GENCODE_SM86 = -gencode=arch=compute_86,code=\"sm_86,compute_86\"
 
-GENCODE = $(GENCODE_SM60)
+GENCODE = $(GENCODE_SM86)
 
 # Link C++ and CUDA compiled object files to target executable:
 $(EXE) : $(OBJS)

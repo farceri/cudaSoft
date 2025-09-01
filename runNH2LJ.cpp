@@ -23,17 +23,22 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readState = true, saveFinal = true, logSave = false, linSave = false, alltoall = false, fixedbc = false;
-  long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]), num1 = atol(argv[8]);
-  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atol(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = 1, ew = ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, timeStep = atof(argv[2]), timeUnit, sigma;
-  double ea = atof(argv[10]), eb = ea, eab = 0.5, Tinject = atof(argv[3]), mass = 10, damping = 1;
-  std::string outDir, potType = argv[9], energyFile, currentDir, inDir = argv[1], dirSample, whichDynamics = "nh";
+  bool alltoall = false, fixedbc = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
+  long maxStep = atof(argv[4]), initialStep = atol(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]);
+  std::string inDir = argv[1], potType = argv[9];
+  // other variables
+  long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 5), saveEnergyFreq = linFreq;
+  long step, updateCount = 0, firstDecade = 0, multiple = 1, saveFreq = 1;
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, sigma, timeUnit;
+  double ec = 1, ew = ec, ea = 2, eb = ea, eab = 0.5, mass = 10, damping = 1;
+  std::string energyFile, outDir, currentDir, dirSample, whichDynamics = "nh";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -43,20 +48,21 @@ int main(int argc, char **argv) {
     sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
     sp.setWallEnergyScale(ew);
   }
-  if(potType == "ljwca") {
-    whichDynamics = "nh-ljwca/";
+  if(potType == "2lj") {
+    whichDynamics = whichDynamics + "-2lj/";
+    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
+    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
+    sp.setEnergyCostant(ec);
+  } else if(potType == "ljwca") {
+    whichDynamics = whichDynamics + "-ljwca/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
     sp.setEnergyCostant(ec);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
-    whichDynamics = "nh-ljmp/";
+    whichDynamics = whichDynamics + "-ljmp/";
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
     sp.setEnergyCostant(ec);
     sp.setLJMinusPlusParams(LJcut, num1);
-  } else if(potType == "2lj") {
-    whichDynamics = whichDynamics + argv[10] + "/";
-    sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
-    sp.setDoubleLJconstants(LJcut, ea, eab, eb, num1);
   } else {
     cout << "Please specify a potential type between ljwca, ljmp and 2lj" << endl;
     exit(1);
@@ -67,36 +73,49 @@ int main(int argc, char **argv) {
   dirSample = whichDynamics + "T" + argv[3] + "/";
   ioSPFile ioSP(&sp);
   // set input and output
-  if (readAndSaveSameDir == true) {//keep running the same dynamics
-    readState = true;
-    inDir = inDir + dirSample;
-    outDir = inDir;
-    if(runDynamics == true) {
-      if(logSave == true) {
-        outDir = outDir + "dynamics-log/";
-      } else {
-        outDir = outDir + "dynamics/";
-      }
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        if(initialStep != 0) {
-          inDir = outDir;
-        }
-      } else {
-        std::experimental::filesystem::create_directory(outDir);
-      }
+  if(justRun == true) {
+    outDir = inDir + "nh/";
+    if(std::experimental::filesystem::exists(outDir) == false) {
+      std::experimental::filesystem::create_directory(outDir);
     }
-  } else {//start a new dyanmics
-    if(readAndMakeNewDir == true) {
+    if(readAndSaveSameDir == true) {
+      inDir = outDir;
+    }
+  } else {
+    if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
-      outDir = inDir + "../../" + dirSample;
-    } else {
-      if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-        std::experimental::filesystem::create_directory(inDir + whichDynamics);
+      inDir = inDir + dirSample;
+      outDir = inDir;
+      if(runDynamics == true) {
+        if(logSave == true) {
+          inDir = outDir;
+          outDir = outDir + "dynamics-log/";
+        } else {
+          inDir = outDir;
+          outDir = outDir + "dynamics/";
+        }
+        if(std::experimental::filesystem::exists(outDir) == true) {
+          if(initialStep != 0) {
+            inDir = outDir;
+          }
+        } else {
+          std::experimental::filesystem::create_directory(outDir);
+        }
       }
-      outDir = inDir + dirSample;
+    } else {//start a new dyanmics
+      if(readAndMakeNewDir == true) {
+        readState = true;
+        outDir = inDir + "../../" + dirSample;
+      } else {
+        if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+          std::experimental::filesystem::create_directory(inDir + whichDynamics);
+        }
+        outDir = inDir + dirSample;
+      }
+      std::experimental::filesystem::create_directory(outDir);
     }
-    std::experimental::filesystem::create_directory(outDir);
   }
+  cout << "inDir: " << inDir << endl << "outDir: " << outDir << endl;
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) {
     ioSP.readParticleState(inDir, numParticles, nDim);
@@ -129,9 +148,9 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleNoseHooverLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveSimpleEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveSimplePressureEnergyAB(step+initialStep, timeStep, numParticles, false);
       if(step % checkPointFreq == 0) {
-        cout << "NVE: current step: " << step;
+        cout << "NH: current step: " << step;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);
@@ -144,8 +163,8 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
+          ioSP.saveNoseHooverParams(outDir);
           //ioSP.saveParticleNeighbors(outDir);
-          //ioSP.saveNoseHooverParams(outDir);
           if(nDim == 3) {
             ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
           }
@@ -187,8 +206,8 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
+    ioSP.saveNoseHooverParams(outDir);
     //ioSP.saveParticleNeighbors(outDir);
-    //ioSP.saveNoseHooverParams(outDir);
     if(nDim == 3) {
       ioSP.saveDumpPacking(outDir, numParticles, nDim, step);
     }
