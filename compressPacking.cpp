@@ -23,22 +23,25 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
-  bool squarebc = false, roundbc = false, lj = false, wca = true, gforce = false, alltoall = false;
+  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = true;
+  bool squarebc = true, roundbc = false, lj = true, wca = false, gforce = false, alltoall = false;
+  // input variables
+  std::string outDir = argv[1];
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
+  // other variables
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
-  double polydispersity = 0.2, previousPhi, currentPhi, deltaPhi = 4e-03, scaleFactor, prevEnergy = 0;
-  double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, dt = atof(argv[2]), size;
-  double ec = 1, ew = 1e02*ec, Tinject = atof(argv[3]), inertiaOverDamping = 10, phi0 = 0.002, phiTh = 0.02;
-  double cutDistance, cutoff = 0.5, timeStep, timeUnit, sigma, lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
-  double gravity = 9.8e-04, mass = 10, damping = 1;
+  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 1e-02, phi0 = 0.1, phiTh = 0.9;
+  double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, size;
+  double ec = 1, ew = 1e02*ec, inertiaOverDamping = 10, scaleFactor, prevEnergy = 0;
+  double cutDistance, cutoff = 0.5, timeUnit, sigma, gravity = 9.8e-04, mass = 10, damping = 1;
   long num1 = int(numParticles / 2);
   if(nDim == 3) {
     LJcut = 2.5;
   }
-  std::string currentDir, outDir = argv[1], inDir, energyFile;
+  std::string currentDir, inDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
@@ -127,7 +130,7 @@ int main(int argc, char **argv) {
   cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
   previousPhi = currentPhi;
   timeUnit = sigma / sqrt(ec);
-  timeStep = sp.setTimeStep(dt*timeUnit);
+  timeStep = sp.setTimeStep(timeStep * timeUnit);
   if(nve == true || noseHoover == true) {
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else {
