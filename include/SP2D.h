@@ -149,6 +149,8 @@ public:
   thrust::device_vector<double> d_unitPos;
   thrust::device_vector<double> d_unitVel;
   thrust::device_vector<double> d_unitVelPos;
+  thrust::device_vector<double> d_alpha_r;
+  thrust::device_vector<double> d_alpha_phi;
   thrust::device_vector<double> d_angMom;
   // two-type particles variables
   thrust::device_vector<long> d_flagAB;
@@ -408,13 +410,13 @@ public:
 
   void setPlasticVariables(double lgamma_);
 
-  void initRigidWall();
+  void initRigidWall(double roughness_ = 1.);
 
   void checkDimGrid();
 
-  void initMobileWall();
+  void initMobileWall(double roughness_ = 1.);
 
-  void initializeWall();
+  void initializeWall(double roughness_ = 1.);
 
   // force and energy
   void setEnergyCostant(double ec_);
@@ -489,7 +491,7 @@ public:
 
   void calcParticleForceEnergy();
 
-  std::tuple<double, double, double> getVicsekOrderParameters();
+  std::tuple<double, double, double, double, double> getVicsekOrderParameters();
 
   double getVicsekHigherOrderParameter(double order_);
 

@@ -67,7 +67,7 @@ INC_DIR = include
 
 # run dynamics
 #EXE = runNVE
-EXE = runNVE2LJ
+#EXE = runNVE2LJ
 #EXE = runNH
 #EXE = runNH2LJ
 #EXE = runNVT
@@ -83,7 +83,7 @@ EXE = runNVE2LJ
 
 # mechanics
 #EXE = linearShearFIRE
-#EXE = linearExtendNVE
+EXE = linearExtendNVE
 #EXE = linearExtendNVE2LJ
 #EXE = linearExtendNH2LJ
 #EXE = linearExtendNVT

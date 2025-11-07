@@ -262,6 +262,10 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     thrust::fill(d_unitVel.begin(), d_unitVel.end(), double(0));
     d_unitVelPos.resize(numParticles * nDim);
     thrust::fill(d_unitVelPos.begin(), d_unitVelPos.end(), double(0));
+    d_alpha_r.resize(numParticles);
+    thrust::fill(d_alpha_r.begin(), d_alpha_r.end(), double(0));
+    d_alpha_phi.resize(numParticles);
+    thrust::fill(d_alpha_phi.begin(), d_alpha_phi.end(), double(0));
     cout << "SP2D::setParticleType: particleType: vicsek" << endl;
   } else {
     cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
@@ -1536,13 +1540,13 @@ void SP2D::initializeParticleAngles() {
 }
 
 // define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
-void SP2D::initRigidWall() {
+void SP2D::initRigidWall(double roughness_) { // roughness is a fraction of the minimum particle diameter to increase number of wall monomers
   double circleLength = 2. * PI * boxRadius;
-  numWall = circleLength / getMinParticleSigma();
+  numWall = circleLength / (getMinParticleSigma() * roughness_);
   cudaMemcpyToSymbol(d_numWall, &numWall, sizeof(numWall));
   wallRad = 0.5 * (circleLength / numWall);
   cudaMemcpyToSymbol(d_wallRad, &wallRad, sizeof(wallRad));
-  cout << "SP2D::initRigidWall:: wallRad: " << wallRad << " numWall: " << numWall << endl;
+  cout << "SP2D::initRigidWall:: wallRad: " << wallRad << " numWall: " << numWall << " roughness: " << roughness_ << endl;
   initWallVariables(numWall);
   initWallNeighbors(numWall);
   for (long wallId = 0; wallId < numWall; wallId++) {
@@ -1602,11 +1606,11 @@ void SP2D::setPlasticVariables(double lgamma_) {
 }
 
 // define positions of monomers on wall by filling the circle of size 2 * PI * boxRadius
-void SP2D::initMobileWall() {
+void SP2D::initMobileWall(double roughness_) { // roughness is a fraction of the minimum particle diameter to increase number of wall monomers
   double circleLength = 2. * PI * boxRadius;
-  numWall = circleLength / getMinParticleSigma();
+  numWall = circleLength / (getMinParticleSigma() * roughness_);
   wallRad = 0.5 * (circleLength / numWall);
-  cout << "SP2D::initMobileWall:: wallRad: " << wallRad << " numWall: " << numWall << endl;
+  cout << "SP2D::initMobileWall:: wallRad: " << wallRad << " numWall: " << numWall << " roughness: " << roughness_ << endl;
   initWallVariables(numWall);
   initWallNeighbors(numWall);
   for (long wallId = 0; wallId < numWall; wallId++) {
@@ -1623,15 +1627,15 @@ void SP2D::initMobileWall() {
   scaleBoxRadius(1.1);
 }
 
-void SP2D::initializeWall() {
+void SP2D::initializeWall(double roughness_) {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::rough:
     case simControlStruct::boundaryEnum::rigid:
-    initRigidWall();
+    initRigidWall(roughness_);
     break;
     case simControlStruct::boundaryEnum::mobile:
     case simControlStruct::boundaryEnum::plastic:
-    initMobileWall();
+    initMobileWall(roughness_);
     break;
     default:
     break;
@@ -2197,13 +2201,15 @@ void SP2D::reflectParticleOnWallWithNoise() {
 	}
 }
 
-std::tuple<double, double, double> SP2D::getVicsekOrderParameters() {
+std::tuple<double, double, double, double, double> SP2D::getVicsekOrderParameters() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
   double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
   double *unitVelPos = thrust::raw_pointer_cast(&d_unitVelPos[0]);
-  kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos);
+  double *alpha_r = thrust::raw_pointer_cast(&d_alpha_r[0]);
+  double *alpha_phi = thrust::raw_pointer_cast(&d_alpha_phi[0]);
+  kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos, alpha_r, alpha_phi);
   // compute phase order parameters
   typedef thrust::device_vector<double>::iterator Iterator;
   strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
@@ -2223,7 +2229,10 @@ std::tuple<double, double, double> SP2D::getVicsekOrderParameters() {
   realField = thrust::reduce(unitVelPos_re.begin(), unitVelPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
   imagField = thrust::reduce(unitVelPos_im.begin(), unitVelPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
   double param3 = sqrt(realField * realField + imagField * imagField);
-  return std::make_tuple(param1, param2, param3);
+  // compute average alpha_r and alpha_phi
+  double param4 = boxRadius * thrust::reduce(d_alpha_r.begin(), d_alpha_r.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param5 = boxRadius * thrust::reduce(d_alpha_phi.begin(), d_alpha_phi.end(), double(0), thrust::plus<double>()) / numParticles;
+  return std::make_tuple(param1, param2, param3, param4, param5);
 }
 
 double SP2D::getVicsekHigherOrderParameter(double order_) {

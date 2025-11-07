@@ -26,11 +26,12 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = false;
-  bool readState = false, saveFinal = true, logSave = false, linSave = true;
+  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables
-  double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
+  double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]);
+  double damping = atof(argv[5]), scale = atof(argv[12]), roughness = atof(argv[13]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
   std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11];
   // step variables
@@ -39,7 +40,7 @@ int main(int argc, char **argv) {
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
   double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
-  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, scale = atof(argv[12]);
+  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec;
   std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "active/";
 
   // initialize sp object
@@ -86,12 +87,15 @@ int main(int argc, char **argv) {
     wallDyn = "fixed";
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else if(wallType == "rough") {
+    //whichDynamics = whichDynamics + "rough" + argv[13] + "/";
     whichDynamics = whichDynamics + "rough/";
     wallDyn = "rough";
+    //wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rough);
   } else if(wallType == "rigid") {
-    whichDynamics = whichDynamics + "rigid/";
+    whichDynamics = whichDynamics + "rigid" + argv[13] + "/";
     wallDyn = "rigid";
+    wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
   } else if(wallType == "mobile") {
     wallDyn = "mobile";
@@ -111,13 +115,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
-  whichDynamics = whichDynamics + "damping" + argv[5] + "/";
-  dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
-  readState = true;
   cout << "Setting default overdamped brownian dynamics" << endl;
-  if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
-    std::experimental::filesystem::create_directory(inDir + whichDynamics);
-  }
   // set input and output
   ioSPFile ioSP(&sp);
   if (justRun == true) {
@@ -132,23 +130,32 @@ int main(int argc, char **argv) {
       }
     } else {
       readState = true;
-      inDir = inDir + wallType + "/"; // "long/";
-      outDir = outDir + "dynamics";
-      if(logSave == true) outDir = outDir + "-log/";
-      else outDir = outDir + "/";
-      if(std::experimental::filesystem::exists(outDir) == true) {
-        inDir = outDir;
+      inDir = inDir + wallDyn + "/"; // "long/";
+      if (runDynamics == true) {
+        outDir = outDir + "dynamics";
+        if(logSave == true) outDir = outDir + "-log/";
+        else outDir = outDir + "/";
+        if(std::experimental::filesystem::exists(outDir) == true) {
+          inDir = outDir;
+        } else {
+          std::experimental::filesystem::create_directory(outDir);
+        }
       } else {
-        std::experimental::filesystem::create_directory(outDir);
+        outDir = inDir;
       }
     }
   } else {
+    whichDynamics = whichDynamics + "damping" + argv[5] + "/";
+    dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
+    if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
+      std::experimental::filesystem::create_directory(inDir + whichDynamics);
+    }
     if (readAndSaveSameDir == true) {//keep running the same dynamics
       readState = true;
       inDir = inDir + dirSample;
       outDir = inDir;
       if(runDynamics == true) {
-        outDir = outDir + "dynamics";
+        outDir = outDir + "dynamics-vel";
         if(logSave == true) outDir = outDir + "-log/";
         else outDir = outDir + "/";
         if(std::experimental::filesystem::exists(outDir) == true) {
@@ -178,7 +185,7 @@ int main(int argc, char **argv) {
   ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   if(readState == true) ioSP.readParticleState(inDir, numParticles, nDim, initAngles, initWall);
   if(initAngles == true) sp.initializeParticleAngles();
-  if(initWall == true) sp.initializeWall();
+  if(initWall == true) sp.initializeWall(roughness);
   if(scaleRadial == true) sp.shrinkRadialCoordinates(scale);
   // output file
   energyFile = outDir + "energy.dat";

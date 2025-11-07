@@ -2834,7 +2834,7 @@ __global__ void kernelCalcVicsekAngleAlignment(double* pAngle) {
 }
 
 // unit position, velocity and velocity-position vectors
-__global__ void kernelCalcUnitPosVel(const double* pPos, const double* pVel, double* unitPos, double* unitVel, double* unitVelPos) {
+__global__ void kernelCalcUnitPosVel(const double* pPos, const double* pVel, double* unitPos, double* unitVel, double* unitVelPos, double* alpha_r, double* alpha_phi) {
   	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
   	if (particleId < d_numParticles) {
 		// compute position unit vector
@@ -2848,6 +2848,10 @@ __global__ void kernelCalcUnitPosVel(const double* pPos, const double* pVel, dou
 		// compute cos(velAngle - posAngle) and sin(velAngle - posAngle)
 		unitVelPos[particleId * d_nDim] = cos(velAngle) * cos(posAngle) + sin(velAngle) * sin(posAngle);
 		unitVelPos[particleId * d_nDim + 1] = sin(velAngle) * cos(posAngle) - cos(velAngle) * sin(posAngle);
+		// compute alpha_r and alpha_phi
+		auto r = sqrt(pPos[particleId * d_nDim] * pPos[particleId * d_nDim] + pPos[particleId * d_nDim + 1] * pPos[particleId * d_nDim + 1]);
+		alpha_r[particleId] = sin(velAngle - posAngle) * sin(velAngle - posAngle) / r;
+		alpha_phi[particleId] = sin(velAngle - posAngle) * cos(velAngle - posAngle) / r;
   	}
 }
 

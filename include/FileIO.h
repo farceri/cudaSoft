@@ -500,10 +500,12 @@ public:
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       energyFile << "\t" << setprecision(precision) << sp_->getNeighborVelocityCorrelation();
     } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      std::tuple<double, double, double> orderParams = sp_->getVicsekOrderParameters();
+      std::tuple<double, double, double, double, double> orderParams = sp_->getVicsekOrderParameters();
       energyFile << "\t" << setprecision(precision) << get<0>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<1>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<2>(orderParams);
+      energyFile << "\t" << setprecision(precision) << get<3>(orderParams);
+      energyFile << "\t" << setprecision(precision) << get<4>(orderParams);
       if(order != 0.f) {
         energyFile << "\t" << setprecision(precision) << sp_->getVicsekHigherOrderParameter(order);
       }
@@ -931,7 +933,7 @@ public:
     long numParticles = sp_->getNumParticles();
     saveParams << "numParticles" << "\t" << numParticles << endl;
     saveParams << "nDim" << "\t" << sp_->getNDim() << endl;
-    saveParams << "sigma" << "\t" << 2 * sp_->getMeanParticleSigma() << endl;
+    saveParams << "sigma" << "\t" << sp_->getMeanParticleSigma() << endl;
     saveParams << "epsilon" << "\t" << sp_->getEnergyCostant() << endl;
     saveParams << "dt" << "\t" << sp_->dt << endl;
     saveParams << "phi" << "\t" << sp_->getParticlePhi() << endl;

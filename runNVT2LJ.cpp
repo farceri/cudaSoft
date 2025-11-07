@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
   bool readNH = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   // input variables
-  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), inertiaOverDamping = atof(argv[9]);
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), dampingOverInertia = atof(argv[9]);
   long maxStep = atof(argv[4]), initialStep = atol(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]);
   std::string inDir = argv[1], potType = argv[10], dynType = argv[11];
   // other variables
@@ -159,12 +159,13 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = sp.getMeanParticleSigma();
-  damping = sqrt(inertiaOverDamping) / sigma;
+  //damping = np.sqrt(inertiaOverDamping) / sigma;
+  damping = dampingOverInertia;
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) * forceUnit << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2 * damping * Tinject) << endl;
   damping /= timeUnit;
   ioSP.saveLangevinParams(outDir, damping);
   // initialize simulation

@@ -28,18 +28,19 @@ int main(int argc, char **argv) {
   // read NH directory denoted by T for all previous options: readNH = true
   // save in "active" directory for all the previous options: activeDir = true
   // read input and save in "dynamics" directory: justRun = true
-  bool readNH = true, activeDir = true, justRun = false, conserve = false, profile = false;
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  // variables
-  bool initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
-  long numParticles = atol(argv[9]), nDim = atol(argv[10]), maxStep = atof(argv[6]), num1 = atol(argv[11]);
+  bool activeDir = true, conserve = false, profile = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
+  bool readNH = true, initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), tp = atof(argv[4]), Ta = atof(argv[5]), dampingOverInertia = atof(argv[11]);
+  long maxStep = atof(argv[6]), initialStep = atol(argv[7]), numParticles = atol(argv[8]), nDim = atol(argv[9]), num1 = atol(argv[10]);
+  std::string inDir = argv[1], potType = argv[12], dynType = argv[13];
+  // other variables
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atol(argv[7]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double forceUnit, timeUnit, timeStep = atof(argv[2]), inertiaOverDamping = atof(argv[8]), waveQ;
-  double Tinject = atof(argv[3]), Dr, tp = atof(argv[4]), driving = atof(argv[5]);
-  double ec = 1, ea = atof(argv[13]), eb = ea, eab = 0.5, LJcut = 4, cutDistance, cutoff = 0.5, sigma, damping;
-  std::string outDir, potType = argv[12], energyFile, currentDir, inDir = argv[1];
-  std::string dynType = argv[14], dirSample, whichDynamics = "active";
+  long step = 0, updateCount = 0, firstDecade = 0, multiple = 1, saveFreq = 1;
+  double LJcut = 4, cutoff = 0.5, cutDistance, waveQ, sigma, timeUnit, forceUnit, damping, driving;
+  double ec = 1, ew = ec, ea = 2, eb = ea, eab = 0.5, range = 3;
+  std::string energyFile, outDir, currentDir, dirSample, whichDynamics = "active";
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -114,8 +115,8 @@ int main(int argc, char **argv) {
       outDir = inDir;
       if(runDynamics == true) {
         if(readNH == true) {
-          inDir = inDir + "damping" + argv[8] + "/";
-          outDir = outDir + "damping" + argv[8] + "/tp" + argv[4] + "-Ta" + argv[5] + "/";
+          inDir = inDir + "damping" + argv[11] + "/";
+          outDir = outDir + "damping" + argv[11] + "/tp" + argv[4] + "-Ta" + argv[5] + "/";
         }
         inDir =	outDir;
         if(logSave == true) {
@@ -167,16 +168,17 @@ int main(int argc, char **argv) {
   ioSP.openEnergyFile(energyFile);
   // initialization
   sigma = sp.getMeanParticleSigma();
-  damping = sqrt(inertiaOverDamping) / sigma;
-  driving = sqrt(2 * damping * driving);
+  //damping = sqrt(inertiaOverDamping) / sigma;
+  damping = dampingOverInertia;
+  driving = sqrt(2 * damping * Ta);
   timeUnit = sigma / sqrt(ea);
   forceUnit = ea / sigma;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   cout << "Units - time: " << timeUnit << " space: " << sigma << " force: " << forceUnit << " time step: " << timeStep << endl;
-  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2*damping*Tinject) << endl;
+  cout << "Thermostat - damping: " << damping << " Tinject: " << Tinject << " noise magnitude: " << sqrt(2 * damping * Tinject) << endl;
   cout << "Activity - Peclet: " << driving * tp / (damping * sigma) << " taup: " << tp << " f0: " << driving << endl;
   damping /= timeUnit;
-  driving = driving*forceUnit;
+  driving *= forceUnit;
   tp *= timeUnit;
   sp.setSelfPropulsionParams(driving, tp);
   ioSP.saveLangevinParams(outDir, damping);
@@ -199,7 +201,7 @@ int main(int argc, char **argv) {
     sp.softParticleLangevinLoop(conserve);
     if(step % saveEnergyFreq == 0) {
       //ioSP.saveEnergy(step+initialStep, timeStep, numParticles);
-      ioSP.savePressureEnergy(step+initialStep, timeStep, numParticles, true);
+      ioSP.savePressureEnergyAB(step+initialStep, timeStep, numParticles, true);
       if(step % checkPointFreq == 0) {
         cout << "Active: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;

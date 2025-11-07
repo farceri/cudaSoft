@@ -24,13 +24,17 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = false, exponential = false, equilibrate = false, saveFinal = true;
-  bool adjustTemp = false, adjustWall = false, adjustGlobal = false, save = false, saveCurrent, saveForce = false, saveStress = false;
-  long step, maxStep = atof(argv[7]), checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
-  long numParticles = atol(argv[8]), nDim = 2, updateCount = 0, direction = 1, num1 = atol(argv[9]), initMaxStep = 1e07;
-  double timeStep = atof(argv[2]), timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01, tempTh = 1e-03;
-  double ec = 1, cutDistance, cutoff = 0.5, sigma, waveQ, Tinject = atof(argv[3]), range = 3, prevEnergy = 0;
-  double ea = atof(argv[10]), eb = ea, eab = 0.5, maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
-  std::string inDir = argv[1], strainType = argv[11], potType = argv[12], outDir, currentDir, energyFile, dirSample, dirSave = "strain";
+  bool adjustGlobal = true, adjustTemp = false, adjustWall = false, save = false, saveCurrent, saveForce = false, saveStress = false;
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
+  double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
+  long maxStep = atof(argv[7]), numParticles = atol(argv[8]), num1 = atol(argv[9]);
+  std::string inDir = argv[1], strainType = argv[10], potType = argv[11];
+  // other variables
+  long nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07, step, checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
+  double timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01, tempTh = 1e-03, prevEnergy = 0;
+  double ea = 2, eb = ea, eab = 0.5, cutDistance, cutoff = 0.5, sigma, waveQ, range = 3;
+  std::string outDir, currentDir, energyFile, dirSample, dirSave = "strain";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
@@ -65,22 +69,25 @@ int main(int argc, char **argv) {
   if (saveForce == true) {
     dirSample += "-wall";
   }
-  if(saveStress == true) {
+  if (saveStress == true) {
     dirSample += "-stress";
+  }
+  if (adjustTemp == true) {
+    dirSample += "-temp";
   }
   if (adjustWall == true) {
     dirSample += "-adjust";
-    if (adjustGlobal == true) {
-      dirSample += "-global";
-    }
+  }
+  if (adjustGlobal == true) {
+    dirSample += "-global";
   }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
-    sp.setEnergyCostant(ec);
+    sp.setEnergyCostant(ea);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
-    sp.setEnergyCostant(ec);
+    sp.setEnergyCostant(ea);
     sp.setLJMinusPlusParams(LJcut, num1);
   } else if(potType == "2lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);
@@ -219,15 +226,15 @@ int main(int argc, char **argv) {
         sp.adjustTemperature(Tinject);
       }
     }
+    if(adjustGlobal == true) {
+      cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustKineticEnergy(prevEnergy);
+      cout << "Energy after global adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+    }
     if(adjustWall == true) {
       cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
       sp.adjustLocalKineticEnergy(previousEnergy, direction);
       cout << "Energy after local adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-      if (adjustGlobal == true) {
-        sp.adjustKineticEnergy(prevEnergy);
-        cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-      }
-      cout << endl;
     }
     sp.resetUpdateCount();
     step = 0;
