@@ -24,12 +24,12 @@ using namespace std;
 int main(int argc, char **argv) {
   // variables
   bool readState = true, biaxial = true, reverse = false, equilibrate = false, saveFinal = true;
-  bool adjustGlobal = true, adjustTemp = false, adjustWall = false, save = false, saveCurrent, saveForce = false;
+  bool adjustGlobal = false, adjustTemp = false, adjustWall = false, save = false, saveCurrent, saveForce = false;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
   double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
   long maxStep = atof(argv[7]), numParticles = atol(argv[8]);
-  std::string inDir = argv[1], strainType = argv[9];
+  std::string inDir = argv[1], strainType = argv[9], adjust = argv[10];
   // other variables
   long nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07, step, checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
   double timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01, tempTh = 1e-03, prevEnergy = 0.0;
@@ -69,13 +69,14 @@ int main(int argc, char **argv) {
   if (saveForce == true) {
     dirSample += "-wall";
   }
-  if (adjustTemp == true) {
+  if (adjust == "temp") {
+    adjustTemp = true;
     dirSample += "-temp";
-  }
-  if (adjustWall == true) {
+  } else if (adjust == "wall") {
+    adjustWall = true;
     dirSample += "-adjust";
-  }
-  if (adjustGlobal == true) {
+  } else if (adjust == "global") {
+    adjustGlobal = true;
     dirSample += "-global";
   }
   sp.setEnergyCostant(ec);
@@ -139,7 +140,7 @@ int main(int argc, char **argv) {
     cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature() << endl;
   }
-  if(adjustWall == true) {
+  if(adjustWall == true || adjustGlobal == true) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
   }
@@ -155,7 +156,7 @@ int main(int argc, char **argv) {
   bool forward = (strain < (maxStrain + strainStep));
   bool backward = false;
   while (forward != backward) {
-    if(adjustWall == true) {
+    if(adjustWall == true || adjustGlobal == true) {
       prevEnergy = sp.getParticleEnergy();
       previousEnergy = sp.getParticleEnergies();
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
