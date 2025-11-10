@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables

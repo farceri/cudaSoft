@@ -22,20 +22,22 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, justRun = false;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
-  bool readNH = false, alltoall = false, squarebc = false, roundbc = true, scaleVel = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
-  long numParticles = atol(argv[6]), nDim = atol(argv[7]), maxStep = atof(argv[4]);
+  bool readNH = true, alltoall = false, squarebc = false, roundbc = false, scaleVel = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  // input variables
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
+  long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]);
+  std::string inDir = argv[1], potType = argv[8], wallType = argv[9];
+  // other variables
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
-  long initialStep = atof(argv[5]), step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
-  double ec = atof(argv[9]), ew = 10*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ;
+  long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
+  double ec = 2, ew = 10*ec, LJcut = 4, cutoff = 0.5, cutDistance, waveQ, sigma, timeUnit;
   double ea = 1e04*ec, el = 1e02*ec, eb = 10*ec;
-  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), sigma, timeUnit;
   std::string outDir, energyFile, currentDir, dirSample, whichDynamics = "nve";
-  std::string inDir = argv[1], potType = argv[8], wallType = argv[10];
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   if(numParticles < 256) {
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
-    whichDynamics = whichDynamics + argv[9] + "/";
+    whichDynamics = whichDynamics + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
