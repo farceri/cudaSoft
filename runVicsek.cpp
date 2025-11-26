@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   bool readState = false, saveFinal = true, logSave = false, linSave = false;
   bool initAngles = false, squarebc = false, roundbc = true, maxRvicsek = false;
   // input variables
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     whichDynamics = "vicsek-na/";
   } else if(alignType == "vel") {
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    whichDynamics = "vicsek-vel/";
+    whichDynamics = "vicsek/";
   } else {
     sp.setAlignType(simControlStruct::alignEnum::additive);
     if(alignType == "force") whichDynamics = "vicsek-force/";

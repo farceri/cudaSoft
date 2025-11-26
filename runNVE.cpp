@@ -22,12 +22,12 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true, justRun = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = true;
   // readAndMakeNewDir reads the input dir and makes/saves a new output dir (cool or heat packing)
   // readAndSaveSameDir reads the input dir and saves in the same input dir (thermalize packing)
   // runDynamics works with readAndSaveSameDir and saves all the dynamics (run and save dynamics)
   bool readNH = true, alltoall = false, squarebc = false, roundbc = false, scaleVel = false;
-  bool readState = true, saveFinal = true, logSave = false, linSave = false;
+  bool readState = true, saveFinal = true, logSave = false, linSave = true;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
   long maxStep = atof(argv[4]), initialStep = atof(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]);
@@ -48,14 +48,14 @@ int main(int argc, char **argv) {
   }
   sp.setEnergyCostant(ec);
   if(potType == "lj") {
-    whichDynamics = whichDynamics + "/";
+    whichDynamics = whichDynamics + "2/"; // 2 is the LJ potential energy scale
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     whichDynamics = whichDynamics + "/";
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
   } else {
-    whichDynamics = whichDynamics + "/";
+    whichDynamics = whichDynamics + "-harm/";
     cout << "Setting default harmonic potential" << endl;
     sp.setWallType(simControlStruct::wallEnum::harmonic);
   }

@@ -22,7 +22,7 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-  // variables
+  // boolean variables
   bool readState = true, biaxial = true, reverse = false, exponential = false, equilibrate = false, saveFinal = true;
   bool adjustGlobal = false, adjustTemp = false, adjustWall = false, save = false, saveCurrent, saveForce = false, saveStress = false;
   // input variables
@@ -99,13 +99,11 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   outDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/";
-  //outDir = inDir + dirSample + "/";
   if(initStrain != 0) {
     // read initial boxSize
     initBoxSize = ioSP.readBoxSize(inDir, nDim);
     strain = initStrain + strainStep;
     inDir = inDir + dirSample + argv[5] + "-tmax" + argv[7] + "/strain" + argv[6] + "/";
-    //inDir = inDir + dirSample + "/strain" + argv[8] + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
   } else {
     strain = strainStep;
@@ -243,7 +241,7 @@ int main(int argc, char **argv) {
     while(step != maxStep) {
       sp.softParticleNVELoop();
       if((step + 1) % linFreq == 0) {
-        if(saveCurrent == true and save == true) {
+        if(saveCurrent == true && save == true) {
           if(saveForce == true) {
             ioSP.saveParticleWallEnergy(step, timeStep, numParticles, range);
           } else if(saveStress == true) {

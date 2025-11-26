@@ -66,7 +66,7 @@ INC_DIR = include
 #EXE = measureTemperature
 
 # run dynamics
-EXE = runNVE
+#EXE = runNVE
 #EXE = runNVE2LJ
 #EXE = runNH
 #EXE = runNH2LJ
@@ -79,7 +79,7 @@ EXE = runNVE
 #EXE = runNPT
 #EXE = runABP
 #EXE = runVicsek
-#EXE = runWall
+EXE = runWall
 
 # mechanics
 #EXE = linearShearFIRE

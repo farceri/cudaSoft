@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
   double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
-  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec;
+  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, order = 2.f;
   std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "active/";
 
   // initialize sp object
@@ -93,9 +93,10 @@ int main(int argc, char **argv) {
     //wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rough);
   } else if(wallType == "rigid") {
-    whichDynamics = whichDynamics + "rigid" + argv[13] + "/";
+    //whichDynamics = whichDynamics + "rigid" + argv[13] + "/";
+    whichDynamics = whichDynamics + "rigid/";
     wallDyn = "rigid";
-    wallDyn = wallDyn + argv[13];
+    //wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
   } else if(wallType == "mobile") {
     wallDyn = "mobile";
@@ -233,7 +234,7 @@ int main(int argc, char **argv) {
   while(step != maxStep) {
     sp.softParticleLangevinLoop();
     if(step % saveEnergyFreq == 0) {
-      ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles);
+      ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles, order);
       if(wallType == "rigid") {
         ioSP.saveWallDynamics(step+initialStep, timeStep);
       }

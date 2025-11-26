@@ -2210,20 +2210,20 @@ std::tuple<double, double, double, double, double> SP2D::getVicsekOrderParameter
   double *alpha_r = thrust::raw_pointer_cast(&d_alpha_r[0]);
   double *alpha_phi = thrust::raw_pointer_cast(&d_alpha_phi[0]);
   kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos, alpha_r, alpha_phi);
-  // compute phase order parameters
+  // compute phase order parameter
   typedef thrust::device_vector<double>::iterator Iterator;
   strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
   strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
   double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
   double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
   double param1 = sqrt(realField * realField + imagField * imagField);
-  // compute velocity order parameters
+  // compute velocity order parameter
   strided_range<Iterator> unitVel_re(d_unitVel.begin(), d_unitVel.end(), 2);
   strided_range<Iterator> unitVel_im(d_unitVel.begin() + 1, d_unitVel.end(), 2);
   realField = thrust::reduce(unitVel_re.begin(), unitVel_re.end(), double(0), thrust::plus<double>()) / numParticles;
   imagField = thrust::reduce(unitVel_im.begin(), unitVel_im.end(), double(0), thrust::plus<double>()) / numParticles;
   double param2 = sqrt(realField * realField + imagField * imagField);
-  // compute velocity-position order parameters
+  // compute velocity-position order parameter
   strided_range<Iterator> unitVelPos_re(d_unitVelPos.begin(), d_unitVelPos.end(), 2);
   strided_range<Iterator> unitVelPos_im(d_unitVelPos.begin() + 1, d_unitVelPos.end(), 2);
   realField = thrust::reduce(unitVelPos_re.begin(), unitVelPos_re.end(), double(0), thrust::plus<double>()) / numParticles;

@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   // read input and save in "dynamics" directory: justRun = true
   bool dampingDir = true, conserve = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
-  bool readNH = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readNH = false, readState = true, saveFinal = true, logSave = false, linSave = false;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), dampingOverInertia = atof(argv[9]);
   long maxStep = atof(argv[4]), initialStep = atol(argv[5]), numParticles = atol(argv[6]), nDim = atol(argv[7]), num1 = atol(argv[8]);

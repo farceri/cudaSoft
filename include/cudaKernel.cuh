@@ -1951,9 +1951,11 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
-			// transform wallForce to polar coordinates and then assign to wForce
-			double radForce, thetaForce;
-			cartesianToPolar(wallForce, radForce, thetaForce);
+			// transform wallForce to radial and tangential components and then assign to wForce
+			double radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
+			double thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
+			//double radForce, thetaForce;
+			//cartesianToPolar(wallForce, radForce, thetaForce);
 			wForce[particleId * d_nDim] = radForce;
 			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
@@ -2065,9 +2067,11 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
-			// transform wallForce to polar coordinates and then assign to wForce
-			double radForce, thetaForce;
-			cartesianToPolar(wallForce, radForce, thetaForce);
+			// transform wallForce to radial and tangential components and then assign to wForce
+			double radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
+			double thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
+			//double radForce, thetaForce;
+			//cartesianToPolar(wallForce, radForce, thetaForce);
 			wForce[particleId * d_nDim] = radForce;
 			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
