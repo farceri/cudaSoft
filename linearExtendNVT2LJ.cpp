@@ -23,7 +23,7 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // boolean variables
-  bool readState = true, biaxial = true, reverse = true, equilibrate = false;
+  bool readState = true, biaxial = true, reverse = false, equilibrate = false;
   bool saveFinal = true, adjustTemp = false, save = false, saveCurrent, saveForce = false;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), dampingOverInertia = atof(argv[4]);
@@ -75,11 +75,11 @@ int main(int argc, char **argv) {
   }
   if(potType == "ljwca") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJWCA);
-    sp.setEnergyCostant(ec);
+    sp.setEnergyCostant(ea);
     sp.setLJWCAparams(LJcut, num1);
   } else if(potType == "ljmp") {
     sp.setPotentialType(simControlStruct::potentialEnum::LJMinusPlus);
-    sp.setEnergyCostant(ec);
+    sp.setEnergyCostant(ea);
     sp.setLJMinusPlusParams(LJcut, num1);
   } else if(potType == "2lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::doubleLJ);

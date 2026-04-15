@@ -58,7 +58,7 @@ SP2D::SP2D(long nParticles, long dim) {
 	simControl.potentialType = simControlStruct::potentialEnum::harmonic;
 	simControl.wallType = simControlStruct::wallEnum::harmonic;
 	simControl.gravityType = simControlStruct::gravityEnum::off;
-	simControl.alignType = simControlStruct::alignEnum::additive;
+	simControl.alignType = simControlStruct::alignEnum::velAlign;
 	syncSimControlToDevice();
   // default parameters
   dt = 1e-04;
@@ -183,6 +183,7 @@ void SP2D::initWallVariables(long numWall_) {
     wallAngle = 0.;
     wallOmega = 0.;
     wallAlpha = 0.;
+    wallTorque = 0.;
   }
 }
 
@@ -230,13 +231,15 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
   } else if(simControl.particleType == simControlStruct::particleEnum::active) {
     if(nDim == 2) {
       d_particleAngle.resize(numParticles);
+      d_activeTorque.resize(numParticles);
       d_randAngle.resize(numParticles);
     } else if(nDim == 3) {
       d_particleAngle.resize(numParticles * nDim);
       d_randAngle.resize(numParticles * nDim);
     }
-    thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
+    thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
+    thrust::fill(d_activeTorque.begin(), d_activeTorque.end(), double(0));
     d_velCorr.resize(numParticles);
     thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
     d_angMom.resize(numParticles);
@@ -246,9 +249,11 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     d_randAngle.resize(numParticles);
     d_particleAngle.resize(numParticles);
     d_particleAlpha.resize(numParticles);
+    d_activeTorque.resize(numParticles);
     thrust::fill(d_randAngle.begin(), d_randAngle.end(), double(0));
     thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_particleAlpha.begin(), d_particleAlpha.end(), double(0));
+    thrust::fill(d_activeTorque.begin(), d_activeTorque.end(), double(0));
     initVicsekNeighbors(numParticles);
     d_vicsekLastPos.resize(numParticles * nDim);
     thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
@@ -455,14 +460,16 @@ simControlStruct::gravityEnum SP2D::getGravityType() {
 
 void SP2D::setAlignType(simControlStruct::alignEnum alignType_) {
 	simControl.alignType = alignType_;
-  if(simControl.alignType == simControlStruct::alignEnum::additive) {
-    cout << "SP2D::setAlignType: alignType: additive" << endl;
-  } else if(simControl.alignType == simControlStruct::alignEnum::nonAdditive) {
-    cout << "SP2D::setAlignType: alignType: non additive" << endl;
+  if(simControl.alignType == simControlStruct::alignEnum::forceAlign) {
+    cout << "SP2D::setAlignType: alignType: forceAlign" << endl;
+  } else if(simControl.alignType == simControlStruct::alignEnum::nonAddForceAlign) {
+    cout << "SP2D::setAlignType: alignType: nonAddForceAlign" << endl;
   } else if(simControl.alignType == simControlStruct::alignEnum::velAlign) {
     cout << "SP2D::setAlignType: alignType: velocity" << endl;
+  } else if(simControl.alignType == simControlStruct::alignEnum::nonAddVelAlign) {
+    cout << "SP2D::setAlignType: alignType: nonAddVelAlign" << endl;
   } else {
-    cout << "SP2D::setAlignType: please specify valid alignType: additive or non additive" << endl;
+    cout << "SP2D::setAlignType: please specify valid alignType: forceAlign, nonAddForceAlign, velAlign or nonAddVelAlign" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -754,12 +761,12 @@ double SP2D::getWallAreaDeviation() {
 
 }
 
-std::tuple<double, double, double> SP2D::getWallAngleDynamics() {
+std::tuple<double, double, double, double> SP2D::getWallAngleDynamics() {
   if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-    return make_tuple(wallAngle, wallOmega, wallAlpha);
+    return make_tuple(wallAngle, wallOmega, wallAlpha, wallTorque);
   } else {
     cout << "SP2D::getWallAngleDynamics only works for rigid boundary!" << endl;
-    return make_tuple(0, 0, 0);
+    return make_tuple(0, 0, 0, 0);
   }
 }
 
@@ -768,6 +775,7 @@ void SP2D::setWallAngleDynamics(thrust::host_vector<double> wallDynamics_) {
     wallAngle = wallDynamics_[0];
     wallOmega = wallDynamics_[1];
     wallAlpha = wallDynamics_[2];
+    wallTorque = wallDynamics_[3];
     d_monomerAlpha.resize(numWall);
     thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
   } else {
@@ -887,29 +895,28 @@ void SP2D::shrinkRadialCoordinates(double scale_) {
   // and multiply radial coordinate by a scalar factor
   if (simControl.geometryType == simControlStruct::geometryEnum::roundWall) {
     if(scale_ >= 1) {
-      cout << "SP2D::shrinkRadialCoordinates: scale must be between 0 and 1!" << endl;
-      return;
-    } else {
-      auto r = thrust::counting_iterator<long>(0);
-      double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-      double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-      double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
-
-      auto scaleRadialCoordinate = [=] __device__ (long particleId) {
-        double x = pPos[particleId * d_nDim];
-        double y = pPos[particleId * d_nDim + 1];
-        double radial = sqrt(x * x + y * y);
-        if (radial > 0) {
-          double theta = atan2(y, x);
-          radial *= scale_;
-          pPos[particleId * d_nDim] = radial * cos(theta);
-          pPos[particleId * d_nDim + 1] = radial * sin(theta);
-        }
-      };
-
-      thrust::for_each(r, r + numParticles, scaleRadialCoordinate);
-      cout << "SP2D::shrinkRadialCoordinates: scale: " << scale_ << endl;
+      cout << "SP2D::shrinkRadialCoordinates: scale must be between 0 and 1! Setting it to 0.99" << endl;
+      scale_ = 0.99;
     }
+    auto r = thrust::counting_iterator<long>(0);
+    double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+    double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+    double *boxSize = thrust::raw_pointer_cast(&d_boxSize[0]);
+
+    auto scaleRadialCoordinate = [=] __device__ (long particleId) {
+      double x = pPos[particleId * d_nDim];
+      double y = pPos[particleId * d_nDim + 1];
+      double radial = sqrt(x * x + y * y);
+      if (radial > 0) {
+        double theta = atan2(y, x);
+        radial *= scale_;
+        pPos[particleId * d_nDim] = radial * cos(theta);
+        pPos[particleId * d_nDim + 1] = radial * sin(theta);
+      }
+    };
+
+    thrust::for_each(r, r + numParticles, scaleRadialCoordinate);
+    cout << "SP2D::shrinkRadialCoordinates: scale: " << scale_ << endl;
   } else {
     cout << "SP2D::scaleRadialCoordinates: only works for roundWall geometry!" << endl;
   }
@@ -1729,8 +1736,12 @@ void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, doub
   thrust::fill(d_flagAB.begin(), d_flagAB.end(), 0);
   d_squaredVelAB.resize(numParticles * nDim);
   d_particleEnergyAB.resize(numParticles);
+  d_particleEnergyAA.resize(num1_);
+  d_particleEnergyBB.resize(numParticles - num1_);
   thrust::fill(d_squaredVelAB.begin(), d_squaredVelAB.end(), double(0));
   thrust::fill(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0));
+  thrust::fill(d_particleEnergyAA.begin(), d_particleEnergyAA.end(), double(0));
+  thrust::fill(d_particleEnergyBB.begin(), d_particleEnergyBB.end(), double(0));
   LJcutoff = LJcutoff_;
   cudaMemcpyToSymbol(d_LJcutoff, &LJcutoff, sizeof(LJcutoff));
   eAA = eAA_;
@@ -1876,10 +1887,12 @@ void SP2D::addSelfPropulsion() {
   }
   auto r = thrust::counting_iterator<long>(0);
   thrust::counting_iterator<long> index_sequence_begin(lrand48());
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+  double *aTorque = thrust::raw_pointer_cast(&d_activeTorque[0]);
 	if(nDim == 2) {
-    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), wrappedGaussNum(0.f,amplitude));
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), gaussNum(0.f,amplitude));
     double *randAngle = thrust::raw_pointer_cast(&d_randAngle[0]);
 
     auto updateActiveNoise2D = [=] __device__ (long pId) {
@@ -1887,6 +1900,8 @@ void SP2D::addSelfPropulsion() {
       pAngle[pId] = pAngle[pId] + PI;
       pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
       pAngle[pId] = pAngle[pId] - PI;
+      // compute active torque and add active force to particle force
+      aTorque[pId] = s_driving * (pPos[pId * s_nDim] * sin(pAngle[pId]) - pPos[pId * s_nDim + 1] * cos(pAngle[pId]));
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1941,11 +1956,13 @@ void SP2D::addVicsekAlignment() {
     }
     auto r = thrust::counting_iterator<long>(0);
     thrust::counting_iterator<long> index_sequence_begin(lrand48());
-    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), wrappedGaussNum(0.f,amplitude));
+    thrust::transform(index_sequence_begin, index_sequence_begin + numParticles, d_randAngle.begin(), gaussNum(0.f,amplitude));
     const double *pAlpha = thrust::raw_pointer_cast(&d_particleAlpha[0]);
+    const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
     double *randAngle = thrust::raw_pointer_cast(&d_randAngle[0]);
     double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
     double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
+    double *aTorque = thrust::raw_pointer_cast(&d_activeTorque[0]);
 
     auto updateVicsekAlignment2D = [=] __device__ (long pId) {
       // overdamped equation for the angle with vicsek alignment as torque
@@ -1953,6 +1970,8 @@ void SP2D::addVicsekAlignment() {
       pAngle[pId] = pAngle[pId] + PI;
       pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
       pAngle[pId] = pAngle[pId] - PI;
+      // compute active torque and add active force to particle force
+      aTorque[pId] = s_driving * (pPos[pId * s_nDim] * sin(pAngle[pId]) - pPos[pId * s_nDim + 1] * cos(pAngle[pId]));
       #pragma unroll (MAXDIM)
       for (long dim = 0; dim < s_nDim; dim++) {
         pForce[pId * s_nDim + dim] += s_driving * ((1 - dim) * cos(pAngle[pId]) + dim * sin(pAngle[pId]));
@@ -1965,18 +1984,22 @@ void SP2D::addVicsekAlignment() {
 
 void SP2D::calcVicsekAlignment() {
   checkVicsekNeighbors();
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pAlpha = thrust::raw_pointer_cast(&d_particleAlpha[0]);
   switch (simControl.alignType) {
-    case simControlStruct::alignEnum::additive:
-    kernelCalcVicsekAdditiveAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
+    case simControlStruct::alignEnum::forceAlign:
+    kernelCalcVicsekForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
     break;
-    case simControlStruct::alignEnum::nonAdditive:
-    kernelCalcVicsekNonAdditiveAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
+    case simControlStruct::alignEnum::nonAddForceAlign:
+    kernelCalcVicsekNonAddForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
     break;
     case simControlStruct::alignEnum::velAlign:
-    const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
     kernelCalcVicsekVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
+    case simControlStruct::alignEnum::nonAddVelAlign:
+    kernelCalcVicsekNonAddVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
+    break;
+    default:
     break;
   }
 }
@@ -2067,8 +2090,10 @@ void SP2D::calcWallAngularAcceleration() {
   const double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
 	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
 	double *mAlpha = thrust::raw_pointer_cast(&d_monomerAlpha[0]);
-  kernelCalcWallAngularAcceleration<<<dimGrid, dimBlock>>>(wPos, wForce, mAlpha);
+	double *mTorque = thrust::raw_pointer_cast(&d_monomerTorque[0]);
+  kernelCalcWallAngularAcceleration<<<dimGrid, dimBlock>>>(wPos, wForce, mAlpha, mTorque);
   wallAlpha = thrust::reduce(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0), plus<double>());
+  wallTorque = thrust::reduce(d_monomerTorque.begin(), d_monomerTorque.end(), double(0), plus<double>());
 }
 
 void SP2D::addParticleGravity() {
@@ -2260,6 +2285,14 @@ double SP2D::getNeighborVelocityCorrelation() {
   double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
   kernelCalcNeighborVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
   return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
+double SP2D::getParticleMomentOfInertia() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
+  kernelCalcParticleMomentOfInertia<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
+  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 double SP2D::getParticleAngularMomentum() {
@@ -2604,6 +2637,11 @@ std::tuple<double, double, double> SP2D::getParticleStressComponents() {
    return std::make_tuple(stress_xx, stress_yy, stress_xy);
 }
 
+// active torque is defined only for particles of type vicsek
+double SP2D::getActiveTorque() {
+  return thrust::reduce(d_activeTorque.begin(), d_activeTorque.end(), double(0), thrust::plus<double>());
+}
+
 // TODO: add roundWall geometry
 std::tuple<double, double> SP2D::computeWallPressure() {
   thrust::device_vector<double> d_wallStress(d_particleForce.size());
@@ -2811,6 +2849,30 @@ double SP2D::getParticleKineticEnergy() {
   return 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
 }
 
+std::tuple<double, double> SP2D::getParticlePotentialEnergyByType() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+	double *pEnergyAA = thrust::raw_pointer_cast(&d_particleEnergyAA[0]);
+	double *pEnergyBB = thrust::raw_pointer_cast(&d_particleEnergyBB[0]);
+  switch (simControl.neighborType) {
+    case simControlStruct::neighborEnum::neighbor:
+    kernelCalcParticleEnergyByType<<<dimGrid, dimBlock>>>(pRad, pPos, pEnergyAA, pEnergyBB);
+    break;
+    default:
+    break;
+  }
+  double epotAA = thrust::reduce(d_particleEnergyAA.begin(), d_particleEnergyAA.end(), double(0), thrust::plus<double>());
+  double epotBB = thrust::reduce(d_particleEnergyBB.begin(), d_particleEnergyBB.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(epotAA, epotBB);
+}
+
+std::tuple<double, double>  SP2D::getParticleKineticEnergyByType() {
+  thrust::transform(d_particleVel.begin(), d_particleVel.begin(), d_squaredVel.begin(), square());
+  double ekinAA = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.begin() + num1, double(0), thrust::plus<double>());
+  double ekinBB = 0.5 * thrust::reduce(d_squaredVel.begin() + num1, d_squaredVel.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(ekinAA, ekinBB);
+}
+
 double SP2D::getWallKineticEnergy() {
   thrust::transform(d_wallVel.begin(), d_wallVel.end(), d_sqWallVel.begin(), square());
   return 0.5 * thrust::reduce(d_sqWallVel.begin(), d_sqWallVel.end(), double(0), thrust::plus<double>());
@@ -2952,131 +3014,6 @@ double SP2D::getTotalEnergy() {
   return getWallEnergy() + getParticleEnergy();
 }
 
-std::tuple<double, double, double> SP2D::getParticleKineticEnergy12() {
-  thrust::transform(d_particleVel.begin(), d_particleVel.end(), d_squaredVel.begin(), square());
-  thrust::device_vector<double> velSq1(num1 * nDim);
-  thrust::device_vector<double> velSq2((numParticles-num1) * nDim);
-  thrust::copy(d_squaredVel.begin(), d_squaredVel.begin() + num1 * nDim, velSq1.begin());
-  thrust::copy(d_squaredVel.begin() + num1 * nDim, d_squaredVel.end(), velSq2.begin());
-  double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>());
-  double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>());
-  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
-  return std::make_tuple(ekin1, ekin2, ekin);
-}
-
-std::tuple<double, double, double> SP2D::getParticleT1T2() {
-  std::tuple<double, double, double> ekins = getParticleKineticEnergy12();
-  double T1 = 2 * get<0>(ekins) / (nDim * num1);
-  double T2 = 2 * get<1>(ekins) / (nDim * (numParticles - num1));
-  double T = 2 * get<2>(ekins) / (nDim * numParticles);
-  //double T = 2 * getParticleKineticEnergy() / (nDim * numParticles);
-  return std::make_tuple(T1, T2, T);
-}
-
-void SP2D::adjustKineticEnergy(double prevEtot) {
-  double scale, ekin = getParticleKineticEnergy();
-  double deltaEtot = getParticlePotentialEnergy() + ekin;
-  deltaEtot -= prevEtot;
-  if(ekin > deltaEtot) {
-    scale = sqrt((ekin - deltaEtot) / ekin);
-    //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
-    long s_nDim(nDim);
-    auto r = thrust::counting_iterator<long>(0);
-    double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-
-    auto adjustParticleVel = [=] __device__ (long pId) {
-      #pragma unroll (MAXDIM)
-      for (long dim = 0; dim < s_nDim; dim++) {
-        pVel[pId * s_nDim + dim] *= scale;
-      }
-    };
-
-    cout << "SP2D::adjustKineticEnergy:: scale: " << scale << endl;
-    thrust::for_each(r, r + numParticles, adjustParticleVel);
-  } else {
-    cout << "SP2D::adjustKineticEnergy:: kinetic energy is less then change in total energy - no adjustment is made" << endl;
-  }
-}
-
-void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_, long direction_) {
-  thrust::device_vector<double> d_prevEnergy = prevEnergy_;
-  // compute new potential energy per particle
-  getParticlePotentialEnergy();
-  // label particles close to compressing walls
-  thrust::device_vector<long> d_wallLabel(numParticles);
-  thrust::fill(d_wallLabel.begin(), d_wallLabel.end(), 0);
-  long *wallLabel = thrust::raw_pointer_cast(&d_wallLabel[0]);
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
-  kernelAssignWallLabel<<<dimGrid,dimBlock>>>(pPos, pRad, wallLabel, direction_);
-
-  /*for (long pId=0; pId<numParticles; pId++) {
-    if(d_wallLabel[pId] == 1) {
-      if(direction_ == 1) {
-        cout << "Particle " << pId << " near vertical wall, pos: " << d_particlePos[pId * nDim] << endl;
-      } else if(direction_ == 0) {
-        cout << "Particle " << pId << " near horizontal wall, pos: " << d_particlePos[pId * nDim + 1] << endl;
-      }
-    }
-  }*/
-
-  // locally rescale velocities for particles near compressing walls
-  long s_nDim(nDim);
-  auto r = thrust::counting_iterator<long>(0);
-  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  const double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
-  const double *prevEnergy = thrust::raw_pointer_cast(&d_prevEnergy[0]);
-
-  auto adjustLocalParticleVel = [=] __device__(long pId) {
-    if(wallLabel[pId] == 1) {
-      double deltaU = pEnergy[pId] - prevEnergy[pId];
-      double ekin = 0.0;
-      #pragma unroll(MAXDIM)
-      for (long dim = 0; dim < s_nDim; dim++) {
-        ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
-      }
-      ekin *= 0.5;
-      if(ekin > deltaU) {
-        double scale = sqrt((ekin - deltaU) / ekin);
-        #pragma unroll(MAXDIM)
-        for (long dim = 0; dim < s_nDim; dim++) {
-          pVel[pId * s_nDim + dim] *= scale;
-        }
-      }
-    }
-    /*double scale = 1.0;
-    if(ekin > deltaU) {
-      scale = sqrt((ekin - deltaU) / ekin);
-    } else {
-      scale = sqrt((deltaU - ekin) / ekin);
-    }
-    #pragma unroll(MAXDIM)
-    for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] *= scale;
-    }*/
-  };
-
-  thrust::for_each(r, r + numParticles, adjustLocalParticleVel);
-}
-
-void SP2D::adjustTemperature(double targetTemp) {
-  double scale = sqrt(targetTemp / getParticleTemperature());
-  //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
-  long s_nDim(nDim);
-  auto r = thrust::counting_iterator<long>(0);
-  double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-
-  auto adjustParticleTemp = [=] __device__ (long pId) {
-    #pragma unroll (MAXDIM)
-    for (long dim = 0; dim < s_nDim; dim++) {
-      pVel[pId * s_nDim + dim] *= scale;
-    }
-  };
-
-  //cout << "SP2D::adjustTemperature:: scale: " << scale << endl;
-  thrust::for_each(r, r + numParticles, adjustParticleTemp);
-}
-
 double SP2D::getMassiveTemperature(long firstIndex, double mass) {
   // temperature computed from the massive particles which are set to be the first
   thrust::transform(d_particleVel.begin(), d_particleVel.begin() + firstIndex * nDim, d_squaredVel.begin(), square());
@@ -3170,6 +3107,148 @@ std::tuple<double, double, double, long> SP2D::getParticleWorkAB() {
   calcParticleHeatAB();
   double heat = thrust::reduce(d_particleEnergyAB.begin(), d_particleEnergyAB.end(), double(0), thrust::plus<double>());
   return std::make_tuple(epot, ekin, heat, numParticlesAB);
+}
+
+std::tuple<double, double, double> SP2D::getParticleKineticEnergy12() {
+  thrust::transform(d_particleVel.begin(), d_particleVel.end(), d_squaredVel.begin(), square());
+  thrust::device_vector<double> velSq1(num1 * nDim);
+  thrust::device_vector<double> velSq2((numParticles-num1) * nDim);
+  thrust::copy(d_squaredVel.begin(), d_squaredVel.begin() + num1 * nDim, velSq1.begin());
+  thrust::copy(d_squaredVel.begin() + num1 * nDim, d_squaredVel.end(), velSq2.begin());
+  double ekin1 = 0.5 * thrust::reduce(velSq1.begin(), velSq1.end(), double(0), thrust::plus<double>());
+  double ekin2 = 0.5 * thrust::reduce(velSq2.begin(), velSq2.end(), double(0), thrust::plus<double>());
+  double ekin = 0.5 * thrust::reduce(d_squaredVel.begin(), d_squaredVel.end(), double(0), thrust::plus<double>());
+  return std::make_tuple(ekin1, ekin2, ekin);
+}
+
+std::tuple<double, double, double> SP2D::getParticleT1T2() {
+  std::tuple<double, double, double> ekins = getParticleKineticEnergy12();
+  double T1 = 2 * get<0>(ekins) / (nDim * num1);
+  double T2 = 2 * get<1>(ekins) / (nDim * (numParticles - num1));
+  double T = 2 * get<2>(ekins) / (nDim * numParticles);
+  //double T = 2 * getParticleKineticEnergy() / (nDim * numParticles);
+  return std::make_tuple(T1, T2, T);
+}
+
+void SP2D::adjustKineticEnergy(double prevEtot) {
+  double scale, ekin = getParticleKineticEnergy();
+  double deltaEtot = getParticlePotentialEnergy() + ekin;
+  deltaEtot -= prevEtot;
+  if(ekin > deltaEtot) {
+    scale = sqrt((ekin - deltaEtot) / ekin);
+    //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
+    long s_nDim(nDim);
+    auto r = thrust::counting_iterator<long>(0);
+    double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+    auto adjustParticleVel = [=] __device__ (long pId) {
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pVel[pId * s_nDim + dim] *= scale;
+      }
+    };
+
+    cout << "SP2D::adjustKineticEnergy:: scale: " << scale << endl;
+    thrust::for_each(r, r + numParticles, adjustParticleVel);
+  } else {
+    cout << "SP2D::adjustKineticEnergy:: kinetic energy is less then change in total energy - no adjustment is made" << endl;
+  }
+}
+
+void SP2D::adjustKineticEnergyByType(double prevEpotAA, double prevEpotBB) {
+  double scaleAA, scaleBB;
+  std::tuple<double, double> ekin = getParticleKineticEnergyByType();
+  double ekinAA = get<0>(ekin);
+  double ekinBB = get<1>(ekin);
+  std::tuple<double, double> epot = getParticlePotentialEnergyByType();
+  double epotAA = get<0>(epot);
+  double epotBB = get<1>(epot);
+  double deltaEpotAA = epotAA - prevEpotAA;
+  double deltaEpotBB = epotBB - prevEpotBB;
+  if((ekinAA > deltaEpotAA) && (ekinBB > deltaEpotBB)) {
+    scaleAA = sqrt((ekinAA - deltaEpotAA) / ekinAA);
+    scaleBB = sqrt((ekinBB - deltaEpotBB) / ekinBB);
+    cout << "SP2D::adjustKineticEnergyByType:: scaleAA: " << scaleAA << " scaleBB: " << scaleBB << endl;
+    long s_nDim(nDim);
+    auto r = thrust::counting_iterator<long>(0);
+    double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+    auto adjustParticleVelAA = [=] __device__ (long pId) {
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pVel[pId * s_nDim + dim] *= scaleAA;
+      }
+    };
+    thrust::for_each(r, r + num1, adjustParticleVelAA);
+
+    auto adjustParticleVelBB = [=] __device__ (long pId) {
+      #pragma unroll (MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        pVel[pId * s_nDim + dim] *= scaleBB;
+      }
+    };
+    thrust::for_each(r + num1, r + numParticles, adjustParticleVelBB);
+  } else {
+    cout << "SP2D::adjustKineticEnergyByType:: kinetic energy is less then change in total energy - no adjustment is made" << endl;
+  }
+}
+
+void SP2D::adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_, long direction_) {
+  thrust::device_vector<double> d_prevEnergy = prevEnergy_;
+  // compute new potential energy per particle
+  getParticlePotentialEnergy();
+  // label particles close to compressing walls
+  thrust::device_vector<long> d_wallLabel(numParticles);
+  thrust::fill(d_wallLabel.begin(), d_wallLabel.end(), 0);
+  long *wallLabel = thrust::raw_pointer_cast(&d_wallLabel[0]);
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+  kernelAssignWallLabel<<<dimGrid,dimBlock>>>(pPos, pRad, wallLabel, direction_);
+  // locally rescale velocities for particles near compressing walls
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  const double *pEnergy = thrust::raw_pointer_cast(&d_particleEnergy[0]);
+  const double *prevEnergy = thrust::raw_pointer_cast(&d_prevEnergy[0]);
+
+  auto adjustLocalParticleVel = [=] __device__(long pId) {
+    if(wallLabel[pId] == 1) {
+      double deltaU = pEnergy[pId] - prevEnergy[pId];
+      double ekin = 0.0;
+      #pragma unroll(MAXDIM)
+      for (long dim = 0; dim < s_nDim; dim++) {
+        ekin += pVel[pId * s_nDim + dim] * pVel[pId * s_nDim + dim];
+      }
+      ekin *= 0.5;
+      if(ekin > deltaU) {
+        double scale = sqrt((ekin - deltaU) / ekin);
+        #pragma unroll(MAXDIM)
+        for (long dim = 0; dim < s_nDim; dim++) {
+          pVel[pId * s_nDim + dim] *= scale;
+        }
+      }
+    }
+  };
+
+  thrust::for_each(r, r + numParticles, adjustLocalParticleVel);
+}
+
+void SP2D::adjustTemperature(double targetTemp) {
+  double scale = sqrt(targetTemp / getParticleTemperature());
+  //cout << "deltaEtot: " << deltaEtot << " ekin - deltaEtot: " << ekin - deltaEtot << " scale: " << scale << endl;
+  long s_nDim(nDim);
+  auto r = thrust::counting_iterator<long>(0);
+  double* pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+
+  auto adjustParticleTemp = [=] __device__ (long pId) {
+    #pragma unroll (MAXDIM)
+    for (long dim = 0; dim < s_nDim; dim++) {
+      pVel[pId * s_nDim + dim] *= scale;
+    }
+  };
+
+  //cout << "SP2D::adjustTemperature:: scale: " << scale << endl;
+  thrust::for_each(r, r + numParticles, adjustParticleTemp);
 }
 
 //************************* contacts and neighbors ***************************//

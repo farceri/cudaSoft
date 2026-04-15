@@ -23,8 +23,8 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = true;
-  bool squarebc = true, roundbc = false, lj = true, wca = false, gforce = false, alltoall = false;
+  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
+  bool squarebc = false, roundbc = true, lj = false, wca = true, gforce = false, alltoall = false;
   // input variables
   std::string outDir = argv[1];
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
-  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 1e-02, phi0 = 0.1, phiTh = 0.9;
+  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 4e-03, phi0 = 0.006, phiTh = 0.4;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, size;
   double ec = 1, ew = 1e02*ec, inertiaOverDamping = 10, scaleFactor, prevEnergy = 0;
   double cutDistance, cutoff = 0.5, timeUnit, sigma, gravity = 9.8e-04, mass = 10, damping = 1;
@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
     sp.setWallEnergyScale(ew);
   } else if(roundbc == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
+    sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
     sp.setWallEnergyScale(ew);
   } else if(gforce == true) {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
@@ -75,8 +76,6 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
-    // use harmonic potential for FIRE minimization
-    sp.setWallType(simControlStruct::wallEnum::harmonic);
     // initialize polydisperse packing
     if(roundbc == true) {
       sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
@@ -117,9 +116,6 @@ int main(int argc, char **argv) {
   } else if(wca == true) {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
-  } else {
-    cout << "Setting Harmonic potential" << endl;
-    sp.setWallType(simControlStruct::wallEnum::harmonic);
   }
   if(gforce == true) {
     sp.setGravityType(simControlStruct::gravityEnum::on);

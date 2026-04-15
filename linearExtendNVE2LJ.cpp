@@ -24,7 +24,7 @@ using namespace std;
 int main(int argc, char **argv) {
   // boolean variables
   bool readState = true, biaxial = true, reverse = false, exponential = false, equilibrate = false, saveFinal = true;
-  bool adjustGlobal = false, adjustTemp = false, adjustWall = false, save = false, saveCurrent, saveForce = false, saveStress = false;
+  bool adjustGlobal = false, adjustTemp = false, adjustType = false, save = false, saveCurrent, saveForce = false, saveStress = false;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]);
   double maxStrain = atof(argv[4]), strainStep = atof(argv[5]), initStrain = atof(argv[6]);
@@ -32,13 +32,13 @@ int main(int argc, char **argv) {
   std::string inDir = argv[1], strainType = argv[10], potType = argv[11], adjust = argv[12];
   // other variables
   long nDim = 2, updateCount = 0, direction = 1, initMaxStep = 1e07, step, checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 2);
-  double timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01, tempTh = 1e-03, prevEnergy = 0;
+  double timeUnit, LJcut = 4, strain, otherStrain, strainFreq = 0.01, tempTh = 1e-03, prevEnergy = 0, prevEpotAA = 0, prevEpotBB = 0;
   double ea = 2, eb = ea, eab = 0.5, cutDistance, cutoff = 0.5, sigma, waveQ, range = 3;
   std::string outDir, currentDir, energyFile, dirSample, dirSave = "strain";
   thrust::host_vector<double> boxSize(nDim);
   thrust::host_vector<double> initBoxSize(nDim);
   thrust::host_vector<double> newBoxSize(nDim);
-  thrust::host_vector<double> previousEnergy(numParticles);
+  std::tuple<double, double> prevEpot;
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   if(strainType == "compress") {
@@ -75,8 +75,8 @@ int main(int argc, char **argv) {
   if (adjust == "temp") {
     adjustTemp = true;
     dirSample += "-temp";
-  } else if (adjust == "wall") {
-    adjustWall = true;
+  } else if (adjust == "type") {
+    adjustType = true;
     dirSample += "-adjust";
   } else if (adjust == "global") {
     adjustGlobal = true;
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
     cout << " U/N: " << sp.getParticlePotentialEnergy() / numParticles;
     cout << " T: " << sp.getParticleTemperature() << endl;
   }
-  if (adjustWall == true || adjustGlobal == true) {
+  if (adjustType == true || adjustGlobal == true) {
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
   }
@@ -169,9 +169,15 @@ int main(int argc, char **argv) {
   bool forward = (strain < (maxStrain + strainStep));
   bool backward = false;
   while (forward != backward) {
-    if(adjustWall == true || adjustGlobal == true) {
+    if(adjustGlobal == true) {
       prevEnergy = sp.getParticleEnergy();
-      previousEnergy = sp.getParticleEnergies();
+      cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
+    }
+    if(adjustType == true) {
+      prevEnergy = sp.getParticleEnergy();
+      std::tuple<double, double> prevEpot = getParticlePotentialEnergyByType();
+      prevEpotAA = get<0>(prevEpot);
+      prevEpotBB = get<1>(prevEpot);
       cout << "Energy before extension - E/N: " << prevEnergy / numParticles << endl;
     }
     if(biaxial == true) {
@@ -217,6 +223,7 @@ int main(int argc, char **argv) {
         ioSP.openEnergyFile(energyFile);
       }
     }
+    // update neighbor list, forces and energy after box deformation
     sp.calcParticleNeighbors(cutDistance);
     sp.calcParticleForceEnergy();
     // adjust kinetic energy to preserve energy conservation
@@ -230,10 +237,10 @@ int main(int argc, char **argv) {
       sp.adjustKineticEnergy(prevEnergy);
       cout << "Energy after global adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     }
-    if(adjustWall == true) {
+    if(adjustType == true) {
       cout << "Energy after extension - E/N: " << sp.getParticleEnergy() / numParticles << endl;
-      sp.adjustLocalKineticEnergy(previousEnergy, direction);
-      cout << "Energy after local adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
+      sp.adjustKineticEnergyByType(prevEpotAA, prevEpotBB);
+      cout << "Energy after type adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     }
     sp.resetUpdateCount();
     step = 0;

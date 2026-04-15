@@ -511,15 +511,18 @@ public:
       }
       energyFile << "\t" << setprecision(precision) << sp_->getVicsekVelocityCorrelation();
     }
+    energyFile << "\t" << setprecision(precision) << sp_->getParticleMomentOfInertia();
     energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum() << endl;
   }
 
   void saveWallDynamics(long step, double timeStep) {
-    std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
+    std::tuple<double, double, double, double> angleDyn = sp_->getWallAngleDynamics();
     wallFile << step + 1 << "\t" << (step + 1) * timeStep << "\t";
     wallFile << setprecision(precision) << get<0>(angleDyn) << "\t";
     wallFile << setprecision(precision) << get<1>(angleDyn) << "\t";
-    wallFile << setprecision(precision) << get<2>(angleDyn) << endl;
+    wallFile << setprecision(precision) << get<2>(angleDyn) << "\t";
+    wallFile << setprecision(precision) << get<3>(angleDyn) << "\t";
+    wallFile << setprecision(precision) << sp_->getActiveTorque() << endl;
   }
 
   void save2DStressProfile(string dirName) {
@@ -719,6 +722,7 @@ public:
     wallDynamics_[0] = wallAngle_;
     wallDynamics_[1] = wallOmega_;
     wallDynamics_[2] = 0.;
+    wallDynamics_[3] = 0.;
     sp_->setWallAngleDynamics(wallDynamics_);
     cout << "FileIO::readRigidWallParams numWall: " << numWall_ << " wallRad: " << wallRad_ << " wallAngle: " << wallAngle_ << " wallOmega: " << wallOmega_ << endl;
     return numWall_;
@@ -902,7 +906,7 @@ public:
     double wallRad = sp_->getWallRad();
     saveParams << "wallRad" << "\t" << wallRad << endl;
     if(sp_->simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
-      std::tuple<double, double, double> angleDyn = sp_->getWallAngleDynamics();
+      std::tuple<double, double, double, double> angleDyn = sp_->getWallAngleDynamics();
       saveParams << "wallAngle" << "\t" << get<0>(angleDyn) << endl;
       saveParams << "wallOmega" << "\t" << get<1>(angleDyn) << endl;
       saveParams << "wallAlpha" << "\t" << get<2>(angleDyn) << endl;

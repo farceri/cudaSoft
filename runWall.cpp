@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables
@@ -40,8 +40,8 @@ int main(int argc, char **argv) {
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
   double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
-  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, order = 2.f;
-  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "active/";
+  double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, order = 0.f; 
+  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "vicsek/";
 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -49,15 +49,18 @@ int main(int argc, char **argv) {
   sp.setParticleType(simControlStruct::particleEnum::vicsek);
 
   // set alignment type
-  if(alignType == "nonAdd") {
-    sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
-    whichDynamics = "vicsek-na/";
-  } else if(alignType == "vel") {
+  if(alignType == "navel") { // non-additive velocity alignment
+    sp.setAlignType(simControlStruct::alignEnum::nonAddVelAlign);
+    whichDynamics = "vicsek-navel/";
+  } else if(alignType == "naforce") { // non-additive force alignment
+    sp.setAlignType(simControlStruct::alignEnum::nonAddForceAlign);
+    whichDynamics = "vicsek-naforce/";
+  } else if(alignType == "force") { // force alignment
+    sp.setAlignType(simControlStruct::alignEnum::forceAlign);
+    whichDynamics = "vicsek-force/";
+  } else { // velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    whichDynamics = "/";
-  } else {
-    sp.setAlignType(simControlStruct::alignEnum::additive);
-    if(alignType == "force") whichDynamics = "vicsek-force/";
+    if(alignType == "vel") whichDynamics = "vicsek-vel/";
   }
 
   if(potType == "lj") {
@@ -84,17 +87,21 @@ int main(int argc, char **argv) {
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
   } else if(wallType == "fixed") {
     whichDynamics = whichDynamics + "fixed/";
+    //whichDynamics = whichDynamics + "fixed-ew" + argv[14] + "/";
     wallDyn = "fixed";
+    //wallDyn = wallDyn + "-ew" + argv[14];
+    //ew = atof(argv[14])*ec;
+    //cout << "SETTING WALL ENERGY SCALE TO " << ew << endl;
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
   } else if(wallType == "rough") {
-    //whichDynamics = whichDynamics + "rough" + argv[13] + "/";
     whichDynamics = whichDynamics + "rough/";
+    //whichDynamics = whichDynamics + "rough" + argv[13] + "/";
     wallDyn = "rough";
     //wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rough);
   } else if(wallType == "rigid") {
-    //whichDynamics = whichDynamics + "rigid" + argv[13] + "/";
     whichDynamics = whichDynamics + "rigid/";
+    //whichDynamics = whichDynamics + "rigid" + argv[13] + "/";
     wallDyn = "rigid";
     //wallDyn = wallDyn + argv[13];
     sp.setBoundaryType(simControlStruct::boundaryEnum::rigid);
@@ -120,18 +127,18 @@ int main(int argc, char **argv) {
   // set input and output
   ioSPFile ioSP(&sp);
   if (justRun == true) {
-    outDir = inDir + wallDyn + "/"; // "long/";
+    outDir = inDir + wallDyn + "/";
     if(std::experimental::filesystem::exists(outDir) == false) {
       std::experimental::filesystem::create_directory(outDir);
     }
     if (readAndSaveSameDir == false) {
-      if(wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
+      if(wallType == "fixed" || wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
         initWall = true; // initializing from NVT
         scaleRadial = true; // scale radial coordinates
       }
     } else {
       readState = true;
-      inDir = inDir + wallDyn + "/"; // "long/";
+      inDir = inDir + wallDyn + "/";
       if (runDynamics == true) {
         outDir = outDir + "dynamics";
         if(logSave == true) outDir = outDir + "-log/";
@@ -239,7 +246,7 @@ int main(int argc, char **argv) {
         ioSP.saveWallDynamics(step+initialStep, timeStep);
       }
       if(step % checkPointFreq == 0) {
-        cout << "Vicsek: current step: " << step + initialStep;
+        cout << "Kuramoto: current step: " << step + initialStep;
         cout << " E/N: " << sp.getTotalEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         if(wallType == "mobile" || wallType == "plastic") {

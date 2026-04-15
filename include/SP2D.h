@@ -30,7 +30,7 @@ struct simControlStruct {
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
   enum class wallEnum {harmonic, lennardJones, WCA} wallType;
   enum class gravityEnum {on, off} gravityType;
-  enum class alignEnum {additive, nonAdditive, velAlign} alignType;
+  enum class alignEnum {forceAlign, nonAddForceAlign, velAlign, nonAddVelAlign} alignType;
 };
 
 // pointer-to-member function call macro
@@ -115,6 +115,7 @@ public:
   thrust::device_vector<double> d_particleAngle;
   thrust::device_vector<double> d_particleOmega;
   thrust::device_vector<double> d_particleAlpha;
+  thrust::device_vector<double> d_activeTorque;
   thrust::device_vector<double> d_randAngle;
   thrust::device_vector<double> d_randomAngle;
   thrust::device_vector<double> d_stress;
@@ -143,7 +144,9 @@ public:
   double wallAngle;
   double wallOmega;
   double wallAlpha;
+  double wallTorque;
   thrust::device_vector<double> d_monomerAlpha;
+  thrust::device_vector<double> d_monomerTorque;
   // correlation variables
   thrust::device_vector<double> d_velCorr;
   thrust::device_vector<double> d_unitPos;
@@ -156,6 +159,8 @@ public:
   thrust::device_vector<long> d_flagAB;
   thrust::device_vector<double> d_squaredVelAB;
   thrust::device_vector<double> d_particleEnergyAB;
+  thrust::device_vector<double> d_particleEnergyAA;
+  thrust::device_vector<double> d_particleEnergyBB;
   // hydrodynamical variables
   thrust::device_vector<double> d_flowVel;
   thrust::device_vector<double> d_surfaceHeight;
@@ -285,7 +290,7 @@ public:
 
   double getWallAreaDeviation();
 
-  std::tuple<double, double, double> getWallAngleDynamics();
+  std::tuple<double, double, double, double> getWallAngleDynamics();
   void setWallAngleDynamics(thrust::host_vector<double> wallDynamics_);
 
   void setParticleLengthScale();
@@ -499,6 +504,8 @@ public:
 
   double getNeighborVelocityCorrelation();
 
+  double getParticleMomentOfInertia();
+
   double getParticleAngularMomentum();
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
@@ -552,6 +559,8 @@ public:
 
   std::tuple<double, double, double> getParticleStressComponents();
 
+  double getActiveTorque();
+
   std::tuple<double, double> computeWallPressure();
 
   void convertFixedWallForceToRadial();
@@ -572,9 +581,13 @@ public:
 
   double getParticlePotentialEnergy();
 
-  double getWallPotentialEnergy();
+  std::tuple<double, double> getParticlePotentialEnergyByType();
 
   double getParticleKineticEnergy();
+
+  std::tuple<double, double> getParticleKineticEnergyByType();
+
+  double getWallPotentialEnergy();
 
   double getWallKineticEnergy();
 
@@ -599,6 +612,8 @@ public:
   double getTotalEnergy();
 
   void adjustKineticEnergy(double prevEtot);
+
+  void adjustKineticEnergyByType(double prevEpotAA, double prevEpotBB);
 
   void adjustLocalKineticEnergy(thrust::host_vector<double> &prevEnergy_, long direction_);
 

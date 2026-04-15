@@ -26,12 +26,12 @@ int main(int argc, char **argv) {
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
-  bool readState = false, saveFinal = true, logSave = false, linSave = false;
+  bool readState = false, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, squarebc = false, roundbc = true, maxRvicsek = false;
   // input variables
   double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
-  std::string inDir = argv[1], potType = argv[9], wallType = argv[10], dynType = argv[11], alignType = argv[12];
+  std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11], dynType = argv[12];
   // step variables
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
@@ -46,15 +46,18 @@ int main(int argc, char **argv) {
   sp.setParticleType(simControlStruct::particleEnum::vicsek);
 
   // set alignment type
-  if(alignType == "nonAdd") {
-    sp.setAlignType(simControlStruct::alignEnum::nonAdditive);
-    whichDynamics = "vicsek-na/";
-  } else if(alignType == "vel") {
+  if(alignType == "navel") { // non-additive velocity alignment
+    sp.setAlignType(simControlStruct::alignEnum::nonAddVelAlign);
+    whichDynamics = "vicsek-navel/";
+  } else if(alignType == "naforce") { // non-additive force alignment
+    sp.setAlignType(simControlStruct::alignEnum::nonAddForceAlign);
+    whichDynamics = "vicsek-naforce/";
+  } else if(alignType == "force") { // force alignment
+    sp.setAlignType(simControlStruct::alignEnum::forceAlign);
+    whichDynamics = "vicsek-force/";
+  } else { // velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    whichDynamics = "vicsek/";
-  } else {
-    sp.setAlignType(simControlStruct::alignEnum::additive);
-    if(alignType == "force") whichDynamics = "vicsek-force/";
+    if(alignType == "vel") whichDynamics = "vicsek-vel/";
   }
 
   // set potential type
@@ -210,7 +213,7 @@ int main(int argc, char **argv) {
     if(step % saveEnergyFreq == 0) {
       ioSP.saveAlignEnergy(step+initialStep, timeStep, numParticles);
       if(step % checkPointFreq == 0) {
-        cout << "Vicsek: current step: " << step + initialStep;
+        cout << "Kuramoto: current step: " << step + initialStep;
         cout << " E/N: " << sp.getParticleEnergy() / numParticles;
         cout << " T: " << sp.getParticleTemperature();
         cout << " ISF: " << sp.getParticleISF(waveQ);

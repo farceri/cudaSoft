@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
   // read input and save in "dynamics" directory: justRun = true
   bool activeDir = true, conserve = false, profile = false;
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false, justRun = false;
-  bool readNH = true, initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readNH = false, initAngles = false, readState = true, saveFinal = true, logSave = false, linSave = true;
   // input variables
   double timeStep = atof(argv[2]), Tinject = atof(argv[3]), tp = atof(argv[4]), Ta = atof(argv[5]), dampingOverInertia = atof(argv[11]);
   long maxStep = atof(argv[6]), initialStep = atol(argv[7]), numParticles = atol(argv[8]), nDim = atol(argv[9]), num1 = atol(argv[10]);
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
         sp.resetUpdateCount();
         if(saveFinal == true) {
           ioSP.saveParticlePacking(outDir);
-          ioSP.saveParticleForces(outDir);
+          //ioSP.saveParticleForces(outDir);
           if(profile == true) ioSP.save2DStressProfile(outDir);
           //ioSP.saveParticleNeighbors(outDir);
         }
@@ -258,7 +258,7 @@ int main(int argc, char **argv) {
   // save final configuration
   if(saveFinal == true) {
     ioSP.saveParticlePacking(outDir);
-    ioSP.saveParticleForces(outDir);
+    //ioSP.saveParticleForces(outDir);
     if(profile == true) ioSP.save2DStressProfile(outDir);
     //ioSP.saveParticleNeighbors(outDir);
   }
