@@ -22,13 +22,13 @@ using std::string;
 using std::tuple;
 
 struct simControlStruct {
-  enum class particleEnum {passive, active, vicsek} particleType;
+  enum class particleEnum {passive, active, kuramoto} particleType;
   enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian} noiseType;
   enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rough, rigid, mobile, plastic} boundaryType;
   enum class geometryEnum {squareWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
-  enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
-  enum class wallEnum {harmonic, lennardJones, WCA} wallType;
+  enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, IPL, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
+  enum class wallEnum {harmonic, lennardJones, WCA, IPL} wallType;
   enum class gravityEnum {on, off} gravityType;
   enum class alignEnum {forceAlign, nonAddForceAlign, velAlign, nonAddVelAlign} alignType;
 };
@@ -73,8 +73,8 @@ public:
   double ec;
   // self-propulsion parameters
   double driving, taup;
-  // Vicsek velocity interaction parameters
-  double Jvicsek, Rvicsek;
+  // Kuramoto velocity interaction parameters
+  double Jk, Rk;
   // Reflection noise
   double angleAmplitude;
   // adhesion constants
@@ -82,6 +82,8 @@ public:
   // Lennard-Jones constants
   double LJcutoff, LJecut, LJfshift;
   double LJecutPlus, LJfshiftPlus;
+  // Inverse power law constants
+  double IPLpower, IPLcutoff, IPLecut, IPLfshift;
   // double Lennard-Jones constants
   double eAA, eAB, eBB;
   long num1;
@@ -168,7 +170,7 @@ public:
   // correlation variables
   thrust::device_vector<double> d_particleInitPos;
   thrust::device_vector<double> d_particleLastPos;
-  thrust::device_vector<double> d_vicsekLastPos;
+  thrust::device_vector<double> d_kuramotoLastPos;
 	thrust::device_vector<double> d_particleDelta;
   thrust::device_vector<double> d_particleDisp;
 
@@ -187,13 +189,13 @@ public:
 	long partNeighborListSize;
   long neighborLimit;
 
-  // Vicsek interaction list
-  thrust::device_vector<int> d_vicsekFlag;
-  thrust::device_vector<long> d_vicsekNeighborList;
-  thrust::device_vector<long> d_vicsekMaxNeighborList;
-  long vicsekMaxNeighbors;
-	long vicsekNeighborListSize;
-  long vicsekNeighborLimit;
+  // Kuramoto interaction list
+  thrust::device_vector<int> d_kuramotoFlag;
+  thrust::device_vector<long> d_kuramotoNeighborList;
+  thrust::device_vector<long> d_kuramotoMaxNeighborList;
+  long kuramotoMaxNeighbors;
+	long kuramotoNeighborListSize;
+  long kuramotoNeighborLimit;
 
   // Wall interaction list
   thrust::device_vector<long> d_wallNeighborList;
@@ -212,7 +214,7 @@ public:
 
   void initParticleNeighbors(long numParticles_);
 
-  void initVicsekNeighbors(long numParticles_);
+  void initKuramotoNeighbors(long numParticles_);
 
   void initWallVariables(long numWall_);
 
@@ -325,7 +327,7 @@ public:
 
   void resetLastPositions();
 
-  void resetVicsekLastPositions();
+  void resetKuramotoLastPositions();
 
   void setInitialPositions();
 
@@ -380,7 +382,7 @@ public:
 
   void checkParticleNeighbors();
 
-  void checkVicsekNeighbors();
+  void checkKuramotoNeighbors();
 
   double getSoftWaveNumber();
 
@@ -432,14 +434,16 @@ public:
   void setSelfPropulsionParams(double driving_, double taup_);
   void getSelfPropulsionParams(double &driving_, double &taup_);
 
-  void setVicsekParams(double driving_, double taup_, double Jvicsek_, double Rvicsek_);
-  void getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, double &Rvicsek_);
+  void setKuramotoParams(double driving_, double taup_, double Jk_, double Rk_);
+  void getKuramotoParams(double &driving_, double &taup_, double &Jk_, double &Rk_);
 
   void setReflectionNoise(double angleAmplitude_);
 
   void setAdhesionParams(double l1_, double l2_);
 
   void setLJcutoff(double LJcutoff_);
+
+  void setIPLParams(double IPLcutoff_, double IPLpower_ = 12);
 
   void setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_);
 
@@ -466,9 +470,9 @@ public:
 
   void addSelfPropulsion();
 
-  void addVicsekAlignment();
+  void addKuramotoAlignment();
 
-  void calcVicsekAlignment();
+  void calcKuramotoAlignment();
 
   void calcParticleFixedWallInteraction();
 
@@ -496,11 +500,11 @@ public:
 
   void calcParticleForceEnergy();
 
-  std::tuple<double, double, double, double, double> getVicsekOrderParameters();
+  std::tuple<double, double, double, double, double> getKuramotoOrderParameters();
 
-  double getVicsekHigherOrderParameter(double order_);
+  double getKuramotoHigherOrderParameter(double order_);
 
-  double getVicsekVelocityCorrelation();
+  double getKuramotoVelocityCorrelation();
 
   double getNeighborVelocityCorrelation();
 
@@ -638,7 +642,7 @@ public:
   // contacts and neighbors
   thrust::host_vector<long> getParticleNeighbors();
 
-  thrust::host_vector<long> getVicsekNeighbors();
+  thrust::host_vector<long> getKuramotoNeighbors();
 
   thrust::host_vector<long> getWallNeighbors();
 
@@ -648,9 +652,9 @@ public:
 
   void syncParticleNeighborsToDevice();
 
-  void calcVicsekNeighborList();
+  void calcKuramotoNeighborList();
 
-  void syncVicsekNeighborsToDevice();
+  void syncKuramotoNeighborsToDevice();
 
   void calcWallNeighborList(double cutDistance);
 

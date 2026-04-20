@@ -4,6 +4,10 @@
 //
 // Include C++ header files
 
+// Example usage
+// ./runKuramoto /dirPath/0.014/ <timstep>=5e-05 <Jk>=1 <taup>=1e03 <damping>=1e02 <numSteps>=1e07 <initialStep>=0 
+// <numParticles>=1024 <interparticle_potential>=wca <boundary_type>=reflect <alignment_type>=vel <integrator_type>=0
+
 #include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
@@ -30,7 +34,7 @@ int main(int argc, char **argv) {
   bool readState = true, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables
-  double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]);
+  double timeStep = atof(argv[2]), Jk = atof(argv[3]), tp = atof(argv[4]);
   double damping = atof(argv[5]), scale = atof(argv[12]), roughness = atof(argv[13]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
   std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11];
@@ -39,28 +43,28 @@ int main(int argc, char **argv) {
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
-  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
+  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rk = 1.5;
   double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, order = 0.f; 
-  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "vicsek/";
+  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "kuramoto/";
 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
-  sp.setParticleType(simControlStruct::particleEnum::vicsek);
+  sp.setParticleType(simControlStruct::particleEnum::kuramoto);
 
   // set alignment type
   if(alignType == "navel") { // non-additive velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::nonAddVelAlign);
-    whichDynamics = "vicsek-navel/";
+    whichDynamics = "kuramoto-navel/";
   } else if(alignType == "naforce") { // non-additive force alignment
     sp.setAlignType(simControlStruct::alignEnum::nonAddForceAlign);
-    whichDynamics = "vicsek-naforce/";
+    whichDynamics = "kuramoto-naforce/";
   } else if(alignType == "force") { // force alignment
     sp.setAlignType(simControlStruct::alignEnum::forceAlign);
-    whichDynamics = "vicsek-force/";
+    whichDynamics = "kuramoto-force/";
   } else { // velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    if(alignType == "vel") whichDynamics = "vicsek-vel/";
+    if(alignType == "vel") whichDynamics = "kuramoto-vel/";
   }
 
   if(potType == "lj") {
@@ -123,7 +127,7 @@ int main(int argc, char **argv) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
   }
   sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
-  cout << "Setting default overdamped brownian dynamics" << endl;
+  cout << "Setting default driven brownian dynamics" << endl;
   // set input and output
   ioSPFile ioSP(&sp);
   if (justRun == true) {
@@ -209,18 +213,18 @@ int main(int argc, char **argv) {
   timeUnit = sigma / sqrt(ec);
   alphaUnit = ec / (sigma * sigma);
   forceUnit = ec / sigma;
-  Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
+  Jk = Jk / (PI * Rk * Rk);
   driving = 2. * damping; // this is necessary to keep the temperature equal to input value, es. 2
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
-  cout << "Vicsek - range: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
+  cout << "Kuramoto - range: " << Rk << " strength: " << Jk << " magnitude: " << Jk * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
   driving *= forceUnit;
   damping /= timeUnit;
-  Jvicsek *= alphaUnit;
-  Rvicsek *= sigma;
-  sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
+  Jk *= alphaUnit;
+  Rk *= sigma;
+  sp.setKuramotoParams(driving, tp, Jk, Rk);
   ioSP.saveLangevinParams(outDir, damping);
 
   // initialize integration scheme

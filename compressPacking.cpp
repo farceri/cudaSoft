@@ -4,6 +4,9 @@
 //
 // Include C++ header files
 
+// Example usage:
+// ./compressPacking /dirPath/ <timestep>=1e-04 <Tinject>=1e-01 <numParticles>=32768 <dim>=2 <boxRadius>=1 0 0
+
 #include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"

@@ -499,17 +499,17 @@ public:
     // check for alignment
     if(sp_->simControl.particleType == simControlStruct::particleEnum::active) {
       energyFile << "\t" << setprecision(precision) << sp_->getNeighborVelocityCorrelation();
-    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      std::tuple<double, double, double, double, double> orderParams = sp_->getVicsekOrderParameters();
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
+      std::tuple<double, double, double, double, double> orderParams = sp_->getKuramotoOrderParameters();
       energyFile << "\t" << setprecision(precision) << get<0>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<1>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<2>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<3>(orderParams);
       energyFile << "\t" << setprecision(precision) << get<4>(orderParams);
       if(order != 0.f) {
-        energyFile << "\t" << setprecision(precision) << sp_->getVicsekHigherOrderParameter(order);
+        energyFile << "\t" << setprecision(precision) << sp_->getKuramotoHigherOrderParameter(order);
       }
-      energyFile << "\t" << setprecision(precision) << sp_->getVicsekVelocityCorrelation();
+      energyFile << "\t" << setprecision(precision) << sp_->getKuramotoVelocityCorrelation();
     }
     energyFile << "\t" << setprecision(precision) << sp_->getParticleMomentOfInertia();
     energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum() << endl;
@@ -967,7 +967,7 @@ public:
     save1DFile(dirName + "particleRad.dat", sp_->getParticleRadii());
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), nDim);
-    if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
       if(nDim == 2) {
         save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
       } else if(nDim == 3) {
@@ -1011,7 +1011,7 @@ public:
   void readParticleState(string dirName, long numParticles_, long nDim_, bool initAngles = false, bool initWall = false) {
     readParticleVelocity(dirName, numParticles_, nDim_);
     if(initAngles == false) {
-      if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+      if(sp_->simControl.particleType == simControlStruct::particleEnum::active || sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
         thrust::host_vector<double> particleAngle_(numParticles_);
         if(nDim_ == 2) {
           particleAngle_ = read1DFile(dirName + "particleAngles.dat", numParticles_);
@@ -1040,7 +1040,7 @@ public:
   void saveParticleState(string dirName) {
     save2DFile(dirName + "particlePos.dat", sp_->getParticlePositions(), sp_->nDim);
     save2DFile(dirName + "particleVel.dat", sp_->getParticleVelocities(), sp_->nDim);
-    //if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
+    //if(sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
     //  if(sp_->nDim == 2) {
     //    save1DFile(dirName + "particleAngles.dat", sp_->getParticleAngles());
     //  } else {
@@ -1071,8 +1071,8 @@ public:
         save2DFile(dirName + "wallForce.dat", sp_->getWallForces(), sp_->nDim);
       }
     }
-    //if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-    //  save2DIndexFile(dirName + "vicsekNeighbors.dat", sp_->getVicsekNeighbors(), sp_->vicsekNeighborListSize);
+    //if(sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
+    //  save2DIndexFile(dirName + "kuramotoNeighbors.dat", sp_->getKuramotoNeighbors(), sp_->kuramotoNeighborListSize);
     //}
   }
 
@@ -1086,13 +1086,13 @@ public:
       sp_->getSelfPropulsionParams(driving, taup);
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
-    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double driving, taup, Jvicsek, Rvicsek;
-      sp_->getVicsekParams(driving, taup, Jvicsek, Rvicsek);
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
+      double driving, taup, Jk, Rk;
+      sp_->getKuramotoParams(driving, taup, Jk, Rk);
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
-      saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
-      saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
+      saveParams << "Rk" << "\t" << Rk << endl;
+      saveParams << "Jk" << "\t" << Jk << endl;
     }
     saveParams.close();
   }
@@ -1110,13 +1110,13 @@ public:
       sp_->getSelfPropulsionParams(driving, taup);
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
-    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::vicsek) {
-      double driving, taup, Jvicsek, Rvicsek;
-      sp_->getVicsekParams(driving, taup, Jvicsek, Rvicsek);
+    } else if(sp_->simControl.particleType == simControlStruct::particleEnum::kuramoto) {
+      double driving, taup, Jk, Rk;
+      sp_->getKuramotoParams(driving, taup, Jk, Rk);
       saveParams << "taup" << "\t" << taup << endl;
       saveParams << "f0" << "\t" << driving << endl;
-      saveParams << "Rvicsek" << "\t" << Rvicsek << endl;
-      saveParams << "Jvicsek" << "\t" << Jvicsek << endl;
+      saveParams << "Rk" << "\t" << Rk << endl;
+      saveParams << "Jk" << "\t" << Jk << endl;
     }
     saveParams.close();
   }

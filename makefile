@@ -78,7 +78,7 @@ INC_DIR = include
 #EXE = runExternalField
 #EXE = runNPT
 #EXE = runABP
-EXE = runVicsek
+EXE = runKuramoto
 #EXE = runWall
 
 # mechanics

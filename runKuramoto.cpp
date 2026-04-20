@@ -4,6 +4,10 @@
 //
 // Include C++ header files
 
+// Example usage
+//./runKuramoto /dirPath/0.014/ <timstep>=5e-05 <Jk>=1 <taup>=1e03 <damping>=1e02 <numSteps>=1e07 <initialStep>=0 
+// <numParticles>=1024 <interparticle_potential>=wca <boundary_type>=reflect <alignment_type>=vel <integrator_type>=0
+
 #include "include/SP2D.h"
 #include "include/FileIO.h"
 #include "include/Simulator.h"
@@ -27,9 +31,9 @@ int main(int argc, char **argv) {
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
   bool readState = false, saveFinal = true, logSave = false, linSave = true;
-  bool initAngles = false, squarebc = false, roundbc = true, maxRvicsek = false;
+  bool initAngles = false, squarebc = false, roundbc = true, maxRk = false;
   // input variables
-  double timeStep = atof(argv[2]), Jvicsek = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
+  double timeStep = atof(argv[2]), Jk = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
   std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11], dynType = argv[12];
   // step variables
@@ -37,27 +41,27 @@ int main(int argc, char **argv) {
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   // force and noise variables
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5; 
-  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rvicsek = 1.5;
-  std::string outDir, currentDir, dirSample, energyFile, dampingDir, whichDynamics = "vicsek/";
+  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rk = 1.5, IPLcutoff = 1.5, IPLpower = 12;
+  std::string outDir, currentDir, dirSample, energyFile, dampingDir, whichDynamics = "kuramoto/";
 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
-  sp.setParticleType(simControlStruct::particleEnum::vicsek);
+  sp.setParticleType(simControlStruct::particleEnum::kuramoto);
 
   // set alignment type
   if(alignType == "navel") { // non-additive velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::nonAddVelAlign);
-    whichDynamics = "vicsek-navel/";
+    whichDynamics = "kuramoto-navel/";
   } else if(alignType == "naforce") { // non-additive force alignment
     sp.setAlignType(simControlStruct::alignEnum::nonAddForceAlign);
-    whichDynamics = "vicsek-naforce/";
+    whichDynamics = "kuramoto-naforce/";
   } else if(alignType == "force") { // force alignment
     sp.setAlignType(simControlStruct::alignEnum::forceAlign);
-    whichDynamics = "vicsek-force/";
+    whichDynamics = "kuramoto-force/";
   } else { // velocity alignment
     sp.setAlignType(simControlStruct::alignEnum::velAlign);
-    if(alignType == "vel") whichDynamics = "vicsek-vel/";
+    if(alignType == "vel") whichDynamics = "kuramoto-vel/";
   }
 
   // set potential type
@@ -91,9 +95,15 @@ int main(int argc, char **argv) {
   } else if(wallType == "noise") {
     whichDynamics = whichDynamics + "noise/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflectNoise);
-  } else if(wallType == "fixed") {
-    whichDynamics = whichDynamics + "fixed/";
+  } else if(wallType == "fixed" || wallType == "fixed-ipl") {
     sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+    if(wallType == "fixed-ipl") {
+      whichDynamics = whichDynamics + "fixed-ipl/";
+      sp.setWallType(simControlStruct::wallEnum::IPL);
+      sp.setIPLParams(IPLcutoff, IPLpower);
+    } else {
+      whichDynamics = whichDynamics + "fixed/";
+    }
   } else {
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
@@ -105,24 +115,24 @@ int main(int argc, char **argv) {
   if(dynType == "langevin") {
     sp.setNoiseType(simControlStruct::noiseEnum::langevin1);
     Tinject = atof(argv[3]);
-    Jvicsek = 1e03;
+    Jk = 1e03;
     tp = 0.;
     whichDynamics = whichDynamics + dynType + argv[5] + "/";
     dirSample = whichDynamics + "T" + argv[3] + "/";
   } else if(dynType == "brownian") {
     sp.setNoiseType(simControlStruct::noiseEnum::brownian);
     Tinject = atof(argv[3]);
-    Jvicsek = 1e03;
+    Jk = 1e03;
     tp = 0.;
     whichDynamics = whichDynamics + dynType + argv[5] + "/";
     dirSample = whichDynamics + "T" + argv[3] + "/";
   } else {
     sp.setNoiseType(simControlStruct::noiseEnum::drivenBrownian);
     whichDynamics = whichDynamics + "damping" + argv[5] + "/";
-    if(maxRvicsek == true) whichDynamics = whichDynamics + "maxR/";
+    if(maxRk == true) whichDynamics = whichDynamics + "maxR/";
     dirSample = whichDynamics + "j" + argv[3] + "-tp" + argv[4] + "/";
     readState = true;
-    cout << "Setting default overdamped brownian dynamics" << endl;
+    cout << "Setting default driven brownian dynamics" << endl;
   }
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
     std::experimental::filesystem::create_directory(inDir + whichDynamics);
@@ -176,20 +186,20 @@ int main(int argc, char **argv) {
   timeUnit = sigma / sqrt(ec);
   alphaUnit = ec / (sigma * sigma);
   forceUnit = ec / sigma;
-  if(maxRvicsek == true) Rvicsek = sp.getBoxRadius();
-  Jvicsek = Jvicsek / (PI * Rvicsek * Rvicsek);
+  if(maxRk == true) Rk = sp.getBoxRadius();
+  Jk = Jk / (PI * Rk * Rk);
   driving = 2. * damping; // this is necessary to keep the temperature equal to input value, es. 2
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
   if(dynType == "langevin") cout << "Langevin - T: " << Tinject << " magnitude: " << sqrt(2 * damping * Tinject) << endl;
-  cout << "Vicsek - range: " << Rvicsek << " strength: " << Jvicsek << " magnitude: " << Jvicsek * timeStep << endl;
+  cout << "Kuramoto - range: " << Rk << " strength: " << Jk << " magnitude: " << Jk * timeStep << endl;
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   tp *= timeUnit;
   driving *= forceUnit;
   damping /= timeUnit;
-  Jvicsek *= alphaUnit;
-  Rvicsek *= sigma;
-  sp.setVicsekParams(driving, tp, Jvicsek, Rvicsek);
+  Jk *= alphaUnit;
+  Rk *= sigma;
+  sp.setKuramotoParams(driving, tp, Jk, Rk);
   ioSP.saveLangevinParams(outDir, damping);
 
   // initialize integration scheme

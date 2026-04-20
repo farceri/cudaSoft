@@ -158,15 +158,15 @@ void SP2D::initParticleNeighbors(long numParticles_) {
   thrust::fill(d_flag.begin(), d_flag.end(), int(0));
 }
 
-void SP2D::initVicsekNeighbors(long numParticles_) {
-  vicsekNeighborListSize = 0;
-  vicsekMaxNeighbors = 0;
-  d_vicsekNeighborList.resize(numParticles_);
-  d_vicsekMaxNeighborList.resize(numParticles_);
-  thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
-  thrust::fill(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), vicsekMaxNeighbors);
-  d_vicsekFlag.resize(numParticles_);
-  thrust::fill(d_vicsekFlag.begin(), d_vicsekFlag.end(), int(0));
+void SP2D::initKuramotoNeighbors(long numParticles_) {
+  kuramotoNeighborListSize = 0;
+  kuramotoMaxNeighbors = 0;
+  d_kuramotoNeighborList.resize(numParticles_);
+  d_kuramotoMaxNeighborList.resize(numParticles_);
+  thrust::fill(d_kuramotoNeighborList.begin(), d_kuramotoNeighborList.end(), -1L);
+  thrust::fill(d_kuramotoMaxNeighborList.begin(), d_kuramotoMaxNeighborList.end(), kuramotoMaxNeighbors);
+  d_kuramotoFlag.resize(numParticles_);
+  thrust::fill(d_kuramotoFlag.begin(), d_kuramotoFlag.end(), int(0));
 }
 
 void SP2D::initWallVariables(long numWall_) {
@@ -245,7 +245,7 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     d_angMom.resize(numParticles);
     thrust::fill(d_angMom.begin(), d_angMom.end(), double(0));
     cout << "SP2D::setParticleType: particleType: active" << endl;
-  } else if(simControl.particleType == simControlStruct::particleEnum::vicsek) {
+  } else if(simControl.particleType == simControlStruct::particleEnum::kuramoto) {
     d_randAngle.resize(numParticles);
     d_particleAngle.resize(numParticles);
     d_particleAlpha.resize(numParticles);
@@ -254,9 +254,9 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     thrust::fill(d_particleAngle.begin(), d_particleAngle.end(), double(0));
     thrust::fill(d_particleAlpha.begin(), d_particleAlpha.end(), double(0));
     thrust::fill(d_activeTorque.begin(), d_activeTorque.end(), double(0));
-    initVicsekNeighbors(numParticles);
-    d_vicsekLastPos.resize(numParticles * nDim);
-    thrust::fill(d_vicsekLastPos.begin(), d_vicsekLastPos.end(), double(0));
+    initKuramotoNeighbors(numParticles);
+    d_kuramotoLastPos.resize(numParticles * nDim);
+    thrust::fill(d_kuramotoLastPos.begin(), d_kuramotoLastPos.end(), double(0));
     d_velCorr.resize(numParticles);
     thrust::fill(d_velCorr.begin(), d_velCorr.end(), double(0));
     d_angMom.resize(numParticles);
@@ -271,9 +271,9 @@ void SP2D::setParticleType(simControlStruct::particleEnum particleType_) {
     thrust::fill(d_alpha_r.begin(), d_alpha_r.end(), double(0));
     d_alpha_phi.resize(numParticles);
     thrust::fill(d_alpha_phi.begin(), d_alpha_phi.end(), double(0));
-    cout << "SP2D::setParticleType: particleType: vicsek" << endl;
+    cout << "SP2D::setParticleType: particleType: kuramoto" << endl;
   } else {
-    cout << "SP2D::setParticleType: please specify valid particleType: passive, active or vicsek" << endl;
+    cout << "SP2D::setParticleType: please specify valid particleType: passive, active or kuramoto" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -400,7 +400,10 @@ void SP2D::setPotentialType(simControlStruct::potentialEnum potentialType_) {
   } else if(simControl.potentialType == simControlStruct::potentialEnum::WCA) {
     setWallType(simControlStruct::wallEnum::WCA);
     cout << "SP2D::setPotentialType: potentialType: WCA" << " set wallType: WCA" << endl;
-  } else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
+  } else if(simControl.potentialType == simControlStruct::potentialEnum::IPL) {
+    setWallType(simControlStruct::wallEnum::IPL);
+    cout << "SP2D::setPotentialType: potentialType: IPL" << " set wallType: IPL" << endl;
+  }else if(simControl.potentialType == simControlStruct::potentialEnum::adhesive) {
     cout << "SP2D::setPotentialType: potentialType: adhesive" << " set wallType: harmonic" << endl;
   } else if(simControl.potentialType == simControlStruct::potentialEnum::doubleLJ) {
     setWallType(simControlStruct::wallEnum::WCA);
@@ -430,8 +433,10 @@ void SP2D::setWallType(simControlStruct::wallEnum wallType_) {
     cout << "SP2D::setWallType: wallType: lennardJones" << endl;
   } else if(simControl.wallType == simControlStruct::wallEnum::WCA) {
     cout << "SP2D::setWallType: wallType: WCA" << endl;
+  } else if(simControl.wallType == simControlStruct::wallEnum::IPL) {
+    cout << "SP2D::setWallType: wallType: IPL" << endl;
   } else {
-    cout << "SP2D::setWallType: please specify valid wallType: harmonic, lennardJones and  WCA" << endl;
+    cout << "SP2D::setWallType: please specify valid wallType: harmonic, lennardJones, WCA and IPL" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -956,9 +961,9 @@ void SP2D::resetLastPositions() {
   d_particleLastPos = d_particlePos;
 }
 
-void SP2D::resetVicsekLastPositions() {
+void SP2D::resetKuramotoLastPositions() {
   cudaDeviceSynchronize();
-  d_vicsekLastPos = d_particlePos;
+  d_kuramotoLastPos = d_particlePos;
 }
 
 void SP2D::setInitialPositions() {
@@ -1123,6 +1128,9 @@ double SP2D::setDisplacementCutoff(double cutoff_) {
     case simControlStruct::potentialEnum::WCA:
     cutDistance = WCAcut;
     break;
+    case simControlStruct::potentialEnum::IPL:
+    cutDistance = IPLcutoff;
+    break;
     case simControlStruct::potentialEnum::Mie:
     cutDistance = LJcutoff;
     break;
@@ -1257,15 +1265,15 @@ void SP2D::checkParticleNeighbors() {
   }
 }
 
-void SP2D::checkVicsekNeighbors() {
+void SP2D::checkKuramotoNeighbors() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *vLastPos = thrust::raw_pointer_cast(&d_vicsekLastPos[0]);
-  int *vicsekFlag = thrust::raw_pointer_cast(&d_vicsekFlag[0]);
-  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, vLastPos, vicsekFlag, Rvicsek);
-  int sumFlag = thrust::reduce(d_vicsekFlag.begin(), d_vicsekFlag.end(), int(0), thrust::plus<int>());
+  const double *vLastPos = thrust::raw_pointer_cast(&d_kuramotoLastPos[0]);
+  int *kuramotoFlag = thrust::raw_pointer_cast(&d_kuramotoFlag[0]);
+  kernelCheckParticleDisplacement<<<dimGrid,dimBlock>>>(pPos, vLastPos, kuramotoFlag, Rk);
+  int sumFlag = thrust::reduce(d_kuramotoFlag.begin(), d_kuramotoFlag.end(), int(0), thrust::plus<int>());
   if(sumFlag != 0) {
-    calcVicsekNeighborList();
-    resetVicsekLastPositions();
+    calcKuramotoNeighborList();
+    resetKuramotoLastPositions();
   }
 }
 
@@ -1684,28 +1692,28 @@ void SP2D::getSelfPropulsionParams(double &driving_, double &taup_) {
   //cout << "SP2D::getSelfPropulsionParams:: driving: " << driving_ << " taup: " << taup_ << endl;
 }
 
-void SP2D::setVicsekParams(double driving_, double taup_, double Jvicsek_, double Rvicsek_) {
+void SP2D::setKuramotoParams(double driving_, double taup_, double Jk_, double Rk_) {
   driving = driving_;
   taup = taup_;
-  Jvicsek = Jvicsek_;
-  Rvicsek = Rvicsek_;
+  Jk = Jk_;
+  Rk = Rk_;
   double boxRadius = getBoxRadius();
-  if(Rvicsek > 0.5 * boxRadius) {
-    Rvicsek = 0.5 * boxRadius;
-    cout << "SP2D::setVicsekParams:: Rvicsek cannot be grater than half the boxRadius, setting Rvicsek equal to half the boxRadius" << endl;
+  if(Rk > 0.5 * boxRadius) {
+    Rk = 0.5 * boxRadius;
+    cout << "SP2D::setKuramotoParams:: Rk cannot be grater than half the boxRadius, setting Rk equal to half the boxRadius" << endl;
   }
   cudaMemcpyToSymbol(d_driving, &driving, sizeof(driving));
   cudaMemcpyToSymbol(d_taup, &taup, sizeof(taup));
-  cudaMemcpyToSymbol(d_Jvicsek, &Jvicsek, sizeof(Jvicsek));
-  //cout << "SP2D::setVicsekParams:: driving: " << driving << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
+  cudaMemcpyToSymbol(d_Jk, &Jk, sizeof(Jk));
+  //cout << "SP2D::setKuramotoParams:: driving: " << driving << " interactin strength: " << Jk << " and radius: " << Rk << endl;
 }
 
-void SP2D::getVicsekParams(double &driving_, double &taup_, double &Jvicsek_, double &Rvicsek_) {
+void SP2D::getKuramotoParams(double &driving_, double &taup_, double &Jk_, double &Rk_) {
   driving_ = driving;
   taup_ = taup;
-  Jvicsek_ = Jvicsek;
-  Rvicsek_ = Rvicsek;
-  //cout << "SP2D::getVicsekParams:: driving: " << driving_ << " interactin strength: " << Jvicsek << " and radius: " << Rvicsek << endl;
+  Jk_ = Jk;
+  Rk_ = Rk;
+  //cout << "SP2D::getKuramotoParams:: driving: " << driving_ << " interactin strength: " << Jk << " and radius: " << Rk << endl;
 }
 
 void SP2D::setReflectionNoise(double angleAmplitude_) {
@@ -1729,6 +1737,29 @@ void SP2D::setLJcutoff(double LJcutoff_) {
 	LJfshift = 24 * ec * (2 * ratio6 - 1) * ratio6 / LJcutoff;
   cudaMemcpyToSymbol(d_LJfshift, &LJfshift, sizeof(LJfshift));
   cout << "SP2D::setLJcutoff::LJcutoff: " << LJcutoff << " energy shift: " << LJecut << " LJfshift: " << LJfshift << endl;
+}
+
+void SP2D::setIPLParams(double IPLcutoff_, double IPLpower_) {
+  IPLcutoff = IPLcutoff_;
+  IPLpower = IPLpower_;
+  cudaMemcpyToSymbol(d_IPLcutoff, &IPLcutoff, sizeof(IPLcutoff));
+  double ratio6 = 1 / pow(IPLcutoff, 6);
+  double ratio12 = ratio6 * ratio6;
+  double ratio_p = ratio12;
+  if(IPLpower == 24) {
+    ratio_p = ratio12 * ratio12;
+  } else if(IPLpower == 36) {
+    ratio_p = ratio12 * ratio12 * ratio12;
+  } else {
+    if(IPLpower != 12) cout << "SP2D::setIPLcutoff:: only 12, 24 and 36 are allowed! Setting IPLpower to 12" << endl;
+    IPLpower = 12;
+  }
+  cudaMemcpyToSymbol(d_IPLpower, &IPLpower, sizeof(IPLpower));
+  IPLecut = ec * ratio_p;
+  cudaMemcpyToSymbol(d_IPLecut, &IPLecut, sizeof(IPLecut));
+	IPLfshift = IPLpower * ec * ratio_p / IPLcutoff;
+  cudaMemcpyToSymbol(d_IPLfshift, &IPLfshift, sizeof(IPLfshift));
+  cout << "SP2D::setIPLcutoff::IPLpower: " << IPLpower << " IPLcutoff: " << IPLcutoff << " energy shift: " << IPLecut << " IPLfshift: " << IPLfshift << endl;
 }
 
 void SP2D::setDoubleLJconstants(double LJcutoff_, double eAA_, double eAB_, double eBB_, long num1_) {
@@ -1944,7 +1975,7 @@ void SP2D::addSelfPropulsion() {
   }
 }
 
-void SP2D::addVicsekAlignment() {
+void SP2D::addKuramotoAlignment() {
 	if(nDim == 2) {
     int s_nDim(nDim);
     double s_dt(dt);
@@ -1964,8 +1995,8 @@ void SP2D::addVicsekAlignment() {
     double *pForce = thrust::raw_pointer_cast(&d_particleForce[0]);
     double *aTorque = thrust::raw_pointer_cast(&d_activeTorque[0]);
 
-    auto updateVicsekAlignment2D = [=] __device__ (long pId) {
-      // overdamped equation for the angle with vicsek alignment as torque
+    auto updateKuramotoAlignment2D = [=] __device__ (long pId) {
+      // overdamped equation for the angle with kuramoto alignment as torque
       pAngle[pId] += randAngle[pId] + s_dt * pAlpha[pId];
       pAngle[pId] = pAngle[pId] + PI;
       pAngle[pId] = pAngle[pId] - 2.0 * PI * floor(pAngle[pId] / (2.0 * PI));
@@ -1978,26 +2009,26 @@ void SP2D::addVicsekAlignment() {
       }
     };
 
-    thrust::for_each(r, r + numParticles, updateVicsekAlignment2D);
+    thrust::for_each(r, r + numParticles, updateKuramotoAlignment2D);
   }
 }
 
-void SP2D::calcVicsekAlignment() {
-  checkVicsekNeighbors();
+void SP2D::calcKuramotoAlignment() {
+  checkKuramotoNeighbors();
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   const double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
   double *pAlpha = thrust::raw_pointer_cast(&d_particleAlpha[0]);
   switch (simControl.alignType) {
     case simControlStruct::alignEnum::forceAlign:
-    kernelCalcVicsekForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
+    kernelCalcKuramotoForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
     break;
     case simControlStruct::alignEnum::nonAddForceAlign:
-    kernelCalcVicsekNonAddForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
+    kernelCalcKuramotoNonAddForceAlignment<<<dimGrid, dimBlock>>>(pAngle, pAlpha);
     break;
     case simControlStruct::alignEnum::velAlign:
-    kernelCalcVicsekVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
+    kernelCalcKuramotoVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
     case simControlStruct::alignEnum::nonAddVelAlign:
-    kernelCalcVicsekNonAddVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
+    kernelCalcKuramotoNonAddVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
     break;
     default:
     break;
@@ -2115,9 +2146,9 @@ void SP2D::calcParticleForceEnergy() {
     case simControlStruct::particleEnum::active:
     addSelfPropulsion();
     break;
-    case simControlStruct::particleEnum::vicsek:
-    calcVicsekAlignment();
-    addVicsekAlignment();
+    case simControlStruct::particleEnum::kuramoto:
+    calcKuramotoAlignment();
+    addKuramotoAlignment();
     break;
     default:
     break;
@@ -2226,7 +2257,7 @@ void SP2D::reflectParticleOnWallWithNoise() {
 	}
 }
 
-std::tuple<double, double, double, double, double> SP2D::getVicsekOrderParameters() {
+std::tuple<double, double, double, double, double> SP2D::getKuramotoOrderParameters() {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
@@ -2260,7 +2291,7 @@ std::tuple<double, double, double, double, double> SP2D::getVicsekOrderParameter
   return std::make_tuple(param1, param2, param3, param4, param5);
 }
 
-double SP2D::getVicsekHigherOrderParameter(double order_) {
+double SP2D::getKuramotoHigherOrderParameter(double order_) {
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
   kernelCalcHigherOrderUnitVel<<<dimGrid, dimBlock>>>(pPos, unitPos, order_);
@@ -2273,10 +2304,10 @@ double SP2D::getVicsekHigherOrderParameter(double order_) {
   return sqrt(realField * realField + imagField * imagField);
 }
 
-double SP2D::getVicsekVelocityCorrelation() {
+double SP2D::getKuramotoVelocityCorrelation() {
   const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
   double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
-  kernelCalcVicsekVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
+  kernelCalcKuramotoVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
   return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
@@ -2637,7 +2668,7 @@ std::tuple<double, double, double> SP2D::getParticleStressComponents() {
    return std::make_tuple(stress_xx, stress_yy, stress_xy);
 }
 
-// active torque is defined only for particles of type vicsek
+// active torque is defined only for particles of type kuramoto
 double SP2D::getActiveTorque() {
   return thrust::reduce(d_activeTorque.begin(), d_activeTorque.end(), double(0), thrust::plus<double>());
 }
@@ -3258,10 +3289,10 @@ thrust::host_vector<long> SP2D::getParticleNeighbors() {
   return partNeighborListFromDevice;
 }
 
-thrust::host_vector<long> SP2D::getVicsekNeighbors() {
-  thrust::host_vector<long> vicsekNeighborListFromDevice;
-  vicsekNeighborListFromDevice = d_vicsekNeighborList;
-  return vicsekNeighborListFromDevice;
+thrust::host_vector<long> SP2D::getKuramotoNeighbors() {
+  thrust::host_vector<long> kuramotoNeighborListFromDevice;
+  kuramotoNeighborListFromDevice = d_kuramotoNeighborList;
+  return kuramotoNeighborListFromDevice;
 }
 
 thrust::host_vector<long> SP2D::getWallNeighbors() {
@@ -3333,45 +3364,45 @@ void SP2D::syncParticleNeighborsToDevice() {
   if(cudaGetLastError()) cout << "SP2D::syncParticleNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
-void SP2D::calcVicsekNeighborList() {
-  thrust::fill(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), 0);
-	thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
-  syncVicsekNeighborsToDevice();
+void SP2D::calcKuramotoNeighborList() {
+  thrust::fill(d_kuramotoMaxNeighborList.begin(), d_kuramotoMaxNeighborList.end(), 0);
+	thrust::fill(d_kuramotoNeighborList.begin(), d_kuramotoNeighborList.end(), -1L);
+  syncKuramotoNeighborsToDevice();
   const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
 	const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
 
-  kernelCalcVicsekNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rvicsek);
+  kernelCalcKuramotoNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rk);
   // compute maximum number of neighbors per particle
-  if(cudaGetLastError()) cout << "SP2D::calcVicsekNeighborList():: cudaGetLastError(): " << cudaGetLastError() << endl;
-  vicsekMaxNeighbors = thrust::reduce(d_vicsekMaxNeighborList.begin(), d_vicsekMaxNeighborList.end(), -1L, thrust::maximum<long>());
-  syncVicsekNeighborsToDevice();
-  //cout << "SP2D::calcVicsekNeighborList: vicsekMaxNeighbors: " << vicsekMaxNeighbors << endl;
+  if(cudaGetLastError()) cout << "SP2D::calcKuramotoNeighborList():: cudaGetLastError(): " << cudaGetLastError() << endl;
+  kuramotoMaxNeighbors = thrust::reduce(d_kuramotoMaxNeighborList.begin(), d_kuramotoMaxNeighborList.end(), -1L, thrust::maximum<long>());
+  syncKuramotoNeighborsToDevice();
+  //cout << "SP2D::calcKuramotoNeighborList: kuramotoMaxNeighbors: " << kuramotoMaxNeighbors << endl;
 
   // if the neighbors don't fit, resize the neighbor list
-  if ( vicsekMaxNeighbors > vicsekNeighborListSize ) {
-		vicsekNeighborListSize = pow(2, ceil(std::log2(vicsekMaxNeighbors)));
-    //cout << "SP2D::calcVicsekNeighborList: vicsekNeighborListSize: " << vicsekNeighborListSize << endl;
+  if ( kuramotoMaxNeighbors > kuramotoNeighborListSize ) {
+		kuramotoNeighborListSize = pow(2, ceil(std::log2(kuramotoMaxNeighbors)));
+    //cout << "SP2D::calcKuramotoNeighborList: kuramotoNeighborListSize: " << kuramotoNeighborListSize << endl;
 		//Now create the actual storage and then put the neighbors in it.
-		d_vicsekNeighborList.resize(numParticles * vicsekNeighborListSize);
+		d_kuramotoNeighborList.resize(numParticles * kuramotoNeighborListSize);
 		//Pre-fill the neighborList with -1
-		thrust::fill(d_vicsekNeighborList.begin(), d_vicsekNeighborList.end(), -1L);
-		syncVicsekNeighborsToDevice();
-		kernelCalcVicsekNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rvicsek);
+		thrust::fill(d_kuramotoNeighborList.begin(), d_kuramotoNeighborList.end(), -1L);
+		syncKuramotoNeighborsToDevice();
+		kernelCalcKuramotoNeighborList<<<dimGrid, dimBlock>>>(pPos, pRad, Rk);
 	}
 }
 
-void SP2D::syncVicsekNeighborsToDevice() {
+void SP2D::syncKuramotoNeighborsToDevice() {
   cudaDeviceSynchronize();
 	//Copy the pointers and information about neighbors to the gpu
-	cudaMemcpyToSymbol(d_vicsekNeighborListSize, &vicsekNeighborListSize, sizeof(vicsekNeighborListSize));
-	cudaMemcpyToSymbol(d_vicsekMaxNeighbors, &vicsekMaxNeighbors, sizeof(vicsekMaxNeighbors));
+	cudaMemcpyToSymbol(d_kuramotoNeighborListSize, &kuramotoNeighborListSize, sizeof(kuramotoNeighborListSize));
+	cudaMemcpyToSymbol(d_kuramotoMaxNeighbors, &kuramotoMaxNeighbors, sizeof(kuramotoMaxNeighbors));
 
-	long* vicsekMaxNeighborList = thrust::raw_pointer_cast(&d_vicsekMaxNeighborList[0]);
-	cudaMemcpyToSymbol(d_vicsekMaxNeighborListPtr, &vicsekMaxNeighborList, sizeof(vicsekMaxNeighborList));
+	long* kuramotoMaxNeighborList = thrust::raw_pointer_cast(&d_kuramotoMaxNeighborList[0]);
+	cudaMemcpyToSymbol(d_kuramotoMaxNeighborListPtr, &kuramotoMaxNeighborList, sizeof(kuramotoMaxNeighborList));
 
-	long* vicsekNeighborList = thrust::raw_pointer_cast(&d_vicsekNeighborList[0]);
-	cudaMemcpyToSymbol(d_vicsekNeighborListPtr, &vicsekNeighborList, sizeof(vicsekNeighborList));
-  if(cudaGetLastError()) cout << "SP2D::syncVicsekNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
+	long* kuramotoNeighborList = thrust::raw_pointer_cast(&d_kuramotoNeighborList[0]);
+	cudaMemcpyToSymbol(d_kuramotoNeighborListPtr, &kuramotoNeighborList, sizeof(kuramotoNeighborList));
+  if(cudaGetLastError()) cout << "SP2D::syncKuramotoNeighborsToDevice():: cudaGetLastError(): " << cudaGetLastError() << endl;
 }
 
 void SP2D::calcWallNeighborList(double cutDistance) {
