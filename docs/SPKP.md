@@ -49,3 +49,5 @@ Example usage within rough boundary conditions:
 Please contact arceri.fra at gmail.com for more info and clarifications.
 
 Example of SPKPs in smooth boundary conditions
+<img width="1280" height="960" alt="vel-phi05-j3-tp1e03" src="https://github.com/user-attachments/assets/6ff7a2cb-0b48-4293-8022-e874eb840880" />
+
