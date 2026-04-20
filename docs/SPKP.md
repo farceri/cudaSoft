@@ -1,4 +1,4 @@
-# Documentation for producing configurations of Self-Propelled Kuramoto Particles (SPKPs)
+# How to produce and evolve configurations of Self-Propelled Kuramoto Particles (SPKPs)
 
 1. Data structure
 Particle configurations are saved in a directory containing the following default files:
