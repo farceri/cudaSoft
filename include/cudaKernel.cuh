@@ -61,6 +61,8 @@ __constant__ double d_nPower;
 __constant__ double d_mPower;
 __constant__ double d_mieConstant;
 __constant__ double d_Miecut;
+// Wall restitution parameter
+__constant__ double d_restparam;
 // Wall shape constants
 __constant__ long d_numWall;
 __constant__ double d_wallRad;
@@ -217,9 +219,9 @@ inline __device__ double calcDistance(const double* thisVec, const double* other
 			return sqrt(distanceSq);
 			break;
 			case simControlStruct::geometryEnum::fixedSides2D:
-			delta = thisVec[1] - otherVec[1];
+			delta = thisVec[0] - otherVec[0];
 			distanceSq = delta * delta;
-			delta = pbcDistance(thisVec[0], otherVec[0], 0);
+			delta = pbcDistance(thisVec[1], otherVec[1], 1);
 			distanceSq += delta * delta;
 			return sqrt(distanceSq);
 			break;
@@ -290,10 +292,10 @@ inline __device__ double calcDeltaAndDistance(const double* thisVec, const doubl
 			return sqrt(distanceSq);
 			break;
 			case simControlStruct::geometryEnum::fixedSides2D:
-			deltaVec[1] = thisVec[1] - otherVec[1];
-			distanceSq = deltaVec[1] * deltaVec[1];
-			deltaVec[0] = pbcDistance(thisVec[0], otherVec[0], 0);
-			distanceSq += deltaVec[0] * deltaVec[0];
+			deltaVec[0] = thisVec[0] - otherVec[0];
+			distanceSq = deltaVec[0] * deltaVec[0];
+			deltaVec[1] = pbcDistance(thisVec[1], otherVec[1], 1);
+			distanceSq += deltaVec[1] * deltaVec[1];
 			return sqrt(distanceSq);
 			break;
 			case simControlStruct::geometryEnum::fixedSides3D:
@@ -677,6 +679,8 @@ inline __device__ double calcIPLInteraction(const double* thisPos, const double*
 		ratio_p = ratio12 * ratio12; // power equal to 24
 	} else if (d_IPLpower == 36) {
 		ratio_p = ratio12 * ratio12 * ratio12; // power equal to 36
+	} else if (d_IPLpower == 48) {
+		ratio_p = ratio12 * ratio12 * ratio12 * ratio12; // power equal to 48
 	}
     if (distance < (d_IPLcutoff * radSum)) {
 		auto forceShift = d_IPLfshift / radSum;
@@ -1264,6 +1268,8 @@ inline __device__ double calcWallIPLInteraction(const double* thisPos, const dou
 		ratio_p = ratio12 * ratio12; // power equal to 24
 	} else if (d_IPLpower == 36) {
 		ratio_p = ratio12 * ratio12 * ratio12; // power equal to 36
+	} else if (d_IPLpower == 48) {
+		ratio_p = ratio12 * ratio12 * ratio12 * ratio12; // power equal to 36
 	}
     if (distance < (d_IPLcutoff * radSum)) {
 		auto forceShift = d_IPLfshift / radSum;
@@ -1411,9 +1417,9 @@ __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const d
 			cutoff = radSum;
 			break;
 		}
-		if(thisPos[1] < cutoff) {
-			wallPos[1] = 0;
-			wallPos[0] = thisPos[0];
+		if(thisPos[0] < cutoff) {
+			wallPos[0] = 0;
+			wallPos[1] = thisPos[1];
 			switch (d_simControl.wallType) {
 			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
@@ -1428,9 +1434,9 @@ __global__ void kernelCalcParticleSidesInteraction2D(const double* pRad, const d
 			pEnergy[particleId] += calcWallContactInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
 			break;
 			}
-		} else if((d_boxSizePtr[1] - thisPos[1]) < cutoff) {
-			wallPos[1] = d_boxSizePtr[1];
-			wallPos[0] = thisPos[0];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < cutoff) {
+			wallPos[0] = d_boxSizePtr[0];
+			wallPos[1] = thisPos[1];
 			switch (d_simControl.wallType) {
 			case simControlStruct::wallEnum::lennardJones:
 			pEnergy[particleId] += calcWallLJInteraction(thisPos, wallPos, radSum, &pForce[particleId*d_nDim], &wForce[particleId*d_nDim]);
@@ -2014,9 +2020,10 @@ __global__ void kernelCheckParticleInsideRoundWall(double* pPos) {
 	}
 }
 
-__global__ void kernelReflectParticleFixedWall(const double* pRad, const double* pPos, double* pVel, double* wForce) {
+__global__ void kernelReflectParticleFixedWall(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		double px, py, norm;
 		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
@@ -2048,18 +2055,35 @@ __global__ void kernelReflectParticleFixedWall(const double* pRad, const double*
 			isWally = true;
 			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
 		}
+		switch (d_simControl.particleType) {
+			case simControlStruct::particleEnum::active:
+			case simControlStruct::particleEnum::kuramoto:
+			px = cos(pAngle[particleId]);
+			py = sin(pAngle[particleId]);
+			if(isWallx) px = -px;
+			if(isWally) py = -py;
+			norm = sqrt(px*px + py*py);
+			px /= norm;
+			py /= norm;
+			pAngle[particleId] = atan2(py, px);
+			//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			break;
+			default:
+			break;
+		}
 		if(isWallx || isWally) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
 }
 
-__global__ void kernelReflectParticleFixedSides2D(const double* pRad, const double* pPos, double* pVel, double* wForce) {
+__global__ void kernelReflectParticleFixedSides2D(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		double px, py, norm;
 		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
@@ -2076,17 +2100,32 @@ __global__ void kernelReflectParticleFixedSides2D(const double* pRad, const doub
 			wForce[particleId*d_nDim + dim] = 0.;
 		}
 		bool isWall = false;
-		if(thisPos[1] < thisRad) {
+		if(thisPos[0] < thisRad) {
 			isWall = true;
-			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
-		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			isWall = true;
-			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		}
+		switch (d_simControl.particleType) {
+			case simControlStruct::particleEnum::active:
+			case simControlStruct::particleEnum::kuramoto:
+			px = cos(pAngle[particleId]);
+			py = sin(pAngle[particleId]);
+			if(isWall) px = -px;
+			norm = sqrt(px*px + py*py);
+			px /= norm;
+			py /= norm;
+			pAngle[particleId] = atan2(py, px);
+			//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			break;
+			default:
+			break;
 		}
 		if(isWall) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -2121,7 +2160,7 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 		if(isWall) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -2130,7 +2169,8 @@ __global__ void kernelReflectParticleFixedSides3D(const double* pRad, const doub
 __global__ void kernelReflectParticleRoundWall(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
+		double px, py, pDotn, norm;
+		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2147,7 +2187,6 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 		getParticleVel(particleId, pVel, thisVel);
 		for (long dim = 0; dim < d_nDim; dim++) {
 			wForce[particleId*d_nDim + dim] = 0.;
-			wallForce[dim] = 0.;
 		}
 		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
@@ -2157,29 +2196,192 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
-				pAngle[particleId] = velAngle;
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
+				px = px - 2 * pDotn * cos(thisTheta);
+				py = py - 2 * pDotn * sin(thisTheta);
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				//pAngle[particleId] = velAngle;
 				break;
 				default:
 				break;
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
-			// transform wallForce to radial and tangential components and then assign to wForce
-			double radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
-			double thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
-			//double radForce, thetaForce;
-			//cartesianToPolar(wallForce, radForce, thetaForce);
-			wForce[particleId * d_nDim] = radForce;
-			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
 
-__global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, double* pVel, const double* randAngle, double* wForce) {
+__global__ void kernelPartiallyReflectParticleFixedWall(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
+		double px, py, norm;
+		double thisPos[MAXDIM], thisVel[MAXDIM];
+		getParticlePos(particleId, pPos, thisPos);
+		auto thisRad = pRad[particleId];
+		switch (d_simControl.potentialType) {
+			case simControlStruct::potentialEnum::none:
+			thisRad = 0.;
+			break;
+			default:
+			break;
+		}
+		// save previous velocity to compute momentum exchange across wall
+		getParticleVel(particleId, pVel, thisVel);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[particleId*d_nDim + dim] = 0.;
+		}
+		bool isWallx = false;
+		if(thisPos[0] < thisRad) {
+			isWallx = true;
+			pVel[particleId * d_nDim] = -d_restparam * pVel[particleId * d_nDim];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
+			isWallx = true;
+			pVel[particleId * d_nDim] = -d_restparam * pVel[particleId * d_nDim];
+		}
+		bool isWally = false;
+		if(thisPos[1] < thisRad) {
+			isWally = true;
+			pVel[particleId * d_nDim + 1] = -d_restparam * pVel[particleId * d_nDim + 1];
+		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
+			isWally = true;
+			pVel[particleId * d_nDim + 1] = -d_restparam * pVel[particleId * d_nDim + 1];
+		}
+		switch (d_simControl.particleType) {
+			case simControlStruct::particleEnum::active:
+			case simControlStruct::particleEnum::kuramoto:
+			px = cos(pAngle[particleId]);
+			py = sin(pAngle[particleId]);
+			if(isWallx) px = -d_restparam * px;
+			if(isWally) py = -d_restparam * py;
+			norm = sqrt(px*px + py*py);
+			px /= norm;
+			py /= norm;
+			pAngle[particleId] = atan2(py, px);
+			break;
+			default:
+			break;
+		}
+		if(isWallx || isWally) {
+		// compute momentum exchange and assign it to wForce
+			for (long dim = 0; dim < d_nDim; dim++) {
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+			}
+		}
+	}
+}
+
+__global__ void kernelPartiallyReflectParticleFixedSides2D(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double px, py, norm;
+		double thisPos[MAXDIM], thisVel[MAXDIM];
+		getParticlePos(particleId, pPos, thisPos);
+		auto thisRad = pRad[particleId];
+		switch (d_simControl.potentialType) {
+			case simControlStruct::potentialEnum::none:
+			thisRad = 0.;
+			break;
+			default:
+			break;
+		}
+		// save previous velocity to compute momentum exchange across wall
+		getParticleVel(particleId, pVel, thisVel);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[particleId*d_nDim + dim] = 0.;
+		}
+		bool isWall = false;
+		if(thisPos[0] < thisRad) {
+			isWall = true;
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
+			isWall = true;
+			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+		}
+		switch (d_simControl.particleType) {
+			case simControlStruct::particleEnum::active:
+			case simControlStruct::particleEnum::kuramoto:
+			px = cos(pAngle[particleId]);
+			py = sin(pAngle[particleId]);
+			if(isWall) px = -d_restparam * px;
+			norm = sqrt(px*px + py*py);
+			px /= norm;
+			py /= norm;
+			pAngle[particleId] = atan2(py, px);
+			break;
+			default:
+			break;
+		}
+		if(isWall) {
+		// compute momentum exchange and assign it to wForce
+			for (long dim = 0; dim < d_nDim; dim++) {
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+			}
+		}
+	}
+}
+
+__global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, const double* pPos, double* pVel, double* pAngle, double* wForce) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double px, py, pDotn, norm;
+		double thisPos[MAXDIM], thisVel[MAXDIM];
+		getParticlePos(particleId, pPos, thisPos);
+		auto thisRad = pRad[particleId];
+		switch (d_simControl.potentialType) {
+			case simControlStruct::potentialEnum::none:
+			thisRad = 0.;
+			break;
+			default:
+			break;
+		}
+		// check if particle is far from the origin more than the box radius R minus the particle radius
+		double thisR, thisTheta;
+		cartesianToPolar(thisPos, thisR, thisTheta);
+		// save previous velocity to compute momentum exchange across wall
+		getParticleVel(particleId, pVel, thisVel);
+		for (long dim = 0; dim < d_nDim; dim++) {
+			wForce[particleId*d_nDim + dim] = 0.;
+		}
+		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
+			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - d_restparam * 2 * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - d_restparam * 2 * vDotn * sin(thisTheta);
+			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
+				px = px - (1 + d_restparam) * pDotn * cos(thisTheta);
+				py = py - (1 + d_restparam) * pDotn * sin(thisTheta);
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
+			for (long dim = 0; dim < d_nDim; dim++) {
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+			}
+		}
+	}
+}
+
+__global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, double* pVel, double* pAngle, const double* randAngle, double* wForce) {
+	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (particleId < d_numParticles) {
+		double px, py, norm;
 		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
@@ -2231,10 +2433,25 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
+		switch (d_simControl.particleType) {
+			case simControlStruct::particleEnum::active:
+			case simControlStruct::particleEnum::kuramoto:
+			px = cos(pAngle[particleId]);
+			py = sin(pAngle[particleId]);
+			if(isWallx) px = -px;
+			if(isWally) py = -py;
+			norm = sqrt(px*px + py*py);
+			px /= norm;
+			py /= norm;
+			pAngle[particleId] = atan2(py, px);
+			break;
+			default:
+			break;
+		}
 		if(isWallx || isWally) {
 		// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
 		}
 	}
@@ -2243,7 +2460,8 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, const double* pPos, double* pVel, double* pAngle, const double* randAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
+		double px, py, pDotn, norm;
+		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2260,7 +2478,6 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 		getParticleVel(particleId, pVel, thisVel);
 		for (long dim = 0; dim < d_nDim; dim++) {
 			wForce[particleId*d_nDim + dim] = 0.;
-			wallForce[dim] = 0.;
 		}
 		if((d_boxRadius - thisR) < thisRad) {
 			// add Gaussian noise to the angle of reflection
@@ -2273,22 +2490,23 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
-				pAngle[particleId] = velAngle;
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
+				px = px - 2 * pDotn * cos(thisTheta);
+				py = py - 2 * pDotn * sin(thisTheta);
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
 				break;
 				default:
 				break;
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wallForce[dim] = (pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
-			// transform wallForce to radial and tangential components and then assign to wForce
-			double radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
-			double thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
-			//double radForce, thetaForce;
-			//cartesianToPolar(wallForce, radForce, thetaForce);
-			wForce[particleId * d_nDim] = radForce;
-			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
@@ -2450,6 +2668,7 @@ inline __device__ void calcWallStress(const double* thisPos, const double* wallP
 		ratio12 = ratio6 * ratio6;
 		if(d_IPLpower == 24) ratio_p = ratio12 * ratio12;
 		else if(d_IPLpower == 36) ratio_p = ratio12 * ratio12 * ratio12;
+		else if(d_IPLpower == 48) ratio_p = ratio12 * ratio12 * ratio12 * ratio12;
 		else ratio_p = ratio12;
 		if (distance < (d_IPLcutoff * radSum)) {
 			forceShift = d_IPLfshift / radSum;
@@ -2547,16 +2766,16 @@ __global__ void kernelCalcSides2DStress(const double* pRad, const double* pPos, 
 			break;
 		}
 		// check if particle is close to the wall at a distance less than its radius
-		if(thisPos[1] < range) {
-			wallPos[0] = thisPos[0];
-			wallPos[1] = 0;
+		if(thisPos[0] < range) {
+			wallPos[1] = thisPos[1];
+			wallPos[0] = 0;
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId + d_nDim + 1] += force[1];
-		} else if((d_boxSizePtr[1] - thisPos[1]) < range) {
-			wallPos[0] = thisPos[0];
-			wallPos[1] = d_boxSizePtr[1];
+			wallStress[particleId + d_nDim] += force[0];
+		} else if((d_boxSizePtr[0] - thisPos[0]) < range) {
+			wallPos[1] = thisPos[1];
+			wallPos[0] = d_boxSizePtr[0];
 			calcWallStress(thisPos, wallPos, radSum, force);
-			wallStress[particleId + d_nDim + 1] += force[1];
+			wallStress[particleId + d_nDim] += force[0];
 		}
 	}
 }

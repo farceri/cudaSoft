@@ -24,7 +24,7 @@ using std::tuple;
 struct simControlStruct {
   enum class particleEnum {passive, active, kuramoto} particleType;
   enum class noiseEnum {langevin1, langevin2, brownian, drivenBrownian} noiseType;
-  enum class boundaryEnum {pbc, leesEdwards, fixed, reflect, reflectNoise, rough, rigid, mobile, plastic} boundaryType;
+  enum class boundaryEnum {pbc, leesEdwards, reflect, partialReflect, reflectNoise, fixed, rough, rigid, mobile, plastic} boundaryType;
   enum class geometryEnum {squareWall, fixedSides2D, fixedSides3D, roundWall} geometryType;
   enum class neighborEnum {neighbor, allToAll} neighborType;
   enum class potentialEnum {none, harmonic, lennardJones, Mie, WCA, IPL, adhesive, doubleLJ, LJMinusPlus, LJWCA} potentialType;
@@ -75,8 +75,10 @@ public:
   double driving, taup;
   // Kuramoto velocity interaction parameters
   double Jk, Rk;
-  // Reflection noise
+  // Wall reflection noise
   double angleAmplitude;
+  // Wall restitution parameter
+  double restparam;
   // adhesion constants
   double l1, l2;
   // Lennard-Jones constants
@@ -388,6 +390,18 @@ public:
 
   double getParticleISF(double waveNumber_);
 
+  std::tuple<double, double, double, double, double> getKuramotoOrderParameters();
+
+  double getKuramotoHigherOrderParameter(double order_);
+
+  double getKuramotoVelocityCorrelation();
+
+  double getNeighborVelocityCorrelation();
+
+  double getParticleMomentOfInertia();
+
+  double getParticleAngularMomentum();
+
   // initialization functions
   void setPolyRandomParticles(double phi0, double polyDispersity);
 
@@ -455,6 +469,8 @@ public:
 
   void setWallEnergyScale(double ew_);
 
+  void setWallRestitutionParam(double restparam_);
+
   void setGravity(double gravity_, double ew_);
 
   void setFluidFlow(double speed_, double viscosity_);
@@ -494,23 +510,13 @@ public:
 
   void reflectParticleOnWall();
 
+  void partiallyReflectParticleOnWall();
+
   void reflectParticleOnWallWithNoise();
 
   void addParticleGravity();
 
   void calcParticleForceEnergy();
-
-  std::tuple<double, double, double, double, double> getKuramotoOrderParameters();
-
-  double getKuramotoHigherOrderParameter(double order_);
-
-  double getKuramotoVelocityCorrelation();
-
-  double getNeighborVelocityCorrelation();
-
-  double getParticleMomentOfInertia();
-
-  double getParticleAngularMomentum();
 
   void setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1);
 
@@ -567,11 +573,11 @@ public:
 
   std::tuple<double, double> computeWallPressure();
 
-  void convertFixedWallForceToRadial();
+  void convertSmoothWallForceToPolar();
 
-  void convertRoughWallForceToRadial();
+  void convertRoughWallForceToPolar();
 
-  void convertMobileWallForceToRadial();
+  void convertMobileWallForceToPolar();
 
   std::tuple<double, double> getWallPressure();
 

@@ -510,9 +510,10 @@ public:
         energyFile << "\t" << setprecision(precision) << sp_->getKuramotoHigherOrderParameter(order);
       }
       energyFile << "\t" << setprecision(precision) << sp_->getKuramotoVelocityCorrelation();
+      energyFile << "\t" << setprecision(precision) << sp_->getParticleMomentOfInertia();
+      energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum();
     }
-    energyFile << "\t" << setprecision(precision) << sp_->getParticleMomentOfInertia();
-    energyFile << "\t" << setprecision(precision) << sp_->getParticleAngularMomentum() << endl;
+    energyFile << endl;
   }
 
   void saveWallDynamics(long step, double timeStep) {

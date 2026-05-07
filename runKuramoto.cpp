@@ -29,19 +29,19 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool readState = false, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, squarebc = false, roundbc = true, maxRk = false;
   // input variables
-  double timeStep = atof(argv[2]), Jk = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]);
+  double timeStep = atof(argv[2]), Jk = atof(argv[3]), tp = atof(argv[4]), damping = atof(argv[5]), restparam = atof(argv[13]);
   long maxStep = atof(argv[6]), initialStep = atof(argv[7]), numParticles = atol(argv[8]), nDim = 2;
   std::string inDir = argv[1], potType = argv[9], wallType = argv[10], alignType = argv[11], dynType = argv[12];
   // step variables
   long checkPointFreq = int(maxStep / 10), linFreq = int(checkPointFreq / 10), saveEnergyFreq = int(linFreq / 10);
   long step = 0, firstDecade = 0, multiple = 1, saveFreq = 1, updateCount = 0;
   // force and noise variables
-  double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5; 
-  double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rk = 1.5, IPLcutoff = 1.5, IPLpower = 12;
+  double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5, scale = 0.99;
+  double ew = 10*ec, LJcut = 4., waveQ, Tinject = 1., driving = 2., Rk = 1.5, IPLcutoff = 1.225, IPLpower = 12.;
   std::string outDir, currentDir, dirSample, energyFile, dampingDir, whichDynamics = "kuramoto/";
 
   // initialize sp object
@@ -95,16 +95,19 @@ int main(int argc, char **argv) {
   } else if(wallType == "noise") {
     whichDynamics = whichDynamics + "noise/";
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflectNoise);
-  } else if(wallType == "fixed" || wallType == "fixed-ipl") {
-    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
-    if(wallType == "fixed-ipl") {
-      whichDynamics = whichDynamics + "fixed-ipl/";
+  } else if(wallType == "fixed" || wallType == "ipl") {
+    if(wallType == "ipl") {
+      whichDynamics = whichDynamics + "ipl/";
       sp.setWallType(simControlStruct::wallEnum::IPL);
       sp.setIPLParams(IPLcutoff, IPLpower);
-    } else {
-      whichDynamics = whichDynamics + "fixed/";
-    }
+    } else whichDynamics = whichDynamics + "fixed/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::fixed);
+  } else if(wallType == "partial") {
+    whichDynamics = whichDynamics + "reflect-rp" + argv[13] + "/";
+    sp.setBoundaryType(simControlStruct::boundaryEnum::partialReflect);
+    sp.setWallRestitutionParam(restparam);
   } else {
+    whichDynamics = whichDynamics + "pbc/";
     cout << "Setting default rectangular geometry with periodic boundaries" << endl;
   }
   if(std::experimental::filesystem::exists(inDir + whichDynamics) == false) {
@@ -145,11 +148,7 @@ int main(int argc, char **argv) {
     inDir = inDir + dirSample;
     outDir = inDir;
     if(runDynamics == true) {
-      if(alignType == "vel") {
-        outDir = outDir + "dynamics-vel";
-      } else {
-        outDir = outDir + "dynamics";
-      }
+      outDir = outDir + "dynamics";
       if(logSave == true) outDir = outDir + "-log/";
       else outDir = outDir + "/";
       if(std::experimental::filesystem::exists(outDir) == true) {
@@ -188,7 +187,7 @@ int main(int argc, char **argv) {
   forceUnit = ec / sigma;
   if(maxRk == true) Rk = sp.getBoxRadius();
   Jk = Jk / (PI * Rk * Rk);
-  driving = 2. * damping; // this is necessary to keep the temperature equal to input value, es. 2
+  driving = driving * damping; // this is necessary to keep the temperature equal to input value, es. v_0 = 2
   cout << "Units - time: " << timeUnit << " space: " << sigma << " time step: " << timeStep << endl;
   cout << "Noise - damping: " << damping << " driving: " << driving << " taup: " << tp << " magnitude: " << sqrt(2 * timeStep / tp) << endl;
   if(dynType == "langevin") cout << "Langevin - T: " << Tinject << " magnitude: " << sqrt(2 * damping * Tinject) << endl;

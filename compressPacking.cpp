@@ -26,21 +26,20 @@ using namespace std;
 
 int main(int argc, char **argv) {
   // variables
-  bool read = false, readState = false, nve = true, noseHoover = false, scaleVel = false;
-  bool squarebc = false, roundbc = true, lj = false, wca = true, gforce = false, alltoall = false;
+  bool read = false, readState = false, gforce = false, alltoall = false;
   // input variables
-  std::string outDir = argv[1];
-  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
   long numParticles = atol(argv[4]), nDim = atol(argv[5]);
+  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
+  std::string outDir = argv[1], boxType = argv[9], potType = argv[10], dynType = argv[11];
   // other variables
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
   long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
-  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 4e-03, phi0 = 0.006, phiTh = 0.4;
+  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 2e-02, phi0 = 0.02, phiTh = 0.5;
   double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, size;
   double ec = 1, ew = 1e02*ec, inertiaOverDamping = 10, scaleFactor, prevEnergy = 0;
   double cutDistance, cutoff = 0.5, timeUnit, sigma, gravity = 9.8e-04, mass = 10, damping = 1;
-  long num1 = int(numParticles / 2);
+  //long num1 = int(numParticles / 2);
   if(nDim == 3) {
     LJcut = 2.5;
   }
@@ -51,14 +50,15 @@ int main(int argc, char **argv) {
 	// initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
-  if(squarebc == true) {
+  // set box type
+  if(boxType == "square") {
     sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
     sp.setWallEnergyScale(ew);
-  } else if(roundbc == true) {
+  } else if(boxType == "circle") {
     sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
     sp.setWallEnergyScale(ew);
-  } else if(gforce == true) {
+  } else if(boxType == "sides2d") {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
     sp.setWallEnergyScale(ew);
   } else {
@@ -79,8 +79,8 @@ int main(int argc, char **argv) {
       ioSP.readParticleState(inDir, numParticles, nDim);
     }
   } else {
-    // initialize polydisperse packing
-    if(roundbc == true) {
+    // initialize packing
+    if(boxType == "round") {
       sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
     } else {
       sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly, lz);
@@ -112,11 +112,12 @@ int main(int argc, char **argv) {
     cout << " maxUnbalancedForce: " << setprecision(precision) << sp.getParticleMaxUnbalancedForce();
     cout << " energy: " << setprecision(precision) << sp.getParticleEnergy() << "\n" << endl;
   }
-  if(lj == true) {
+  // set potential type
+  if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
     cout << "Setting Lennard-Jones potential" << endl;
     sp.setLJcutoff(LJcut);
-  } else if(wca == true) {
+  } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
     cout << "Setting WCA potential" << endl;
   }
@@ -130,26 +131,29 @@ int main(int argc, char **argv) {
   previousPhi = currentPhi;
   timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
-  if(nve == true || noseHoover == true) {
+  // set thermostat type
+  if(dynType == "nve") {
+    sp.initSoftParticleNVE(Tinject, readState);
+    cout << "Setting NVE integrator" << endl;
+    cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
+  } else if(dynType == "nh") {
+    sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
+    cout << "Setting Nose Hoover integrator" << endl;
+    cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
+  } else if(dynType == "scalevel") {
+    sp.initSoftParticleNVE(Tinject, readState);
+    sp.initSoftParticleNVERescale(Tinject);
+    cout << "Setting SCALE VEL thermostat" << endl;
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else {
+    sp.initSoftParticleLangevin(Tinject, damping, readState);
+    cout << "Setting default Langevin integrator" << endl;
     damping = sqrt(inertiaOverDamping) / sigma;
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
-  }
-  if(nve == true) {
-    sp.initSoftParticleNVE(Tinject, readState);
-  } else if(noseHoover == true) {
-    sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
-  } else if(scaleVel == true) {
-    sp.initSoftParticleNVE(Tinject, readState); // this is done to inject velocities
-    sp.initSoftParticleNVERescale(Tinject);
-  } else {
-    sp.initSoftParticleLangevin(Tinject, damping, readState);
   }
   currentDir = outDir + "initial/";
   std::experimental::filesystem::create_directory(currentDir);
   ioSP.saveParticlePacking(currentDir);
-  // initilize velocities only the first time
   while (searchStep < maxSearchStep) {
     currentDir = outDir + std::to_string(sp.getParticlePhi()).substr(0,5) + "/";
     std::experimental::filesystem::create_directory(currentDir);
@@ -164,7 +168,7 @@ int main(int argc, char **argv) {
     // equilibrate dynamics
     step = 0;
     // remove energy injected by compression
-    if(searchStep != 0 && nve == true) {
+    if(searchStep != 0 && dynType == "nve") {
       sp.calcParticleNeighbors(cutDistance);
       sp.calcParticleForceEnergy();
       cout << "Energy after compression - E/N: " << sp.getParticleEnergy() / numParticles << endl;
@@ -173,11 +177,11 @@ int main(int argc, char **argv) {
       cout << "Energy after adjustment - E/N: " << sp.getParticleEnergy() / numParticles << endl;
     }
     while(step != maxStep) {
-      if(nve == true) {
+      if(dynType == "nve") {
         sp.softParticleNVELoop();
-      } else if(noseHoover == true) {
+      } else if(dynType == "nh") {
         sp.softParticleNoseHooverLoop();
-      } else if(scaleVel == true) {
+      } else if(dynType == "scalevel") {
         sp.softParticleNVERescaleLoop();
       } else {
         sp.softParticleLangevinLoop();
@@ -202,7 +206,7 @@ int main(int argc, char **argv) {
           cout << endl;
         }
       }
-      if(nve == true) {
+      if(dynType == "nve") {
         if(abs(sp.getParticleTemperature() - Tinject) > 1e-02) {
           sp.rescaleParticleVelocity(Tinject);
         }
@@ -214,7 +218,7 @@ int main(int argc, char **argv) {
     // save minimized configuration
     ioSP.saveParticlePacking(currentDir);
     //ioSP.saveParticleNeighbors(currentDir);
-    //if(noseHoover == true) {
+    //if(dynType == "nh") {
     //  ioSP.saveNoseHooverParams(currentDir);
     //}
     if(nDim == 3) {
@@ -237,7 +241,7 @@ int main(int argc, char **argv) {
       sp.scaleParticles(scaleFactor);
       sp.scaleParticlePacking();
       currentPhi = sp.getParticlePhi();
-      if(roundbc == true) {
+      if(boxType == "circle") {
         cout << "\nNew phi: " << currentPhi << " box radius: " << sp.getBoxRadius() << " scale: " << scaleFactor << endl;
       } else {
         boxSize = sp.getBoxSize();

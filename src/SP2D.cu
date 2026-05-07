@@ -62,23 +62,24 @@ SP2D::SP2D(long nParticles, long dim) {
 	syncSimControlToDevice();
   // default parameters
   dt = 1e-04;
-  rho0 = 1;
-	ec = 1;
-	l1 = 0;
-	l2 = 0;
-  LEshift = 0;
-  gravity = 0;
-  ew = 1;
-  flowSpeed = 0;
-  flowDecay = 1;
-  flowViscosity = 1;
-  cutDistance = 1;
+  rho0 = 1.;
+	ec = 1.;
+	l1 = 0.;
+	l2 = 0.;
+  LEshift = 0.;
+  gravity = 0.;
+  ew = 1.;
+  flowSpeed = 0.;
+  flowDecay = 1.;
+  flowViscosity = 1.;
+  cutDistance = 1.;
   updateCount = 0;
   shift = false;
   ea = 1e05;
-  el = 1;
-  eb = 1;
-  angleAmplitude = 0.0;
+  el = 1.;
+  eb = 1.;
+  angleAmplitude = 0.;
+  restparam = 1.;
   d_boxSize.resize(nDim);
   thrust::fill(d_boxSize.begin(), d_boxSize.end(), double(1));
   d_stress.resize(nDim * nDim);
@@ -300,14 +301,16 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
     cout << "SP2D::setBoundaryType: boundaryType: pbc" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::leesEdwards) {
     cout << "SP2D::setBoundaryType: boundaryType: leesEdwards" << endl;
-  } else if(simControl.boundaryType == simControlStruct::boundaryEnum::fixed) {
-    cout << "SP2D::setBoundaryType: boundaryType: fixed" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::reflect) {
     cout << "SP2D::setBoundaryType: boundaryType: reflect" << endl;
+  } else if(simControl.boundaryType == simControlStruct::boundaryEnum::partialReflect) {
+    cout << "SP2D::setBoundaryType: boundaryType: partialReflect - restitution parameter is set to 1" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::reflectNoise) {
     d_randomAngle.resize(numParticles);
     thrust::fill(d_randomAngle.begin(), d_randomAngle.end(), double(0));
-    cout << "SP2D::setBoundaryType: boundaryType: reflectnoise" << endl;
+    cout << "SP2D::setBoundaryType: boundaryType: reflectNoise" << endl;
+  } else if(simControl.boundaryType == simControlStruct::boundaryEnum::fixed) {
+    cout << "SP2D::setBoundaryType: boundaryType: fixed" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::rough) {
     setNeighborType(simControlStruct::neighborEnum::neighbor);
     setGeometryType(simControlStruct::geometryEnum::roundWall);
@@ -326,7 +329,7 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
     lgamma = 1.;
     cout << "SP2D::setBoundaryType: boundaryType: plastic" << endl;
   } else {
-    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, fixed, reflect, reflectNoise, rough, rigid, mobile and plastic" << endl;
+    cout << "SP2D::setBoundaryType: please specify valid boundaryType: pbc, leesEdwards, reflect, partialReflect, reflectNoise, fixed, rough, rigid, mobile and plastic" << endl;
   }
 	syncSimControlToDevice();
 }
@@ -1317,6 +1320,83 @@ double SP2D::getParticleISF(double waveNumber_) {
   return thrust::reduce(d_particleSF.begin(), d_particleSF.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
+std::tuple<double, double, double, double, double> SP2D::getKuramotoOrderParameters() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
+  double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
+  double *unitVelPos = thrust::raw_pointer_cast(&d_unitVelPos[0]);
+  double *alpha_r = thrust::raw_pointer_cast(&d_alpha_r[0]);
+  double *alpha_phi = thrust::raw_pointer_cast(&d_alpha_phi[0]);
+  kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos, alpha_r, alpha_phi);
+  // compute phase order parameter
+  typedef thrust::device_vector<double>::iterator Iterator;
+  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
+  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
+  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param1 = sqrt(realField * realField + imagField * imagField);
+  // compute velocity order parameter
+  strided_range<Iterator> unitVel_re(d_unitVel.begin(), d_unitVel.end(), 2);
+  strided_range<Iterator> unitVel_im(d_unitVel.begin() + 1, d_unitVel.end(), 2);
+  realField = thrust::reduce(unitVel_re.begin(), unitVel_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  imagField = thrust::reduce(unitVel_im.begin(), unitVel_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param2 = sqrt(realField * realField + imagField * imagField);
+  // compute velocity-position order parameter
+  strided_range<Iterator> unitVelPos_re(d_unitVelPos.begin(), d_unitVelPos.end(), 2);
+  strided_range<Iterator> unitVelPos_im(d_unitVelPos.begin() + 1, d_unitVelPos.end(), 2);
+  realField = thrust::reduce(unitVelPos_re.begin(), unitVelPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  imagField = thrust::reduce(unitVelPos_im.begin(), unitVelPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param3 = sqrt(realField * realField + imagField * imagField);
+  // compute average alpha_r and alpha_phi
+  double param4 = boxRadius * thrust::reduce(d_alpha_r.begin(), d_alpha_r.end(), double(0), thrust::plus<double>()) / numParticles;
+  double param5 = boxRadius * thrust::reduce(d_alpha_phi.begin(), d_alpha_phi.end(), double(0), thrust::plus<double>()) / numParticles;
+  return std::make_tuple(param1, param2, param3, param4, param5);
+}
+
+double SP2D::getKuramotoHigherOrderParameter(double order_) {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
+  kernelCalcHigherOrderUnitVel<<<dimGrid, dimBlock>>>(pPos, unitPos, order_);
+  // compute phase order parameters
+  typedef thrust::device_vector<double>::iterator Iterator;
+  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
+  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
+  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
+  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
+  return sqrt(realField * realField + imagField * imagField);
+}
+
+double SP2D::getKuramotoVelocityCorrelation() {
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
+  kernelCalcKuramotoVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
+  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
+double SP2D::getNeighborVelocityCorrelation() {
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
+  kernelCalcNeighborVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
+  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
+double SP2D::getParticleMomentOfInertia() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
+  kernelCalcParticleMomentOfInertia<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
+  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
+double SP2D::getParticleAngularMomentum() {
+  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
+  kernelCalcParticleAngularMomentum<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
+  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
+}
+
 //************************ initialization functions **************************//
 void SP2D::setPolyRandomParticles(double phi0, double polyDispersity) {
   thrust::host_vector<double> boxSize(nDim);
@@ -1750,8 +1830,10 @@ void SP2D::setIPLParams(double IPLcutoff_, double IPLpower_) {
     ratio_p = ratio12 * ratio12;
   } else if(IPLpower == 36) {
     ratio_p = ratio12 * ratio12 * ratio12;
+  } else if(IPLpower == 48) {
+    ratio_p = ratio12 * ratio12 * ratio12 * ratio12;
   } else {
-    if(IPLpower != 12) cout << "SP2D::setIPLcutoff:: only 12, 24 and 36 are allowed! Setting IPLpower to 12" << endl;
+    if(IPLpower != 12) cout << "SP2D::setIPLcutoff:: only 12, 24, 36 and 48 are allowed! Setting IPLpower to 12" << endl;
     IPLpower = 12;
   }
   cudaMemcpyToSymbol(d_IPLpower, &IPLpower, sizeof(IPLpower));
@@ -1845,6 +1927,12 @@ void SP2D::setMieParams(double LJcutoff_, double nPower_, double mPower_) {
 void SP2D::setWallEnergyScale(double ew_) {
   ew = ew_;
   cudaMemcpyToSymbol(d_ew, &ew, sizeof(ew));
+}
+
+void SP2D::setWallRestitutionParam(double restparam_) {
+  restparam = restparam_;
+  cudaMemcpyToSymbol(d_restparam, &restparam, sizeof(restparam));
+  cout << "SP2D::setWallRestitutionParam: restparam: " << restparam << endl;
 }
 
 void SP2D::setGravity(double gravity_, double ew_) {
@@ -2027,6 +2115,7 @@ void SP2D::calcKuramotoAlignment() {
     break;
     case simControlStruct::alignEnum::velAlign:
     kernelCalcKuramotoVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
+    break;
     case simControlStruct::alignEnum::nonAddVelAlign:
     kernelCalcKuramotoNonAddVelocityAlignment<<<dimGrid, dimBlock>>>(pVel, pAlpha);
     break;
@@ -2202,6 +2291,8 @@ void SP2D::checkReflectiveWall() {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::reflect:
     reflectParticleOnWall();
+    case simControlStruct::boundaryEnum::partialReflect:
+    partiallyReflectParticleOnWall();
     break;
     case simControlStruct::boundaryEnum::reflectNoise:
     reflectParticleOnWallWithNoise();
@@ -2219,16 +2310,37 @@ void SP2D::reflectParticleOnWall() {
 	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
   switch (simControl.geometryType) {
     case simControlStruct::geometryEnum::squareWall:
-    kernelReflectParticleFixedWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
+    kernelReflectParticleFixedWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides2D:
-    kernelReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
+    kernelReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
     break;
     case simControlStruct::geometryEnum::fixedSides3D:
     kernelReflectParticleFixedSides3D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, wForce);
     break;
 		case simControlStruct::geometryEnum::roundWall:
     kernelReflectParticleRoundWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
+    break;
+    default:
+    break;
+	}
+}
+
+void SP2D::partiallyReflectParticleOnWall() {
+  const double *pRad = thrust::raw_pointer_cast(&d_particleRad[0]);
+	const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
+  double *pAngle = thrust::raw_pointer_cast(&d_particleAngle[0]);
+  double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
+	double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
+  switch (simControl.geometryType) {
+    case simControlStruct::geometryEnum::squareWall:
+    kernelPartiallyReflectParticleFixedWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
+    break;
+    case simControlStruct::geometryEnum::fixedSides2D:
+    kernelPartiallyReflectParticleFixedSides2D<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
+    break;
+		case simControlStruct::geometryEnum::roundWall:
+    kernelPartiallyReflectParticleRoundWall<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, wForce);
     break;
     default:
     break;
@@ -2247,7 +2359,7 @@ void SP2D::reflectParticleOnWallWithNoise() {
   const double *randAngle = thrust::raw_pointer_cast(&d_randomAngle[0]);
   switch (simControl.geometryType) {
 		case simControlStruct::geometryEnum::squareWall:
-    kernelReflectParticleFixedWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, randAngle, wForce);
+    kernelReflectParticleFixedWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, randAngle, wForce);
     break;
 		case simControlStruct::geometryEnum::roundWall:
     kernelReflectParticleRoundWallWithNoise<<<dimGrid, dimBlock>>>(pRad, pPos, pVel, pAngle, randAngle, wForce);
@@ -2255,83 +2367,6 @@ void SP2D::reflectParticleOnWallWithNoise() {
     default:
     break;
 	}
-}
-
-std::tuple<double, double, double, double, double> SP2D::getKuramotoOrderParameters() {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
-  double *unitVel = thrust::raw_pointer_cast(&d_unitVel[0]);
-  double *unitVelPos = thrust::raw_pointer_cast(&d_unitVelPos[0]);
-  double *alpha_r = thrust::raw_pointer_cast(&d_alpha_r[0]);
-  double *alpha_phi = thrust::raw_pointer_cast(&d_alpha_phi[0]);
-  kernelCalcUnitPosVel<<<dimGrid, dimBlock>>>(pPos, pVel, unitPos, unitVel, unitVelPos, alpha_r, alpha_phi);
-  // compute phase order parameter
-  typedef thrust::device_vector<double>::iterator Iterator;
-  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
-  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
-  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
-  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
-  double param1 = sqrt(realField * realField + imagField * imagField);
-  // compute velocity order parameter
-  strided_range<Iterator> unitVel_re(d_unitVel.begin(), d_unitVel.end(), 2);
-  strided_range<Iterator> unitVel_im(d_unitVel.begin() + 1, d_unitVel.end(), 2);
-  realField = thrust::reduce(unitVel_re.begin(), unitVel_re.end(), double(0), thrust::plus<double>()) / numParticles;
-  imagField = thrust::reduce(unitVel_im.begin(), unitVel_im.end(), double(0), thrust::plus<double>()) / numParticles;
-  double param2 = sqrt(realField * realField + imagField * imagField);
-  // compute velocity-position order parameter
-  strided_range<Iterator> unitVelPos_re(d_unitVelPos.begin(), d_unitVelPos.end(), 2);
-  strided_range<Iterator> unitVelPos_im(d_unitVelPos.begin() + 1, d_unitVelPos.end(), 2);
-  realField = thrust::reduce(unitVelPos_re.begin(), unitVelPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
-  imagField = thrust::reduce(unitVelPos_im.begin(), unitVelPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
-  double param3 = sqrt(realField * realField + imagField * imagField);
-  // compute average alpha_r and alpha_phi
-  double param4 = boxRadius * thrust::reduce(d_alpha_r.begin(), d_alpha_r.end(), double(0), thrust::plus<double>()) / numParticles;
-  double param5 = boxRadius * thrust::reduce(d_alpha_phi.begin(), d_alpha_phi.end(), double(0), thrust::plus<double>()) / numParticles;
-  return std::make_tuple(param1, param2, param3, param4, param5);
-}
-
-double SP2D::getKuramotoHigherOrderParameter(double order_) {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  double *unitPos = thrust::raw_pointer_cast(&d_unitPos[0]);
-  kernelCalcHigherOrderUnitVel<<<dimGrid, dimBlock>>>(pPos, unitPos, order_);
-  // compute phase order parameters
-  typedef thrust::device_vector<double>::iterator Iterator;
-  strided_range<Iterator> unitPos_re(d_unitPos.begin(), d_unitPos.end(), 2);
-  strided_range<Iterator> unitPos_im(d_unitPos.begin() + 1, d_unitPos.end(), 2);
-  double realField = thrust::reduce(unitPos_re.begin(), unitPos_re.end(), double(0), thrust::plus<double>()) / numParticles;
-  double imagField = thrust::reduce(unitPos_im.begin(), unitPos_im.end(), double(0), thrust::plus<double>()) / numParticles;
-  return sqrt(realField * realField + imagField * imagField);
-}
-
-double SP2D::getKuramotoVelocityCorrelation() {
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
-  kernelCalcKuramotoVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
-  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
-}
-
-double SP2D::getNeighborVelocityCorrelation() {
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *velCorr = thrust::raw_pointer_cast(&d_velCorr[0]);
-  kernelCalcNeighborVelocityCorrelation<<<dimGrid, dimBlock>>>(pVel, velCorr);
-  return thrust::reduce(d_velCorr.begin(), d_velCorr.end(), double(0), thrust::plus<double>()) / numParticles;
-}
-
-double SP2D::getParticleMomentOfInertia() {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
-  kernelCalcParticleMomentOfInertia<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
-  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
-}
-
-double SP2D::getParticleAngularMomentum() {
-  const double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
-  const double *pVel = thrust::raw_pointer_cast(&d_particleVel[0]);
-  double *angMom = thrust::raw_pointer_cast(&d_angMom[0]);
-  kernelCalcParticleAngularMomentum<<<dimGrid, dimBlock>>>(pPos, pVel, angMom);
-  return thrust::reduce(d_angMom.begin(), d_angMom.end(), double(0), thrust::plus<double>()) / numParticles;
 }
 
 void SP2D::setTwoParticleTestPacking(double sigma0, double sigma1, double lx, double ly, double y0, double y1, double vel1) {
@@ -2688,7 +2723,7 @@ std::tuple<double, double> SP2D::computeWallPressure() {
 		break;
 		case simControlStruct::geometryEnum::fixedSides2D:
     kernelCalcSides2DStress<<<dimGrid, dimBlock>>>(pRad, pPos, wallStress);
-    boxLength = 2. * d_boxSize[1];
+    boxLength = 2. * d_boxSize[0];
     break;
     default:
     break;
@@ -2706,29 +2741,27 @@ std::tuple<double, double> SP2D::computeWallPressure() {
   }
 }
 
-void SP2D::convertFixedWallForceToRadial() {
+void SP2D::convertSmoothWallForceToPolar() {
   // convert wallForce from cartesian to polar coordinates
   auto r = thrust::counting_iterator<long>(0);
   double *pPos = thrust::raw_pointer_cast(&d_particlePos[0]);
   double *wForce = thrust::raw_pointer_cast(&d_wallForce[0]);
 
-  // wallForce in fixed wall boundary is defined in the particle coordinate system
-  auto convertFixedWallForce = [=] __device__ (long particleId) {
-    if(wForce[particleId * d_nDim] != 0. && wForce[particleId * d_nDim + 1] != 0.) {
-      double x = pPos[particleId * d_nDim];
-      double y = pPos[particleId * d_nDim + 1];
-      double theta = atan2(y, x);
-      double force_rad = cos(theta) * wForce[particleId * d_nDim] + sin(theta) * wForce[particleId * d_nDim + 1];
-      double force_tan = -sin(theta) * wForce[particleId * d_nDim] + cos(theta) * wForce[particleId * d_nDim + 1];
-      wForce[particleId * d_nDim] = force_rad;
-      wForce[particleId * d_nDim + 1] = force_tan;
-    }
+  // wallForce in smooth wall boundary is defined in the particle coordinate system
+  auto convertSmoothWallForce = [=] __device__ (long particleId) {
+    double x = pPos[particleId * d_nDim];
+    double y = pPos[particleId * d_nDim + 1];
+    double theta = atan2(y, x);
+    double force_rad = cos(theta) * wForce[particleId * d_nDim] + sin(theta) * wForce[particleId * d_nDim + 1];
+    double force_tan = -sin(theta) * wForce[particleId * d_nDim] + cos(theta) * wForce[particleId * d_nDim + 1];
+    wForce[particleId * d_nDim] = force_rad;
+    wForce[particleId * d_nDim + 1] = force_tan;
   };
 
-  thrust::for_each(r, r + numParticles, convertFixedWallForce);
+  thrust::for_each(r, r + numParticles, convertSmoothWallForce);
 }
 
-void SP2D::convertRoughWallForceToRadial() {
+void SP2D::convertRoughWallForceToPolar() {
   // convert wallForce from cartesian to polar coordinates
   auto r = thrust::counting_iterator<long>(0);
   double *wPos = thrust::raw_pointer_cast(&d_wallPos[0]);
@@ -2747,7 +2780,7 @@ void SP2D::convertRoughWallForceToRadial() {
   thrust::for_each(r, r + numWall, convertRoughWallForce);
 }
 
-void SP2D::convertMobileWallForceToRadial() {
+void SP2D::convertMobileWallForceToPolar() {
   // first compute wall center of mass
   typedef thrust::device_vector<double>::iterator Iterator;
   strided_range<Iterator> xWallPos(d_wallPos.begin(), d_wallPos.end(), 2);
@@ -2780,16 +2813,19 @@ std::tuple<double, double> SP2D::getWallPressure() {
       case simControlStruct::geometryEnum::roundWall:
       boxLength = 2. * PI * boxRadius;
       switch (simControl.boundaryType) {
+        case simControlStruct::boundaryEnum::reflect:
+        case simControlStruct::boundaryEnum::reflectNoise:
+        case simControlStruct::boundaryEnum::partialReflect:
         case simControlStruct::boundaryEnum::fixed:
-        convertFixedWallForceToRadial();
+        convertSmoothWallForceToPolar();
         break;
         case simControlStruct::boundaryEnum::rough:
         case simControlStruct::boundaryEnum::rigid:
-        convertRoughWallForceToRadial();
+        convertRoughWallForceToPolar();
         break;
         case simControlStruct::boundaryEnum::mobile:
         case simControlStruct::boundaryEnum::plastic:
-        convertMobileWallForceToRadial();
+        convertMobileWallForceToPolar();
         boxLength = thrust::reduce(d_wallLength.begin(), d_wallLength.end(), double(0), thrust::plus<double>());
         default:
         break;

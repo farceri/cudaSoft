@@ -136,10 +136,11 @@ int main(int argc, char **argv) {
       std::experimental::filesystem::create_directory(outDir);
     }
     if (readAndSaveSameDir == false) {
-      if(wallType == "fixed" || wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
+      if(wallType == "rough" || wallType == "rigid" || wallType == "mobile" || wallType == "plastic") {
         initWall = true; // initializing from NVT
         scaleRadial = true; // scale radial coordinates
       }
+      if(wallType == "fixed") scaleRadial = true;
     } else {
       readState = true;
       inDir = inDir + wallDyn + "/";
