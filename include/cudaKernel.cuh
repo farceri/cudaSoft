@@ -62,7 +62,7 @@ __constant__ double d_mPower;
 __constant__ double d_mieConstant;
 __constant__ double d_Miecut;
 // Wall restitution parameter
-__constant__ double d_restparam;
+__constant__ double d_restparam = 1.;
 // Wall shape constants
 __constant__ long d_numWall;
 __constant__ double d_wallRad;
@@ -74,8 +74,8 @@ __constant__ double d_wallEnergy;
 __constant__ double d_ea;
 __constant__ double d_eb;
 __constant__ double d_el;
-__constant__ double d_stiff = 1;
-__constant__ double d_extSq = 1;
+__constant__ double d_stiff = 1.;
+__constant__ double d_extSq = 1.;
 // Stress profile bin size
 __constant__ double d_binSize;
 __constant__ long d_nBinsX;
@@ -2055,24 +2055,24 @@ __global__ void kernelReflectParticleFixedWall(const double* pRad, const double*
 			isWally = true;
 			pVel[particleId * d_nDim + 1] = -pVel[particleId * d_nDim + 1];
 		}
-		switch (d_simControl.particleType) {
-			case simControlStruct::particleEnum::active:
-			case simControlStruct::particleEnum::kuramoto:
-			px = cos(pAngle[particleId]);
-			py = sin(pAngle[particleId]);
-			if(isWallx) px = -px;
-			if(isWally) py = -py;
-			norm = sqrt(px*px + py*py);
-			px /= norm;
-			py /= norm;
-			pAngle[particleId] = atan2(py, px);
-			//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			break;
-			default:
-			break;
-		}
 		if(isWallx || isWally) {
-		// compute momentum exchange and assign it to wForce
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				if(isWallx) px = -px;
+				if(isWally) py = -py;
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
@@ -2107,23 +2107,23 @@ __global__ void kernelReflectParticleFixedSides2D(const double* pRad, const doub
 			isWall = true;
 			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
 		}
-		switch (d_simControl.particleType) {
-			case simControlStruct::particleEnum::active:
-			case simControlStruct::particleEnum::kuramoto:
-			px = cos(pAngle[particleId]);
-			py = sin(pAngle[particleId]);
-			if(isWall) px = -px;
-			norm = sqrt(px*px + py*py);
-			px /= norm;
-			py /= norm;
-			pAngle[particleId] = atan2(py, px);
-			//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
-			break;
-			default:
-			break;
-		}
 		if(isWall) {
-		// compute momentum exchange and assign it to wForce
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				if(isWall) px = -px;
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
@@ -2190,22 +2190,21 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 		}
 		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
-			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(thisTheta);
-			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(thisTheta);
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			pVel[particleId * d_nDim] -= 2. * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] -= 2. * vDotn * sin(thisTheta);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
 				px = cos(pAngle[particleId]);
 				py = sin(pAngle[particleId]);
 				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
-				px = px - 2 * pDotn * cos(thisTheta);
-				py = py - 2 * pDotn * sin(thisTheta);
+				px -= 2. * pDotn * cos(thisTheta);
+				py -= 2. * pDotn * sin(thisTheta);
 				norm = sqrt(px*px + py*py);
 				px /= norm;
 				py /= norm;
 				pAngle[particleId] = atan2(py, px);
-				//pAngle[particleId] = velAngle;
+				//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 				break;
 				default:
 				break;
@@ -2253,23 +2252,23 @@ __global__ void kernelPartiallyReflectParticleFixedWall(const double* pRad, cons
 			isWally = true;
 			pVel[particleId * d_nDim + 1] = -d_restparam * pVel[particleId * d_nDim + 1];
 		}
-		switch (d_simControl.particleType) {
-			case simControlStruct::particleEnum::active:
-			case simControlStruct::particleEnum::kuramoto:
-			px = cos(pAngle[particleId]);
-			py = sin(pAngle[particleId]);
-			if(isWallx) px = -d_restparam * px;
-			if(isWally) py = -d_restparam * py;
-			norm = sqrt(px*px + py*py);
-			px /= norm;
-			py /= norm;
-			pAngle[particleId] = atan2(py, px);
-			break;
-			default:
-			break;
-		}
 		if(isWallx || isWally) {
-		// compute momentum exchange and assign it to wForce
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				if(isWallx) px = -d_restparam * px;
+				if(isWally) py = -d_restparam * py;
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
@@ -2299,27 +2298,27 @@ __global__ void kernelPartiallyReflectParticleFixedSides2D(const double* pRad, c
 		bool isWall = false;
 		if(thisPos[0] < thisRad) {
 			isWall = true;
-			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
+			pVel[particleId * d_nDim] = -d_restparam * pVel[particleId * d_nDim];
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			isWall = true;
-			pVel[particleId * d_nDim] = -pVel[particleId * d_nDim];
-		}
-		switch (d_simControl.particleType) {
-			case simControlStruct::particleEnum::active:
-			case simControlStruct::particleEnum::kuramoto:
-			px = cos(pAngle[particleId]);
-			py = sin(pAngle[particleId]);
-			if(isWall) px = -d_restparam * px;
-			norm = sqrt(px*px + py*py);
-			px /= norm;
-			py /= norm;
-			pAngle[particleId] = atan2(py, px);
-			break;
-			default:
-			break;
+			pVel[particleId * d_nDim] = -d_restparam * pVel[particleId * d_nDim];
 		}
 		if(isWall) {
-		// compute momentum exchange and assign it to wForce
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				if(isWall) px = -d_restparam * px;
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
@@ -2351,21 +2350,21 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 		}
 		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
-			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - d_restparam * 2 * vDotn * cos(thisTheta);
-			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - d_restparam * 2 * vDotn * sin(thisTheta);
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
+			pVel[particleId * d_nDim] -= (1. + d_restparam) * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] -= (1. + d_restparam) * vDotn * sin(thisTheta);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
 				px = cos(pAngle[particleId]);
 				py = sin(pAngle[particleId]);
 				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
-				px = px - (1 + d_restparam) * pDotn * cos(thisTheta);
-				py = py - (1 + d_restparam) * pDotn * sin(thisTheta);
+				px -= (1. + d_restparam) * pDotn * cos(thisTheta);
+				py -= (1. + d_restparam) * pDotn * sin(thisTheta);
 				norm = sqrt(px*px + py*py);
 				px /= norm;
 				py /= norm;
 				pAngle[particleId] = atan2(py, px);
+				//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 				break;
 				default:
 				break;
@@ -2381,7 +2380,7 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, const double* pPos, double* pVel, double* pAngle, const double* randAngle, double* wForce) {
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
-		double px, py, norm;
+		double reflectAngle, px, py, pDotn, norm;
 		double thisPos[MAXDIM], thisVel[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
@@ -2401,7 +2400,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 		if(thisPos[0] < thisRad) {
 			isWallx = true;
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = randAngle[particleId];
+			reflectAngle = randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
@@ -2409,7 +2408,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 		} else if((d_boxSizePtr[0] - thisPos[0]) < thisRad) {
 			isWallx = true;
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = -PI + randAngle[particleId];
+			reflectAngle = -PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
@@ -2419,7 +2418,7 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 		if(thisPos[1] < thisRad) {
 			isWally = true;
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = -0.5 * PI + randAngle[particleId];
+			reflectAngle = -0.5 * PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
@@ -2427,29 +2426,30 @@ __global__ void kernelReflectParticleFixedWallWithNoise(const double* pRad, cons
 		} else if((d_boxSizePtr[1] - thisPos[1]) < thisRad) {
 			isWally = true;
 			// add Gaussian noise to the angle of reflection
-			auto reflectAngle = 0.5 * PI + randAngle[particleId];
+			reflectAngle = 0.5 * PI + randAngle[particleId];
 			checkAngleMinusPIPlusPI(reflectAngle);
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
 		}
-		switch (d_simControl.particleType) {
-			case simControlStruct::particleEnum::active:
-			case simControlStruct::particleEnum::kuramoto:
-			px = cos(pAngle[particleId]);
-			py = sin(pAngle[particleId]);
-			if(isWallx) px = -px;
-			if(isWally) py = -py;
-			norm = sqrt(px*px + py*py);
-			px /= norm;
-			py /= norm;
-			pAngle[particleId] = atan2(py, px);
-			break;
-			default:
-			break;
-		}
 		if(isWallx || isWally) {
-		// compute momentum exchange and assign it to wForce
+			switch (d_simControl.particleType) {
+				case simControlStruct::particleEnum::active:
+				case simControlStruct::particleEnum::kuramoto:
+				px = cos(pAngle[particleId]);
+				py = sin(pAngle[particleId]);
+				pDotn = px * cos(reflectAngle) + py * sin(reflectAngle);
+				if(isWallx) px = -2 * pDotn * cos(reflectAngle);
+				if(isWally) py = -2 * pDotn * sin(reflectAngle);
+				norm = sqrt(px*px + py*py);
+				px /= norm;
+				py /= norm;
+				pAngle[particleId] = atan2(py, px);
+				break;
+				default:
+				break;
+			}
+			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
 				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
@@ -2486,7 +2486,6 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 			auto vDotn = pVel[particleId * d_nDim] * cos(reflectAngle) + pVel[particleId * d_nDim + 1] * sin(reflectAngle);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(reflectAngle);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(reflectAngle);
-			auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
@@ -2499,6 +2498,7 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 				px /= norm;
 				py /= norm;
 				pAngle[particleId] = atan2(py, px);
+				//pAngle[particleId] = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 				break;
 				default:
 				break;

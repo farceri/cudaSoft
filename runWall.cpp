@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   double ec = 1, timeUnit, forceUnit, alphaUnit, sigma, cutDistance, cutoff = 0.5;
   double ew = 10*ec, LJcut = 4, waveQ, Tinject = 2, driving = 2, Rk = 1.5;
   double ea = 1e02*ec, el = 1e03*ec, eb = 1e02*ec, order = 0.f; 
-  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "kuramoto/";
+  std::string outDir, currentDir, dirSample, energyFile, wallFile, wallDyn, wallDir, whichDynamics = "/";
 
   // initialize sp object
 	SP2D sp(numParticles, nDim);
@@ -149,7 +149,9 @@ int main(int argc, char **argv) {
         if(logSave == true) outDir = outDir + "-log/";
         else outDir = outDir + "/";
         if(std::experimental::filesystem::exists(outDir) == true) {
-          inDir = outDir;
+          if(initialStep != 0) {
+            inDir = outDir;
+          }
         } else {
           std::experimental::filesystem::create_directory(outDir);
         }

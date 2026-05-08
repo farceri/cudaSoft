@@ -304,7 +304,7 @@ void SP2D::setBoundaryType(simControlStruct::boundaryEnum boundaryType_) {
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::reflect) {
     cout << "SP2D::setBoundaryType: boundaryType: reflect" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::partialReflect) {
-    cout << "SP2D::setBoundaryType: boundaryType: partialReflect - restitution parameter is set to 1" << endl;
+    cout << "SP2D::setBoundaryType: boundaryType: partialReflect - default restitution parameter is 1" << endl;
   } else if(simControl.boundaryType == simControlStruct::boundaryEnum::reflectNoise) {
     d_randomAngle.resize(numParticles);
     thrust::fill(d_randomAngle.begin(), d_randomAngle.end(), double(0));
@@ -2291,6 +2291,7 @@ void SP2D::checkReflectiveWall() {
   switch (simControl.boundaryType) {
     case simControlStruct::boundaryEnum::reflect:
     reflectParticleOnWall();
+    break;
     case simControlStruct::boundaryEnum::partialReflect:
     partiallyReflectParticleOnWall();
     break;
