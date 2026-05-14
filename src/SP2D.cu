@@ -2814,9 +2814,6 @@ std::tuple<double, double> SP2D::getWallPressure() {
       case simControlStruct::geometryEnum::roundWall:
       boxLength = 2. * PI * boxRadius;
       switch (simControl.boundaryType) {
-        case simControlStruct::boundaryEnum::reflect:
-        case simControlStruct::boundaryEnum::reflectNoise:
-        case simControlStruct::boundaryEnum::partialReflect:
         case simControlStruct::boundaryEnum::fixed:
         convertSmoothWallForceToPolar();
         break;
@@ -2840,9 +2837,9 @@ std::tuple<double, double> SP2D::getWallPressure() {
       typedef thrust::device_vector<double>::iterator Iterator;
       strided_range<Iterator> xWallForce(d_wallForce.begin(), d_wallForce.end(), 2);
       strided_range<Iterator> yWallForce(d_wallForce.begin() + 1, d_wallForce.end(), 2);
-      double xForce = thrust::reduce(xWallForce.begin(), xWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
-      double yForce = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
-      return std::make_tuple(xForce, yForce);
+      double xPress = thrust::reduce(xWallForce.begin(), xWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
+      double yPress = thrust::reduce(yWallForce.begin(), yWallForce.end(), double(0), thrust::plus<double>()) / boxLength;
+      return std::make_tuple(xPress, yPress);
     } else {
       cout << "SP2D::getWallPressure: Warning! boxLength is zero!" << endl;
       return std::make_tuple(0, 0);

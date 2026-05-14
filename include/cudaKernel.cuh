@@ -2170,7 +2170,7 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double px, py, pDotn, norm;
-		double thisPos[MAXDIM], thisVel[MAXDIM];
+		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2186,20 +2186,23 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 		// save previous velocity to compute momentum exchange across wall
 		getParticleVel(particleId, pVel, thisVel);
 		for (long dim = 0; dim < d_nDim; dim++) {
-			wForce[particleId*d_nDim + dim] = 0.;
+			wForce[particleId * d_nDim + dim] = 0.;
+			wallForce[dim] = 0.;
 		}
 		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
-			pVel[particleId * d_nDim] -= 2. * vDotn * cos(thisTheta);
-			pVel[particleId * d_nDim + 1] -= 2. * vDotn * sin(thisTheta);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(thisTheta);
+			//auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
+				//pAngle[particleId] = velAngle;
 				px = cos(pAngle[particleId]);
 				py = sin(pAngle[particleId]);
 				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
-				px -= 2. * pDotn * cos(thisTheta);
-				py -= 2. * pDotn * sin(thisTheta);
+				px = px - 2 * pDotn * cos(thisTheta);
+				py = py - 2 * pDotn * sin(thisTheta);
 				norm = sqrt(px*px + py*py);
 				px /= norm;
 				py /= norm;
@@ -2211,8 +2214,13 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wallForce[dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
+			// transform wallForce to radial and tangential components and then assign to wForce
+			auto radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
+			auto thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
+			wForce[particleId * d_nDim] = radForce;
+			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
@@ -2330,7 +2338,7 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double px, py, pDotn, norm;
-		double thisPos[MAXDIM], thisVel[MAXDIM];
+		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2347,8 +2355,9 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 		getParticleVel(particleId, pVel, thisVel);
 		for (long dim = 0; dim < d_nDim; dim++) {
 			wForce[particleId*d_nDim + dim] = 0.;
+			wallForce[dim] = 0.;
 		}
-		if((d_boxRadius - thisR) < thisRad) { // should replace thisRad with zero?
+		if((d_boxRadius - thisR) < thisRad) {
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
 			pVel[particleId * d_nDim] -= (1. + d_restparam) * vDotn * cos(thisTheta);
 			pVel[particleId * d_nDim + 1] -= (1. + d_restparam) * vDotn * sin(thisTheta);
@@ -2371,8 +2380,13 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wallForce[dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
+			// transform wallForce to radial and tangential components and then assign to wForce
+			auto radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
+			auto thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
+			wForce[particleId * d_nDim] = radForce;
+			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
@@ -2461,7 +2475,7 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 	long particleId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (particleId < d_numParticles) {
 		double px, py, pDotn, norm;
-		double thisPos[MAXDIM], thisVel[MAXDIM];
+		double thisPos[MAXDIM], thisVel[MAXDIM], wallForce[MAXDIM];
 		getParticlePos(particleId, pPos, thisPos);
 		auto thisRad = pRad[particleId];
 		switch (d_simControl.potentialType) {
@@ -2478,6 +2492,7 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 		getParticleVel(particleId, pVel, thisVel);
 		for (long dim = 0; dim < d_nDim; dim++) {
 			wForce[particleId*d_nDim + dim] = 0.;
+			wallForce[dim] = 0.;
 		}
 		if((d_boxRadius - thisR) < thisRad) {
 			// add Gaussian noise to the angle of reflection
@@ -2505,8 +2520,13 @@ __global__ void kernelReflectParticleRoundWallWithNoise(const double* pRad, cons
 			}
 			// compute momentum exchange and assign it to wForce
 			for (long dim = 0; dim < d_nDim; dim++) {
-				wForce[particleId * d_nDim + dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
+				wallForce[dim] = -(pVel[particleId * d_nDim + dim] - thisVel[dim]) / d_dt;
 			}
+			// transform wallForce to radial and tangential components and then assign to wForce
+			auto radForce = wallForce[0] * cos(thisTheta) + wallForce[1] * sin(thisTheta);
+			auto thetaForce = -wallForce[0] * sin(thisTheta) + wallForce[1] * cos(thisTheta);
+			wForce[particleId * d_nDim] = radForce;
+			wForce[particleId * d_nDim + 1] = thetaForce;
 		}
 	}
 }
