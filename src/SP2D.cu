@@ -180,6 +180,8 @@ void SP2D::initWallVariables(long numWall_) {
   if(simControl.boundaryType == simControlStruct::boundaryEnum::rigid) {
     d_monomerAlpha.resize(numWall_);
     thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
+    d_monomerTorque.resize(numWall_);
+    thrust::fill(d_monomerTorque.begin(), d_monomerTorque.end(), double(0));
     cout << "SP2D::initWallVariables: boundaryType: rigid" << endl;
     wallAngle = 0.;
     wallOmega = 0.;
@@ -786,6 +788,8 @@ void SP2D::setWallAngleDynamics(thrust::host_vector<double> wallDynamics_) {
     wallTorque = wallDynamics_[3];
     d_monomerAlpha.resize(numWall);
     thrust::fill(d_monomerAlpha.begin(), d_monomerAlpha.end(), double(0));
+    d_monomerTorque.resize(numWall);
+    thrust::fill(d_monomerTorque.begin(), d_monomerTorque.end(), double(0));
   } else {
     cout << "SP2D::getWallAngleDynamics only works for rigid boundary!" << endl;
   }

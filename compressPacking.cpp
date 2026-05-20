@@ -28,39 +28,38 @@ int main(int argc, char **argv) {
   // variables
   bool read = false, readState = false, gforce = false, alltoall = false;
   // input variables
-  long numParticles = atol(argv[4]), nDim = atol(argv[5]);
-  double timeStep = atof(argv[2]), Tinject = atof(argv[3]), lx = atof(argv[6]), ly = atof(argv[7]), lz = atof(argv[8]);
-  std::string outDir = argv[1], boxType = argv[9], potType = argv[10], dynType = argv[11];
+  long numParticles = atol(argv[5]), nDim = atol(argv[6]);
+  double timeStep = atof(argv[3]), Tinject = atof(argv[4]), lx = atof(argv[7]), ly = atof(argv[8]), lz = atof(argv[9]);
+  std::string outDir = argv[1], inDir = argv[2], boxType = argv[10], potType = argv[11], dynType = argv[12];
   // other variables
   long iteration = 0, maxIterations = 1e05, minStep = 20, numStep = 0;
-  long maxStep = 1e04, step = 0, maxSearchStep = 1500, searchStep = 0;
+  long maxStep = 1e05, step = 0, maxSearchStep = 1500, searchStep = 0;
   long printFreq = int(maxStep / 10), updateCount = 0, saveEnergyFreq = int(printFreq / 10);
-  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 2e-02, phi0 = 0.02, phiTh = 0.5;
-  double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, size;
+  double polydispersity = 0.05, previousPhi, currentPhi, deltaPhi = 8e-03, phi0 = 0.006, phiTh = 0.4;
+  double LJcut = 4, forceTollerance = 1e-08, waveQ, FIREStep = 1e-02, size, scale = 0.99;
   double ec = 1, ew = 1e02*ec, inertiaOverDamping = 10, scaleFactor, prevEnergy = 0;
   double cutDistance, cutoff = 0.5, timeUnit, sigma, gravity = 9.8e-04, mass = 10, damping = 1;
   //long num1 = int(numParticles / 2);
   if(nDim == 3) {
     LJcut = 2.5;
   }
-  std::string currentDir, inDir, energyFile;
+  std::string currentDir, energyFile;
   thrust::host_vector<double> boxSize(nDim);
   // fire paramaters: a_start, f_dec, f_inc, f_a, dt, dt_max, a
   std::vector<double> particleFIREparams = {0.2, 0.5, 1.1, 0.99, FIREStep, 10*FIREStep, 0.2};
-	// initialize sp object
+	
+  // initialize sp object
 	SP2D sp(numParticles, nDim);
   sp.setEnergyCostant(ec);
+  sp.setWallEnergyScale(ew);
   // set box type
   if(boxType == "square") {
     sp.setGeometryType(simControlStruct::geometryEnum::squareWall);
-    sp.setWallEnergyScale(ew);
   } else if(boxType == "circle") {
     sp.setGeometryType(simControlStruct::geometryEnum::roundWall);
     sp.setBoundaryType(simControlStruct::boundaryEnum::reflect);
-    sp.setWallEnergyScale(ew);
   } else if(boxType == "sides2d") {
     sp.setGeometryType(simControlStruct::geometryEnum::fixedSides2D);
-    sp.setWallEnergyScale(ew);
   } else {
     cout << "Setting default rectangular geometry with periodic boundary conditions" << endl;
   }
@@ -69,18 +68,19 @@ int main(int argc, char **argv) {
   }
   ioSPFile ioSP(&sp);
   std::experimental::filesystem::create_directory(outDir);
+
   // read initial configuration
-  if(read == true) {
-    inDir = argv[9];
+  if(inDir != "0") {
+    cout << "Reading initial configuration from " << inDir << endl;
+    read = true;
+    readState = true;
     inDir = outDir + inDir + "/";
     ioSP.readParticlePackingFromDirectory(inDir, numParticles, nDim);
     sigma = sp.getMeanParticleSigma();
-    if(readState == true) {
-      ioSP.readParticleState(inDir, numParticles, nDim);
-    }
+    ioSP.readParticleState(inDir, numParticles, nDim);
   } else {
     // initialize packing
-    if(boxType == "round") {
+    if(boxType == "circle") {
       sp.setRoundScaledPolyRandomParticles(phi0, polydispersity, lx); // lx is box radius for round geometry
     } else {
       sp.setScaledPolyRandomParticles(phi0, polydispersity, lx, ly, lz);
@@ -88,6 +88,7 @@ int main(int argc, char **argv) {
     //sp.setScaledMonoRandomParticles(phi0, lx, ly, lz);
     //sp.setScaledBiRandomParticles(phi0, lx, ly, lz);
     sp.scaleParticlePacking();
+    sp.shrinkRadialCoordinates(scale);
     sigma = sp.getMeanParticleSigma();
     sp.initFIRE(particleFIREparams, minStep, numStep, numParticles);
     sp.setParticleMassFIRE();
@@ -115,39 +116,34 @@ int main(int argc, char **argv) {
   // set potential type
   if(potType == "lj") {
     sp.setPotentialType(simControlStruct::potentialEnum::lennardJones);
-    cout << "Setting Lennard-Jones potential" << endl;
     sp.setLJcutoff(LJcut);
   } else if(potType == "wca") {
     sp.setPotentialType(simControlStruct::potentialEnum::WCA);
-    cout << "Setting WCA potential" << endl;
   }
   if(gforce == true) {
     sp.setGravityType(simControlStruct::gravityEnum::on);
     sp.setGravity(gravity, ew);
   }
-  // quasistatic thermal compression
+
+  // quasistatic isothermal compression
   currentPhi = sp.getParticlePhi();
-  cout << "current phi: " << currentPhi << ", average size: " << sigma << endl;
+  cout << "CURRENT PHI: " << currentPhi << ", average size: " << sigma << endl;
   previousPhi = currentPhi;
   timeUnit = sigma / sqrt(ec);
   timeStep = sp.setTimeStep(timeStep * timeUnit);
   // set thermostat type
   if(dynType == "nve") {
     sp.initSoftParticleNVE(Tinject, readState);
-    cout << "Setting NVE integrator" << endl;
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else if(dynType == "nh") {
     sp.initSoftParticleNoseHoover(Tinject, mass, damping, readState);
-    cout << "Setting Nose Hoover integrator" << endl;
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else if(dynType == "scalevel") {
     sp.initSoftParticleNVE(Tinject, readState);
     sp.initSoftParticleNVERescale(Tinject);
-    cout << "Setting SCALE VEL thermostat" << endl;
     cout << "Time step: " << timeStep << ", Tinject: " << Tinject << endl;
   } else {
     sp.initSoftParticleLangevin(Tinject, damping, readState);
-    cout << "Setting default Langevin integrator" << endl;
     damping = sqrt(inertiaOverDamping) / sigma;
     cout << "Time step: " << timeStep << ", damping: " << damping << endl;
   }
@@ -242,13 +238,13 @@ int main(int argc, char **argv) {
       sp.scaleParticlePacking();
       currentPhi = sp.getParticlePhi();
       if(boxType == "circle") {
-        cout << "\nNew phi: " << currentPhi << " box radius: " << sp.getBoxRadius() << " scale: " << scaleFactor << endl;
+        cout << "\nNEW PHI: " << currentPhi << " box radius: " << sp.getBoxRadius() << " scale: " << scaleFactor << endl;
       } else {
         boxSize = sp.getBoxSize();
         if(nDim == 2) {
-          cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
+          cout << "\nNEW PHI: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " scale: " << scaleFactor << endl;
         } else if(nDim == 3) {
-          cout << "\nNew phi: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
+          cout << "\nNEW PHI: " << currentPhi << " Lx: " << boxSize[0] << " Ly: " << boxSize[1] << " Lz: " << boxSize[2] << " scale: " << scaleFactor << endl;
         } else {
           cout << "WallSize: only dimensions 2 and 3 are allowed!" << endl;
         }

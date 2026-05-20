@@ -703,6 +703,7 @@ public:
     double wallAngle_ = 0.;
     double wallOmega_ = 0.;
     double wallAlpha_ = 0.;
+    double wallTorque_ = 0.;
     while (readParams >> paramName >> paramValue) {
       if(paramName == "numWall") {
         numWall_ = paramValue;
@@ -719,7 +720,7 @@ public:
     sp_->initWallNeighbors(numWall_);
     // read wall angle dynamics
     sp_->setRigidWallParams(numWall_, wallRad_);
-    thrust::host_vector<double> wallDynamics_(3);
+    thrust::host_vector<double> wallDynamics_(4);
     wallDynamics_[0] = wallAngle_;
     wallDynamics_[1] = wallOmega_;
     wallDynamics_[2] = 0.;

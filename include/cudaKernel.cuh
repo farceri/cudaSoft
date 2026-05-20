@@ -2193,11 +2193,9 @@ __global__ void kernelReflectParticleRoundWall(const double* pRad, const double*
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
 			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - 2 * vDotn * cos(thisTheta);
 			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - 2 * vDotn * sin(thisTheta);
-			//auto velAngle = atan2(pVel[particleId * d_nDim + 1], pVel[particleId * d_nDim]);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
-				//pAngle[particleId] = velAngle;
 				px = cos(pAngle[particleId]);
 				py = sin(pAngle[particleId]);
 				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
@@ -2359,16 +2357,16 @@ __global__ void kernelPartiallyReflectParticleRoundWall(const double* pRad, cons
 		}
 		if((d_boxRadius - thisR) < thisRad) {
 			auto vDotn = pVel[particleId * d_nDim] * cos(thisTheta) + pVel[particleId * d_nDim + 1] * sin(thisTheta);
-			pVel[particleId * d_nDim] -= (1. + d_restparam) * vDotn * cos(thisTheta);
-			pVel[particleId * d_nDim + 1] -= (1. + d_restparam) * vDotn * sin(thisTheta);
+			pVel[particleId * d_nDim] = pVel[particleId * d_nDim] - (1. + d_restparam) * vDotn * cos(thisTheta);
+			pVel[particleId * d_nDim + 1] = pVel[particleId * d_nDim + 1] - (1. + d_restparam) * vDotn * sin(thisTheta);
 			switch (d_simControl.particleType) {
 				case simControlStruct::particleEnum::active:
 				case simControlStruct::particleEnum::kuramoto:
 				px = cos(pAngle[particleId]);
 				py = sin(pAngle[particleId]);
 				pDotn = px * cos(thisTheta) + py * sin(thisTheta);
-				px -= (1. + d_restparam) * pDotn * cos(thisTheta);
-				py -= (1. + d_restparam) * pDotn * sin(thisTheta);
+				px = px - (1. + d_restparam) * pDotn * cos(thisTheta);
+				py = py - (1. + d_restparam) * pDotn * sin(thisTheta);
 				norm = sqrt(px*px + py*py);
 				px /= norm;
 				py /= norm;

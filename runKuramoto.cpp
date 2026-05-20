@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   // read and save same directory: readAndSaveSameDir = true
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
-  bool readAndMakeNewDir = false, readAndSaveSameDir = false, runDynamics = false;
+  bool readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
   bool readState = false, saveFinal = true, logSave = false, linSave = true;
   bool initAngles = false, squarebc = false, roundbc = true, maxRk = false;
   // input variables

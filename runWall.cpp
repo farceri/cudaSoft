@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
   // read directory and save in new directory: readAndMakeNewDir = true
   // read directory and save in "dynamics" dirctory: readAndSaveSameDir = true and runDynamics = true
   bool justRun = true, readAndMakeNewDir = false, readAndSaveSameDir = true, runDynamics = true;
-  bool readState = true, saveFinal = true, logSave = false, linSave = true;
+  bool readState = true, saveFinal = true, logSave = false, linSave = false;
   bool initAngles = false, initWall = false, scaleRadial = false;
   // input variables
   double timeStep = atof(argv[2]), Jk = atof(argv[3]), tp = atof(argv[4]);
